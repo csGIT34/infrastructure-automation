@@ -27,11 +27,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
-        run: |
-          cd api
-          pip install --target=".python_packages/lib/site-packages" -r requirements.txt
-
       - name: Azure Login
         uses: azure/login@v1
         with:
@@ -46,3 +41,7 @@ jobs:
           package: api
           scm-do-build-during-deployment: true
           enable-oryx-build: true
+
+      - name: Restart Function App
+        run: |
+          az functionapp restart --name ${{ env.AZURE_FUNCTIONAPP_NAME }} --resource-group rg-infrastructure-api
