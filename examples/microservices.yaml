@@ -1,0 +1,41 @@
+# Microservices Infrastructure
+# This template provisions infrastructure for a microservices application
+
+metadata:
+  project_name: order-service
+  environment: staging
+  business_unit: commerce
+  cost_center: CC-COM-001
+  owner_email: commerce-team@company.com
+  location: eastus
+  tags:
+    Application: OrderService
+    Team: Commerce
+    Architecture: Microservices
+
+resources:
+  # MongoDB for document storage
+  - type: mongodb
+    name: orders-db
+    config:
+      consistency_level: Session
+      serverless: false
+      throughput: 400
+
+  # Key Vault for secrets and certificates
+  - type: keyvault
+    name: secrets
+    config:
+      sku: standard
+      rbac_enabled: true
+      purge_protection: true
+
+  # Storage Account for files
+  - type: storage_account
+    name: files
+    config:
+      tier: Standard
+      replication: ZRS                # Zone-redundant for higher availability
+      containers:
+        - name: documents
+        - name: images

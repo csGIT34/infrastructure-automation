@@ -1,0 +1,47 @@
+# Data Pipeline Infrastructure
+# This template provisions infrastructure for a data processing pipeline
+
+metadata:
+  project_name: data-pipeline
+  environment: dev
+  business_unit: data-science
+  cost_center: CC-DS-001
+  owner_email: datateam@company.com
+  location: eastus
+  tags:
+    Application: DataPipeline
+    Team: DataScience
+
+resources:
+  # Event Hub for data ingestion
+  - type: eventhub
+    name: ingestion
+    config:
+      sku: Standard
+      capacity: 1
+      partition_count: 4
+      message_retention: 7
+      hubs:
+        - name: events
+          partition_count: 4
+        - name: metrics
+          partition_count: 2
+
+  # Storage Account for data lake
+  - type: storage_account
+    name: datalake
+    config:
+      tier: Standard
+      replication: LRS
+      is_hns_enabled: true            # Hierarchical namespace for ADLS Gen2
+      containers:
+        - name: raw
+        - name: processed
+        - name: curated
+
+  # Key Vault for credentials
+  - type: keyvault
+    name: secrets
+    config:
+      sku: standard
+      rbac_enabled: true
