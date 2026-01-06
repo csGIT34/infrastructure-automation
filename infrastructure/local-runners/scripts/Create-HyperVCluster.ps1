@@ -8,10 +8,10 @@
     to run GitHub Actions self-hosted runners.
 
 .PARAMETER VMPath
-    Path where VM files will be stored. Default: C:\VMs
+    Path where VM files will be stored. Default: S:\Hyper-V
 
 .PARAMETER ISOPath
-    Path to Ubuntu Server 22.04 ISO. Default: C:\ISOs\ubuntu-22.04-live-server-amd64.iso
+    Path to Ubuntu Server 22.04 ISO. Default: T:\ISOs\ubuntu-22.04-live-server-amd64.iso
 
 .PARAMETER WorkerCount
     Number of worker nodes to create. Default: 2
@@ -20,12 +20,12 @@
     Skip virtual switch and NAT creation if already configured.
 
 .EXAMPLE
-    .\Create-HyperVCluster.ps1 -VMPath "D:\VMs" -WorkerCount 2
+    .\Create-HyperVCluster.ps1 -VMPath "S:\Hyper-V" -WorkerCount 2
 #>
 
 param(
-    [string]$VMPath = "C:\VMs",
-    [string]$ISOPath = "C:\ISOs\ubuntu-22.04-live-server-amd64.iso",
+    [string]$VMPath = "S:\Hyper-V",
+    [string]$ISOPath = "T:\ISOs\ubuntu-22.04-live-server-amd64.iso",
     [int]$WorkerCount = 2,
     [switch]$SkipNetworkSetup
 )
@@ -195,7 +195,7 @@ Write-Host "  Network configs saved to: $configPath" -ForegroundColor Green
 Write-Host "[5/6] VM Summary" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  Name             Role      CPU   RAM    Disk   IP Address" -ForegroundColor White
-Write-Host "  ─────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host "  -------------------------------------------------------------" -ForegroundColor DarkGray
 
 foreach ($vm in $VMs) {
     $role = $vm.Role.PadRight(8)
