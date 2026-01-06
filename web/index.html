@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 2rem;
         }
@@ -41,10 +41,57 @@
             font-size: 1rem;
         }
 
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.5rem;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: #a1a1aa;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.2s;
+            width: auto;
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .tab-btn.active {
+            color: #fff;
+            background: rgba(59, 130, 246, 0.2);
+            border-bottom: 2px solid #3b82f6;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .main-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 2rem;
+        }
+
+        .main-content.single-column {
+            grid-template-columns: 1fr;
         }
 
         @media (max-width: 900px) {
@@ -107,7 +154,7 @@
         }
 
         .yaml-editor {
-            min-height: 400px;
+            min-height: 350px;
         }
 
         button {
@@ -144,8 +191,10 @@
             box-shadow: none;
         }
 
-        .status-panel {
-            margin-top: 1rem;
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            width: auto;
         }
 
         .status-box {
@@ -160,17 +209,10 @@
             word-break: break-all;
         }
 
-        .status-success {
-            border-left: 3px solid #22c55e;
-        }
-
-        .status-error {
-            border-left: 3px solid #ef4444;
-        }
-
-        .status-pending {
-            border-left: 3px solid #f59e0b;
-        }
+        .status-success { border-left: 3px solid #22c55e; }
+        .status-error { border-left: 3px solid #ef4444; }
+        .status-pending { border-left: 3px solid #f59e0b; }
+        .status-info { border-left: 3px solid #3b82f6; }
 
         .template-buttons {
             display: flex;
@@ -202,18 +244,109 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .badge {
+        /* Queue Status Cards */
+        .queue-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 700px) {
+            .queue-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .queue-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+        }
+
+        .queue-card h3 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+        }
+
+        .queue-card.dev h3 { color: #22c55e; }
+        .queue-card.staging h3 { color: #f59e0b; }
+        .queue-card.prod h3 { color: #ef4444; }
+
+        .queue-count {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1;
+        }
+
+        .queue-label {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+            margin-top: 0.5rem;
+        }
+
+        .queue-dead-letter {
+            font-size: 0.7rem;
+            color: #71717a;
+            margin-top: 0.25rem;
+        }
+
+        /* Request Status */
+        .request-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .request-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .request-id {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85rem;
+            color: #fff;
+            word-break: break-all;
+        }
+
+        .status-badge {
             display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
             font-size: 0.7rem;
             font-weight: 600;
             text-transform: uppercase;
         }
 
-        .badge-dev { background: #22c55e; color: #000; }
-        .badge-staging { background: #f59e0b; color: #000; }
-        .badge-prod { background: #ef4444; color: #fff; }
+        .status-badge.pending { background: #f59e0b; color: #000; }
+        .status-badge.processing { background: #3b82f6; color: #fff; }
+        .status-badge.completed { background: #22c55e; color: #000; }
+        .status-badge.failed { background: #ef4444; color: #fff; }
+
+        .request-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .request-detail {
+            color: #a1a1aa;
+        }
+
+        .request-detail strong {
+            color: #fff;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
 
         .spinner {
             display: inline-block;
@@ -230,98 +363,275 @@
             to { transform: rotate(360deg); }
         }
 
+        .refresh-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: #a1a1aa;
+        }
+
+        .auto-refresh input[type="checkbox"] {
+            width: auto;
+        }
+
+        .last-updated {
+            font-size: 0.75rem;
+            color: #71717a;
+        }
+
         .hidden { display: none; }
+
+        .inline-form {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .inline-form input {
+            flex: 1;
+        }
+
+        .inline-form button {
+            width: auto;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Infrastructure Self-Service Portal</h1>
-            <p>Submit infrastructure requests using YAML configuration</p>
+            <p>Submit and monitor infrastructure requests</p>
         </header>
 
-        <div class="main-content">
-            <div class="panel">
-                <h2>Request Configuration</h2>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('submit')">Submit Request</button>
+            <button class="tab-btn" onclick="showTab('status')">Queue Status</button>
+            <button class="tab-btn" onclick="showTab('lookup')">Request Lookup</button>
+        </div>
 
-                <div class="config-section">
-                    <div class="form-group">
-                        <label for="email">Requester Email</label>
-                        <input type="email" id="email" placeholder="your.email@company.com" value="test@example.com">
+        <!-- Submit Request Tab -->
+        <div id="tab-submit" class="tab-content active">
+            <div class="main-content">
+                <div class="panel">
+                    <h2>Request Configuration</h2>
+
+                    <div class="config-section">
+                        <div class="form-group">
+                            <label for="email">Requester Email</label>
+                            <input type="email" id="email" placeholder="your.email@company.com" value="test@example.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="environment">Environment</label>
+                            <select id="environment">
+                                <option value="dev">Development (dev)</option>
+                                <option value="staging">Staging</option>
+                                <option value="prod">Production</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="environment">Environment</label>
-                        <select id="environment">
-                            <option value="dev">Development (dev)</option>
-                            <option value="staging">Staging</option>
-                            <option value="prod">Production</option>
-                        </select>
+                        <label>Quick Templates</label>
+                        <div class="template-buttons">
+                            <button class="template-btn" onclick="loadTemplate('storage')">Storage Account</button>
+                            <button class="template-btn" onclick="loadTemplate('webapp')">Web App Stack</button>
+                            <button class="template-btn" onclick="loadTemplate('database')">Database</button>
+                            <button class="template-btn" onclick="loadTemplate('full')">Full Stack</button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label>Quick Templates</label>
-                    <div class="template-buttons">
-                        <button class="template-btn" onclick="loadTemplate('storage')">Storage Account</button>
-                        <button class="template-btn" onclick="loadTemplate('webapp')">Web App Stack</button>
-                        <button class="template-btn" onclick="loadTemplate('database')">Database</button>
-                        <button class="template-btn" onclick="loadTemplate('full')">Full Stack</button>
+                    <div class="form-group">
+                        <label for="yaml">YAML Configuration</label>
+                        <textarea id="yaml" class="yaml-editor" placeholder="Enter your infrastructure YAML here..."></textarea>
                     </div>
+
+                    <button id="submitBtn" onclick="submitRequest()">Submit Request</button>
+                    <button class="btn-secondary" onclick="validateYaml()">Validate YAML</button>
                 </div>
 
-                <div class="form-group">
-                    <label for="yaml">YAML Configuration</label>
-                    <textarea id="yaml" class="yaml-editor" placeholder="Enter your infrastructure YAML here..."></textarea>
-                </div>
+                <div class="panel">
+                    <h2>Connection Settings</h2>
 
-                <button id="submitBtn" onclick="submitRequest()">
-                    Submit Request
-                </button>
-                <button class="btn-secondary" onclick="validateYaml()">
-                    Validate YAML
-                </button>
-            </div>
+                    <div class="info-box">
+                        <strong>How it works:</strong><br>
+                        1. Configure your infrastructure using YAML<br>
+                        2. Submit the request to the queue<br>
+                        3. GitHub Actions processes the request<br>
+                        4. Terraform provisions your resources
+                    </div>
 
-            <div class="panel">
-                <h2>Request Status</h2>
+                    <div class="form-group">
+                        <label for="servicebusNs">Service Bus Namespace</label>
+                        <input type="text" id="servicebusNs" value="sb-infra-api-rrkkz6a8">
+                    </div>
 
-                <div class="info-box">
-                    <strong>How it works:</strong><br>
-                    1. Configure your infrastructure using YAML<br>
-                    2. Submit the request to the queue<br>
-                    3. GitHub Actions processes the request<br>
-                    4. Terraform provisions your resources
-                </div>
+                    <div class="form-group">
+                        <label for="sasKey">SAS Key (RootManageSharedAccessKey)</label>
+                        <input type="password" id="sasKey" placeholder="Enter your SAS key">
+                    </div>
 
-                <div class="form-group">
-                    <label for="servicebusNs">Service Bus Namespace</label>
-                    <input type="text" id="servicebusNs" value="sb-infra-api-rrkkz6a8">
-                </div>
+                    <div class="form-group">
+                        <label for="cosmosEndpoint">Cosmos DB Endpoint</label>
+                        <input type="text" id="cosmosEndpoint" value="https://cosmos-infra-api-rrkkz6a8.documents.azure.com:443/">
+                    </div>
 
-                <div class="form-group">
-                    <label for="sasKey">SAS Key (RootManageSharedAccessKey)</label>
-                    <input type="password" id="sasKey" placeholder="Enter your SAS key">
-                </div>
+                    <div class="form-group">
+                        <label for="cosmosKey">Cosmos DB Key</label>
+                        <input type="password" id="cosmosKey" placeholder="Enter your Cosmos DB key">
+                    </div>
 
-                <div class="status-panel">
-                    <label>Response</label>
-                    <div id="statusBox" class="status-box">
-Ready to submit requests.
+                    <div class="status-panel">
+                        <label>Response</label>
+                        <div id="statusBox" class="status-box">Ready to submit requests.
 
-Tip: Get your SAS key with:
+Tip: Get your keys with:
+
+# Service Bus SAS Key
 az servicebus namespace authorization-rule keys list \
   --namespace-name sb-infra-api-rrkkz6a8 \
   --resource-group rg-infrastructure-api \
   --name RootManageSharedAccessKey \
   --query primaryKey -o tsv
+
+# Cosmos DB Key
+az cosmosdb keys list \
+  --name cosmos-infra-api-rrkkz6a8 \
+  --resource-group rg-infrastructure-api \
+  --query primaryMasterKey -o tsv</div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Queue Status Tab -->
+        <div id="tab-status" class="tab-content">
+            <div class="panel">
+                <div class="refresh-row">
+                    <h2 style="margin-bottom: 0;">Queue Status</h2>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <div class="auto-refresh">
+                            <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+                            <label for="autoRefresh" style="margin: 0;">Auto-refresh (30s)</label>
+                        </div>
+                        <button class="btn-small btn-secondary" onclick="refreshQueueStatus()">Refresh Now</button>
+                    </div>
+                </div>
+
+                <div class="queue-cards">
+                    <div class="queue-card dev">
+                        <h3>Development</h3>
+                        <div class="queue-count" id="dev-count">-</div>
+                        <div class="queue-label">active messages</div>
+                        <div class="queue-dead-letter" id="dev-dead-letter">Dead letter: -</div>
+                    </div>
+                    <div class="queue-card staging">
+                        <h3>Staging</h3>
+                        <div class="queue-count" id="staging-count">-</div>
+                        <div class="queue-label">active messages</div>
+                        <div class="queue-dead-letter" id="staging-dead-letter">Dead letter: -</div>
+                    </div>
+                    <div class="queue-card prod">
+                        <h3>Production</h3>
+                        <div class="queue-count" id="prod-count">-</div>
+                        <div class="queue-label">active messages</div>
+                        <div class="queue-dead-letter" id="prod-dead-letter">Dead letter: -</div>
+                    </div>
+                </div>
+
+                <div class="last-updated" id="queue-last-updated">Last updated: Never</div>
+
+                <div class="info-box" style="margin-top: 1rem;">
+                    <strong>Note:</strong> Queue status requires a valid SAS key. Enter it in the "Submit Request" tab.
+                    The queue consumer workflow checks these queues every minute and triggers provisioning workers.
+                </div>
+            </div>
+        </div>
+
+        <!-- Request Lookup Tab -->
+        <div id="tab-lookup" class="tab-content">
+            <div class="panel">
+                <h2>Request Lookup</h2>
+
+                <div class="form-group">
+                    <label for="lookupRequestId">Request ID</label>
+                    <div class="inline-form">
+                        <input type="text" id="lookupRequestId" placeholder="Enter request ID (e.g., req-1704567890123-abc123def)">
+                        <button onclick="lookupRequest()">Lookup</button>
+                    </div>
+                </div>
+
+                <div id="lookupResult" class="hidden">
+                    <div class="request-card">
+                        <div class="request-header">
+                            <div>
+                                <div class="request-id" id="result-id">-</div>
+                            </div>
+                            <span class="status-badge" id="result-status">-</span>
+                        </div>
+                        <div class="request-details">
+                            <div class="request-detail">
+                                <strong>Project</strong>
+                                <span id="result-project">-</span>
+                            </div>
+                            <div class="request-detail">
+                                <strong>Environment</strong>
+                                <span id="result-environment">-</span>
+                            </div>
+                            <div class="request-detail">
+                                <strong>Requester</strong>
+                                <span id="result-requester">-</span>
+                            </div>
+                            <div class="request-detail">
+                                <strong>Business Unit</strong>
+                                <span id="result-business-unit">-</span>
+                            </div>
+                            <div class="request-detail">
+                                <strong>Created</strong>
+                                <span id="result-created">-</span>
+                            </div>
+                            <div class="request-detail">
+                                <strong>Updated</strong>
+                                <span id="result-updated">-</span>
+                            </div>
+                            <div class="request-detail" id="result-github-row" style="grid-column: span 2;">
+                                <strong>GitHub Run</strong>
+                                <a id="result-github-link" href="#" target="_blank" style="color: #93c5fd;">-</a>
+                            </div>
+                            <div class="request-detail" id="result-error-row" class="hidden" style="grid-column: span 2;">
+                                <strong>Error</strong>
+                                <span id="result-error" style="color: #ef4444;">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="lookupStatus" class="status-box status-info" style="margin-top: 1rem;">
+Enter a request ID to look up its provisioning status.
+
+Request IDs are returned when you submit a request and look like:
+req-1704567890123-abc123def
+
+Note: Requires Cosmos DB key to be set in the "Submit Request" tab.</div>
+
+                <h2 style="margin-top: 2rem;">Recent Requests</h2>
+                <button class="btn-secondary" onclick="loadRecentRequests()" style="margin-bottom: 1rem;">Load Recent Requests</button>
+                <div id="recentRequests"></div>
             </div>
         </div>
     </div>
 
     <script>
+        let autoRefreshInterval = null;
+
         const templates = {
             storage: `metadata:
   project_name: myproject
@@ -420,6 +730,17 @@ resources:
           access_type: private`
         };
 
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            event.target.classList.add('active');
+
+            if (tabName === 'status') {
+                refreshQueueStatus();
+            }
+        }
+
         function loadTemplate(name) {
             document.getElementById('yaml').value = templates[name];
             updateEnvironmentFromYaml();
@@ -437,70 +758,54 @@ resources:
             const yaml = document.getElementById('yaml').value;
             const statusBox = document.getElementById('statusBox');
 
-            try {
-                // Basic YAML validation
-                const lines = yaml.split('\n');
-                let hasMetadata = false;
-                let hasResources = false;
-                let hasProjectName = false;
-                let hasEnvironment = false;
-                let hasCostCenter = false;
-                let hasOwnerEmail = false;
-                let hasBusinessUnit = false;
+            const lines = yaml.split('\n');
+            let hasMetadata = false, hasResources = false, hasProjectName = false;
+            let hasEnvironment = false, hasCostCenter = false, hasOwnerEmail = false, hasBusinessUnit = false;
 
-                for (const line of lines) {
-                    if (line.match(/^metadata:/)) hasMetadata = true;
-                    if (line.match(/^resources:/)) hasResources = true;
-                    if (line.match(/project_name:/)) hasProjectName = true;
-                    if (line.match(/environment:/)) hasEnvironment = true;
-                    if (line.match(/cost_center:/)) hasCostCenter = true;
-                    if (line.match(/owner_email:/)) hasOwnerEmail = true;
-                    if (line.match(/business_unit:/)) hasBusinessUnit = true;
-                }
+            for (const line of lines) {
+                if (line.match(/^metadata:/)) hasMetadata = true;
+                if (line.match(/^resources:/)) hasResources = true;
+                if (line.match(/project_name:/)) hasProjectName = true;
+                if (line.match(/environment:/)) hasEnvironment = true;
+                if (line.match(/cost_center:/)) hasCostCenter = true;
+                if (line.match(/owner_email:/)) hasOwnerEmail = true;
+                if (line.match(/business_unit:/)) hasBusinessUnit = true;
+            }
 
-                const errors = [];
-                if (!hasMetadata) errors.push('Missing "metadata:" section');
-                if (!hasResources) errors.push('Missing "resources:" section');
-                if (!hasProjectName) errors.push('Missing "project_name" in metadata');
-                if (!hasEnvironment) errors.push('Missing "environment" in metadata');
-                if (!hasBusinessUnit) errors.push('Missing "business_unit" in metadata');
-                if (!hasCostCenter) errors.push('Missing "cost_center" in metadata');
-                if (!hasOwnerEmail) errors.push('Missing "owner_email" in metadata');
+            const errors = [];
+            if (!hasMetadata) errors.push('Missing "metadata:" section');
+            if (!hasResources) errors.push('Missing "resources:" section');
+            if (!hasProjectName) errors.push('Missing "project_name" in metadata');
+            if (!hasEnvironment) errors.push('Missing "environment" in metadata');
+            if (!hasBusinessUnit) errors.push('Missing "business_unit" in metadata');
+            if (!hasCostCenter) errors.push('Missing "cost_center" in metadata');
+            if (!hasOwnerEmail) errors.push('Missing "owner_email" in metadata');
 
-                if (errors.length > 0) {
-                    statusBox.className = 'status-box status-error';
-                    statusBox.textContent = 'Validation Errors:\n\n' + errors.join('\n');
-                } else {
-                    statusBox.className = 'status-box status-success';
-                    statusBox.textContent = 'YAML validation passed!\n\nAll required fields present:\n- metadata section\n- resources section\n- project_name\n- environment\n- business_unit\n- cost_center\n- owner_email';
-                }
-            } catch (e) {
+            if (errors.length > 0) {
                 statusBox.className = 'status-box status-error';
-                statusBox.textContent = 'Validation Error:\n\n' + e.message;
+                statusBox.textContent = 'Validation Errors:\n\n' + errors.join('\n');
+            } else {
+                statusBox.className = 'status-box status-success';
+                statusBox.textContent = 'YAML validation passed!\n\nAll required fields present.';
             }
         }
 
-        function generateSasToken(namespace, sasKey, queueName) {
-            const uri = `https://${namespace}.servicebus.windows.net/${queueName}`.toLowerCase();
-            const expiry = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+        async function generateSasToken(namespace, sasKey, resource) {
+            const uri = `https://${namespace}.servicebus.windows.net/${resource}`.toLowerCase();
+            const expiry = Math.floor(Date.now() / 1000) + 3600;
 
             const encoder = new TextEncoder();
             const encodedUri = encodeURIComponent(uri);
             const stringToSign = `${encodedUri}\n${expiry}`;
 
-            return crypto.subtle.importKey(
-                'raw',
-                encoder.encode(sasKey),
-                { name: 'HMAC', hash: 'SHA-256' },
-                false,
-                ['sign']
-            ).then(key => {
-                return crypto.subtle.sign('HMAC', key, encoder.encode(stringToSign));
-            }).then(signature => {
-                const base64Signature = btoa(String.fromCharCode(...new Uint8Array(signature)));
-                const encodedSignature = encodeURIComponent(base64Signature);
-                return `SharedAccessSignature sr=${encodedUri}&sig=${encodedSignature}&se=${expiry}&skn=RootManageSharedAccessKey`;
-            });
+            const key = await crypto.subtle.importKey(
+                'raw', encoder.encode(sasKey),
+                { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+            );
+            const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(stringToSign));
+            const base64Signature = btoa(String.fromCharCode(...new Uint8Array(signature)));
+            const encodedSignature = encodeURIComponent(base64Signature);
+            return `SharedAccessSignature sr=${encodedUri}&sig=${encodedSignature}&se=${expiry}&skn=RootManageSharedAccessKey`;
         }
 
         async function submitRequest() {
@@ -520,22 +825,20 @@ resources:
 
             if (!sasKey.trim()) {
                 statusBox.className = 'status-box status-error';
-                statusBox.textContent = 'Error: Please enter SAS key\n\nGet it with:\naz servicebus namespace authorization-rule keys list \\\n  --namespace-name ' + namespace + ' \\\n  --resource-group rg-infrastructure-api \\\n  --name RootManageSharedAccessKey \\\n  --query primaryKey -o tsv';
+                statusBox.textContent = 'Error: Please enter SAS key';
                 return;
             }
 
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner"></span>Submitting...';
             statusBox.className = 'status-box status-pending';
-            statusBox.textContent = 'Generating SAS token and submitting request...';
+            statusBox.textContent = 'Submitting request...';
 
             try {
                 const queueName = `infrastructure-requests-${environment}`;
                 const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
                 const sasToken = await generateSasToken(namespace, sasKey, queueName);
 
-                // Update YAML with selected environment
                 let updatedYaml = yaml;
                 if (yaml.includes('environment:')) {
                     updatedYaml = yaml.replace(/environment:\s*\w+/, `environment: ${environment}`);
@@ -545,18 +848,12 @@ resources:
                     request_id: requestId,
                     yaml_content: updatedYaml,
                     requester_email: email,
-                    metadata: {
-                        environment: environment,
-                        submitted_at: new Date().toISOString()
-                    }
+                    metadata: { environment, submitted_at: new Date().toISOString() }
                 });
 
                 const response = await fetch(`https://${namespace}.servicebus.windows.net/${queueName}/messages`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': sasToken,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Authorization': sasToken, 'Content-Type': 'application/json' },
                     body: body
                 });
 
@@ -569,38 +866,243 @@ Queue: ${queueName}
 Environment: ${environment}
 Time: ${new Date().toLocaleString()}
 
-Next Steps:
-1. The queue consumer workflow runs every minute
-2. Or trigger manually: gh workflow run queue-consumer.yaml
-3. Monitor: gh run list --workflow=queue-consumer.yaml
-
-Your infrastructure will be provisioned shortly!`;
+Copy the Request ID to track status in the "Request Lookup" tab.`;
                 } else {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
                 }
             } catch (error) {
                 statusBox.className = 'status-box status-error';
-                statusBox.textContent = `Error Submitting Request:
-
-${error.message}
-
-Common issues:
-- Invalid SAS key
-- CORS policy (try from same domain or use CLI)
-- Network connectivity`;
+                statusBox.textContent = `Error: ${error.message}`;
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = 'Submit Request';
             }
         }
 
-        // Load default template on page load
+        async function refreshQueueStatus() {
+            const namespace = document.getElementById('servicebusNs').value;
+            const sasKey = document.getElementById('sasKey').value;
+
+            if (!sasKey) {
+                document.getElementById('queue-last-updated').textContent = 'Enter SAS key in Submit Request tab';
+                return;
+            }
+
+            const queues = ['dev', 'staging', 'prod'];
+
+            for (const env of queues) {
+                const queueName = `infrastructure-requests-${env}`;
+                try {
+                    const sasToken = await generateSasToken(namespace, sasKey, queueName);
+                    const response = await fetch(`https://${namespace}.servicebus.windows.net/${queueName}?api-version=2017-04`, {
+                        headers: { 'Authorization': sasToken }
+                    });
+
+                    if (response.ok) {
+                        const text = await response.text();
+                        const parser = new DOMParser();
+                        const xml = parser.parseFromString(text, 'text/xml');
+
+                        const activeCount = xml.querySelector('ActiveMessageCount')?.textContent || '0';
+                        const deadLetterCount = xml.querySelector('DeadLetterMessageCount')?.textContent || '0';
+
+                        document.getElementById(`${env}-count`).textContent = activeCount;
+                        document.getElementById(`${env}-dead-letter`).textContent = `Dead letter: ${deadLetterCount}`;
+                    }
+                } catch (e) {
+                    document.getElementById(`${env}-count`).textContent = '?';
+                }
+            }
+
+            document.getElementById('queue-last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            if (checkbox.checked) {
+                refreshQueueStatus();
+                autoRefreshInterval = setInterval(refreshQueueStatus, 30000);
+            } else {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
+        async function generateCosmosAuthHeader(verb, resourceType, resourceId, date, key) {
+            const encoder = new TextEncoder();
+            const stringToSign = `${verb.toLowerCase()}\n${resourceType.toLowerCase()}\n${resourceId}\n${date.toLowerCase()}\n\n`;
+
+            const keyBytes = Uint8Array.from(atob(key), c => c.charCodeAt(0));
+            const cryptoKey = await crypto.subtle.importKey(
+                'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+            );
+            const signature = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(stringToSign));
+            const base64Signature = btoa(String.fromCharCode(...new Uint8Array(signature)));
+
+            return encodeURIComponent(`type=master&ver=1.0&sig=${base64Signature}`);
+        }
+
+        async function lookupRequest() {
+            const requestId = document.getElementById('lookupRequestId').value.trim();
+            const cosmosEndpoint = document.getElementById('cosmosEndpoint').value;
+            const cosmosKey = document.getElementById('cosmosKey').value;
+            const lookupStatus = document.getElementById('lookupStatus');
+            const lookupResult = document.getElementById('lookupResult');
+
+            if (!requestId) {
+                lookupStatus.className = 'status-box status-error';
+                lookupStatus.textContent = 'Please enter a request ID';
+                lookupResult.classList.add('hidden');
+                return;
+            }
+
+            if (!cosmosKey) {
+                lookupStatus.className = 'status-box status-error';
+                lookupStatus.textContent = 'Please enter Cosmos DB key in the Submit Request tab';
+                lookupResult.classList.add('hidden');
+                return;
+            }
+
+            lookupStatus.className = 'status-box status-pending';
+            lookupStatus.textContent = 'Looking up request...';
+
+            try {
+                const date = new Date().toUTCString();
+                const resourceId = `dbs/infrastructure/colls/infrastructure-requests`;
+                const auth = await generateCosmosAuthHeader('POST', 'docs', resourceId, date, cosmosKey);
+
+                const response = await fetch(`${cosmosEndpoint}dbs/infrastructure/colls/infrastructure-requests/docs`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': auth,
+                        'x-ms-date': date,
+                        'x-ms-version': '2018-12-31',
+                        'Content-Type': 'application/query+json',
+                        'x-ms-documentdb-isquery': 'true',
+                        'x-ms-documentdb-query-enablecrosspartition': 'true'
+                    },
+                    body: JSON.stringify({
+                        query: `SELECT * FROM c WHERE c.id = @id`,
+                        parameters: [{ name: '@id', value: requestId }]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.Documents && data.Documents.length > 0) {
+                    const doc = data.Documents[0];
+                    displayRequestResult(doc);
+                    lookupStatus.className = 'status-box status-success';
+                    lookupStatus.textContent = 'Request found!';
+                    lookupResult.classList.remove('hidden');
+                } else {
+                    lookupStatus.className = 'status-box status-error';
+                    lookupStatus.textContent = 'Request not found. The request ID may be incorrect or the request has not been processed yet.';
+                    lookupResult.classList.add('hidden');
+                }
+            } catch (error) {
+                lookupStatus.className = 'status-box status-error';
+                lookupStatus.textContent = `Error: ${error.message}\n\nNote: CORS may block direct Cosmos DB access from browser.`;
+                lookupResult.classList.add('hidden');
+            }
+        }
+
+        function displayRequestResult(doc) {
+            document.getElementById('result-id').textContent = doc.id || doc.requestId;
+            document.getElementById('result-project').textContent = doc.project_name || '-';
+            document.getElementById('result-environment').textContent = doc.environment || '-';
+            document.getElementById('result-requester').textContent = doc.requester_email || '-';
+            document.getElementById('result-business-unit').textContent = doc.business_unit || '-';
+            document.getElementById('result-created').textContent = doc.created_at ? new Date(doc.created_at).toLocaleString() : '-';
+            document.getElementById('result-updated').textContent = doc.updated_at ? new Date(doc.updated_at).toLocaleString() : '-';
+
+            const statusBadge = document.getElementById('result-status');
+            statusBadge.textContent = doc.status || 'unknown';
+            statusBadge.className = `status-badge ${doc.status || ''}`;
+
+            const githubRow = document.getElementById('result-github-row');
+            const githubLink = document.getElementById('result-github-link');
+            if (doc.github_run_url) {
+                githubRow.style.display = 'block';
+                githubLink.href = doc.github_run_url;
+                githubLink.textContent = doc.github_run_url;
+            } else {
+                githubRow.style.display = 'none';
+            }
+
+            const errorRow = document.getElementById('result-error-row');
+            const errorSpan = document.getElementById('result-error');
+            if (doc.error_message) {
+                errorRow.style.display = 'block';
+                errorSpan.textContent = doc.error_message;
+            } else {
+                errorRow.style.display = 'none';
+            }
+        }
+
+        async function loadRecentRequests() {
+            const cosmosEndpoint = document.getElementById('cosmosEndpoint').value;
+            const cosmosKey = document.getElementById('cosmosKey').value;
+            const container = document.getElementById('recentRequests');
+
+            if (!cosmosKey) {
+                container.innerHTML = '<div class="status-box status-error">Please enter Cosmos DB key in the Submit Request tab</div>';
+                return;
+            }
+
+            container.innerHTML = '<div class="status-box status-pending">Loading...</div>';
+
+            try {
+                const date = new Date().toUTCString();
+                const resourceId = `dbs/infrastructure/colls/infrastructure-requests`;
+                const auth = await generateCosmosAuthHeader('POST', 'docs', resourceId, date, cosmosKey);
+
+                const response = await fetch(`${cosmosEndpoint}dbs/infrastructure/colls/infrastructure-requests/docs`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': auth,
+                        'x-ms-date': date,
+                        'x-ms-version': '2018-12-31',
+                        'Content-Type': 'application/query+json',
+                        'x-ms-documentdb-isquery': 'true',
+                        'x-ms-documentdb-query-enablecrosspartition': 'true'
+                    },
+                    body: JSON.stringify({
+                        query: `SELECT TOP 10 * FROM c ORDER BY c._ts DESC`
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                if (data.Documents && data.Documents.length > 0) {
+                    container.innerHTML = data.Documents.map(doc => `
+                        <div class="request-card" style="cursor: pointer;" onclick="document.getElementById('lookupRequestId').value='${doc.id}'; lookupRequest();">
+                            <div class="request-header">
+                                <div class="request-id">${doc.id}</div>
+                                <span class="status-badge ${doc.status}">${doc.status}</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: #a1a1aa;">
+                                ${doc.project_name || '-'} | ${doc.environment || '-'} | ${doc.updated_at ? new Date(doc.updated_at).toLocaleString() : '-'}
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div class="status-box">No requests found</div>';
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="status-box status-error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadTemplate('storage');
         });
 
-        // Update environment dropdown when YAML changes
         document.getElementById('yaml').addEventListener('blur', updateEnvironmentFromYaml);
     </script>
 </body>
