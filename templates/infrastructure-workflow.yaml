@@ -1,0 +1,101 @@
+# Copy this file to your repository: .github/workflows/infrastructure.yaml
+#
+# Required secret: INFRA_SERVICE_BUS_SAS_KEY
+# Get it from your platform team or the infrastructure portal
+#
+# Usage:
+# 1. Create infrastructure.yaml in your repo root
+# 2. Create a PR to see the plan preview
+# 3. Merge to main to provision resources
+
+name: Infrastructure GitOps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure.yaml'
+  pull_request:
+    paths:
+      - 'infrastructure.yaml'
+
+jobs:
+  # On PR: Validate and show plan preview
+  plan:
+    if: github.event_name == 'pull_request'
+    uses: csGIT34/infrastructure-automation/.github/workflows/gitops-infrastructure.yaml@main
+    with:
+      infrastructure_file: 'infrastructure.yaml'
+      action: 'plan'
+    secrets:
+      INFRA_SERVICE_BUS_SAS_KEY: ${{ secrets.INFRA_SERVICE_BUS_SAS_KEY }}
+
+  # Post plan as PR comment
+  comment:
+    needs: plan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Download plan
+        uses: actions/download-artifact@v4
+        with:
+          name: infrastructure-plan
+        continue-on-error: true
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## Infrastructure Plan\n\n';
+
+            try {
+              if (fs.existsSync('plan_preview.md')) {
+                body = fs.readFileSync('plan_preview.md', 'utf8');
+              } else {
+                body += '✅ Infrastructure configuration validated successfully.\n\n';
+                body += 'Merge this PR to provision the infrastructure.';
+              }
+            } catch (e) {
+              body += '✅ Validation passed. See workflow summary for details.';
+            }
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Infrastructure Plan')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  # On merge to main: Apply infrastructure
+  apply:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: csGIT34/infrastructure-automation/.github/workflows/gitops-infrastructure.yaml@main
+    with:
+      infrastructure_file: 'infrastructure.yaml'
+      action: 'apply'
+    secrets:
+      INFRA_SERVICE_BUS_SAS_KEY: ${{ secrets.INFRA_SERVICE_BUS_SAS_KEY }}
