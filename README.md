@@ -120,6 +120,94 @@ Resources are named using this pattern:
 - **Storage Account**: `{project_name}{resource_name}{environment}` (lowercase, no hyphens, max 24 chars)
 - **Other Resources**: `{project_name}-{resource_name}-{environment}`
 
+## Managing Existing Infrastructure
+
+The platform uses Terraform state to track deployed resources. You can add, modify, or remove resources from existing projects by submitting updated requests.
+
+### How State Management Works
+
+The Terraform state key is derived from your metadata:
+```
+{business_unit}/{environment}/{project_name}/terraform.tfstate
+```
+
+When you submit a request with the **same** `project_name`, `environment`, and `business_unit`, Terraform:
+1. Loads the existing state file
+2. Compares your new YAML against the current state
+3. Only adds, modifies, or removes what changed
+
+### Adding Resources to an Existing Project
+
+Submit a new request with the same metadata but include the new resource in the list:
+
+**Original request** (storage account only):
+```yaml
+metadata:
+  project_name: myapp
+  environment: dev
+  business_unit: engineering
+  cost_center: CC-ENG-001
+  owner_email: team@company.com
+
+resources:
+  - type: storage_account
+    name: data
+    config:
+      tier: Standard
+      replication: LRS
+```
+
+**Updated request** (adds Key Vault):
+```yaml
+metadata:
+  project_name: myapp              # Must match original
+  environment: dev                 # Must match original
+  business_unit: engineering       # Must match original
+  cost_center: CC-ENG-001
+  owner_email: team@company.com
+
+resources:
+  - type: storage_account          # Existing - will be unchanged
+    name: data
+    config:
+      tier: Standard
+      replication: LRS
+  - type: keyvault                 # New - will be created
+    name: secrets
+    config:
+      sku: standard
+      rbac_enabled: true
+```
+
+Terraform will detect that the storage account already exists and only create the new Key Vault.
+
+### Modifying Existing Resources
+
+Change configuration values in the resource's `config` block:
+
+```yaml
+resources:
+  - type: storage_account
+    name: data
+    config:
+      tier: Standard
+      replication: GRS              # Changed from LRS to GRS
+      versioning: true              # Added new setting
+```
+
+### Removing Resources
+
+To remove a resource, submit a request **without** that resource in the list. Terraform will destroy any resources that are no longer defined.
+
+**Warning**: Always review your YAML carefully before submitting. Omitting a resource will delete it and any data it contains.
+
+### Best Practices
+
+1. **Always include all resources** - List every resource you want to keep, not just new ones
+2. **Use version control** - Store your YAML files in Git to track changes over time
+3. **Test in dev first** - Make changes in dev environment before staging/prod
+4. **Review Terraform plans** - Check the workflow logs to see what Terraform plans to change
+
 ## How to Test
 
 ### Prerequisites
