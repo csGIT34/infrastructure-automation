@@ -11,12 +11,6 @@ terraform {
     }
 }
 
-variable "name" { type = string }
-variable "resource_group_name" { type = string }
-variable "location" { type = string }
-variable "config" { type = any }
-variable "tags" { type = map(string); default = {} }
-
 resource "random_password" "admin" {
     length  = 32
     special = true
