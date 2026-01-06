@@ -1,3 +1,16 @@
+# =============================================================================
+# AKS RUNNERS - PRODUCTION ONLY
+# =============================================================================
+# This configuration deploys AKS for GitHub runners in production.
+# Estimated cost: $200-500+/month depending on node pool scaling
+#
+# FOR DEVELOPMENT/TESTING: Use local k3s cluster instead (FREE)
+# See: infrastructure/local-runners/ and docs/LOCAL-K8S-SETUP.md
+#
+# To deploy this, you must explicitly run:
+#   cd infrastructure/aks-runners && terraform init && terraform apply
+# =============================================================================
+
 terraform {
     required_providers {
         azurerm = {

@@ -45,7 +45,7 @@ resource "azurerm_service_plan" "function" {
     resource_group_name = azurerm_resource_group.api.name
     location            = azurerm_resource_group.api.location
     os_type             = "Linux"
-    sku_name            = "P1v3"
+    sku_name            = "Y1"  # Consumption plan - FREE tier (1M executions/month)
 
     tags = azurerm_resource_group.api.tags
 }
@@ -96,8 +96,7 @@ resource "azurerm_servicebus_namespace" "main" {
     name                = "sb-infra-requests-${random_string.suffix.result}"
     resource_group_name = azurerm_resource_group.api.name
     location            = azurerm_resource_group.api.location
-    sku                 = "Premium"
-    capacity            = 1
+    sku                 = "Basic"  # Basic tier - ~$0.05 per million operations
 
     tags = azurerm_resource_group.api.tags
 }
@@ -106,20 +105,17 @@ resource "azurerm_servicebus_queue" "prod" {
     name         = "infrastructure-requests-prod"
     namespace_id = azurerm_servicebus_namespace.main.id
 
-    max_size_in_megabytes                    = 5120
-    requires_duplicate_detection             = true
-    duplicate_detection_history_time_window  = "PT10M"
-    max_delivery_count                       = 3
-    lock_duration                            = "PT5M"
+    max_size_in_megabytes = 1024  # Basic tier max
+    max_delivery_count    = 3
+    # Note: Basic tier doesn't support duplicate detection or custom lock duration
 }
 
 resource "azurerm_servicebus_queue" "staging" {
     name         = "infrastructure-requests-staging"
     namespace_id = azurerm_servicebus_namespace.main.id
 
-    max_size_in_megabytes = 2048
+    max_size_in_megabytes = 1024
     max_delivery_count    = 5
-    lock_duration         = "PT5M"
 }
 
 resource "azurerm_servicebus_queue" "dev" {
@@ -128,15 +124,15 @@ resource "azurerm_servicebus_queue" "dev" {
 
     max_size_in_megabytes = 1024
     max_delivery_count    = 10
-    lock_duration         = "PT5M"
 }
 
 resource "azurerm_cosmosdb_account" "main" {
-    name                = "cosmos-infra-${random_string.suffix.result}"
-    resource_group_name = azurerm_resource_group.api.name
-    location            = azurerm_resource_group.api.location
-    offer_type          = "Standard"
-    kind                = "GlobalDocumentDB"
+    name                       = "cosmos-infra-${random_string.suffix.result}"
+    resource_group_name        = azurerm_resource_group.api.name
+    location                   = azurerm_resource_group.api.location
+    offer_type                 = "Standard"
+    kind                       = "GlobalDocumentDB"
+    enable_free_tier           = true  # FREE TIER: 1000 RU/s + 25GB storage
 
     consistency_policy {
         consistency_level = "Session"
@@ -147,10 +143,12 @@ resource "azurerm_cosmosdb_account" "main" {
         failover_priority = 0
     }
 
+    # Use periodic backup (free) instead of continuous (paid)
     backup {
-        type                = "Continuous"
+        type                = "Periodic"
         interval_in_minutes = 240
-        retention_in_hours  = 720
+        retention_in_hours  = 8
+        storage_redundancy  = "Local"
     }
 
     tags = azurerm_resource_group.api.tags
@@ -168,7 +166,7 @@ resource "azurerm_cosmosdb_sql_container" "requests" {
     account_name        = azurerm_cosmosdb_account.main.name
     database_name       = azurerm_cosmosdb_sql_database.main.name
     partition_key_path  = "/id"
-    throughput          = 400
+    # No throughput specified - uses shared database throughput from free tier
 }
 
 resource "azurerm_role_assignment" "function_servicebus" {
