@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd api
-          pip install -r requirements.txt
+          pip install --target=".python_packages/lib/site-packages" -r requirements.txt
 
       - name: Azure Login
         uses: azure/login@v1
