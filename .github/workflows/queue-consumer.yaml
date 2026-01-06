@@ -13,6 +13,7 @@ env:
     AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
     AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
     SERVICEBUS_NAMESPACE: ${{ secrets.SERVICEBUS_NAMESPACE }}
+    RESOURCE_GROUP: rg-infrastructure-api
 
 jobs:
     check-queues:
@@ -34,16 +35,19 @@ jobs:
               id: check
               run: |
                   PROD_COUNT=$(az servicebus queue show \
+                      --resource-group $RESOURCE_GROUP \
                       --namespace-name $SERVICEBUS_NAMESPACE \
                       --name infrastructure-requests-prod \
                       --query "countDetails.activeMessageCount" -o tsv)
 
                   STAGING_COUNT=$(az servicebus queue show \
+                      --resource-group $RESOURCE_GROUP \
                       --namespace-name $SERVICEBUS_NAMESPACE \
                       --name infrastructure-requests-staging \
                       --query "countDetails.activeMessageCount" -o tsv)
 
                   DEV_COUNT=$(az servicebus queue show \
+                      --resource-group $RESOURCE_GROUP \
                       --namespace-name $SERVICEBUS_NAMESPACE \
                       --name infrastructure-requests-dev \
                       --query "countDetails.activeMessageCount" -o tsv)
