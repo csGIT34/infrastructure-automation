@@ -95,6 +95,7 @@ jobs:
         with:
             queue_name: "infrastructure-requests-dev"
             environment: "dev"
-            runner_labels: '["self-hosted", "linux", "local"]'
+            # Using GitHub-hosted runner for testing (self-hosted k3s needs Azure CLI installed)
+            runner_labels: '["ubuntu-latest"]'
             max_parallel: 5
         secrets: inherit

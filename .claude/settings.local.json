@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(az rest:*)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20753649862 --repo csGIT34/infrastructure-automation --log-failed)"
+    ]
+  }
+}

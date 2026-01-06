@@ -100,7 +100,8 @@ def provision_infrastructure(req: func.HttpRequest) -> func.HttpResponse:
                 if requests_container:
                         requests_container.create_item(request_record)
 
-                queue_name = "infrastructure-requests"  # Single queue for all environments
+                environment = metadata.get('environment', 'dev')
+                queue_name = f"infrastructure-requests-{environment}"
                 servicebus_client = get_servicebus_client()
                 if servicebus_client:
                         message = ServiceBusMessage(

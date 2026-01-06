@@ -1,0 +1,4 @@
+{
+  "requester_email": "test@example.com",
+  "yaml_content": "metadata:\n  project_name: test-project\n  environment: dev\n  business_unit: engineering\n  cost_center: CC-TEST-001\n  owner_email: test@example.com\n  location: centralus\n\nresources:\n  - type: storage_account\n    name: testdata\n    config:\n      tier: Standard\n      replication: LRS\n"
+}
