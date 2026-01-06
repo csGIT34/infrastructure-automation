@@ -1,0 +1,365 @@
+# Infrastructure Self-Service Platform
+
+An enterprise-grade platform that enables development teams to provision Azure infrastructure through simple YAML configuration files. Teams submit infrastructure requests which are automatically validated, queued, and provisioned via Terraform.
+
+## Architecture Overview
+
+```
+                                    +------------------+
+                                    |   GitHub Repo    |
+                                    | (YAML Requests)  |
+                                    +--------+---------+
+                                             |
+                                             v
++----------------+              +------------------------+
+|  API Gateway   |   REST API   |    Azure Service Bus   |
+| (Azure Func)   +------------->|  (Message Queues)      |
++----------------+              |  - dev queue           |
+                                |  - staging queue       |
+                                |  - prod queue          |
+                                +----------+-------------+
+                                           |
+                          +----------------+----------------+
+                          |                                 |
+                          v                                 v
+              +-----------+-----------+        +-----------+-----------+
+              |  GitHub Actions       |        |   Cosmos DB           |
+              |  Queue Consumer       |        |   (Request Tracking)  |
+              +-----------+-----------+        +-----------------------+
+                          |
+                          v
+              +-----------+-----------+
+              |  Provision Workers    |
+              |  (Terraform Apply)    |
+              +-----------+-----------+
+                          |
+                          v
+              +-----------+-----------+
+              |   Azure Resources     |
+              |   (Created Infra)     |
+              +-----------------------+
+```
+
+## Components
+
+| Component | Description | Location |
+|-----------|-------------|----------|
+| **API Gateway** | Azure Function App that validates requests and queues them | `infrastructure/api-gateway/` |
+| **Service Bus** | Message queues for dev/staging/prod environments | Azure resource |
+| **Cosmos DB** | Tracks request status and history | Azure resource |
+| **Queue Consumer** | GitHub Actions workflow that monitors queues | `.github/workflows/queue-consumer.yaml` |
+| **Provision Worker** | Runs Terraform to create infrastructure | `.github/workflows/provision-worker.yaml` |
+| **Terraform Catalog** | Modular Terraform configs for each resource type | `terraform/catalog/` |
+
+## Azure Resources Required
+
+Before using this platform, you need the following Azure resources:
+
+| Resource | Purpose | Example Name |
+|----------|---------|--------------|
+| Resource Group | Contains platform infrastructure | `rg-infrastructure-api` |
+| Function App | API Gateway for request submission | `func-infra-api-*` |
+| Service Bus Namespace | Message queuing | `sb-infra-api-*` |
+| Cosmos DB Account | Request tracking database | `cosmos-infra-api-*` |
+| Storage Account | Terraform state storage | `stfuncapi*` |
+| App Registration | OIDC authentication for GitHub Actions | `github-infrastructure-automation` |
+
+## GitHub Secrets Required
+
+Configure these secrets in your GitHub repository:
+
+| Secret | Description |
+|--------|-------------|
+| `AZURE_TENANT_ID` | Azure AD tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
+| `AZURE_CLIENT_ID` | App registration client ID (for queue-consumer) |
+| `AZURE_CLIENT_ID_dev` | App registration client ID for dev environment |
+| `AZURE_CLIENT_ID_staging` | App registration client ID for staging environment |
+| `AZURE_CLIENT_ID_prod` | App registration client ID for prod environment |
+| `SERVICEBUS_NAMESPACE` | Service Bus namespace name (without `.servicebus.windows.net`) |
+| `COSMOS_ENDPOINT` | Cosmos DB endpoint URL |
+| `TF_STATE_STORAGE_ACCOUNT` | Storage account name for Terraform state |
+
+## Supported Resource Types
+
+| Resource Type | Terraform Module | Description |
+|--------------|------------------|-------------|
+| `storage_account` | `terraform/modules/storage-account` | Azure Storage Account with optional containers |
+| `postgresql` | `terraform/modules/postgresql` | Azure Database for PostgreSQL Flexible Server |
+| `mongodb` | `terraform/modules/mongodb` | Azure Cosmos DB with MongoDB API |
+| `keyvault` | `terraform/modules/keyvault` | Azure Key Vault for secrets management |
+
+## Request YAML Schema
+
+Infrastructure requests use this YAML structure:
+
+```yaml
+metadata:
+  project_name: my-project        # Required: Used in resource naming
+  environment: dev                # Required: dev, staging, or prod
+  business_unit: engineering      # Required: For cost allocation
+  cost_center: CC-ENG-001         # Required: For billing
+  owner_email: team@company.com   # Required: Contact email
+  location: eastus                # Optional: Azure region (default: eastus)
+  tags:                           # Optional: Additional tags
+    Application: MyApp
+    Team: Platform
+
+resources:
+  - type: storage_account         # Resource type
+    name: data                    # Resource name suffix
+    config:                       # Type-specific configuration
+      tier: Standard
+      replication: LRS
+```
+
+### Resource Naming Convention
+
+Resources are named using this pattern:
+- **Resource Group**: `rg-{project_name}-{environment}`
+- **Storage Account**: `{project_name}{resource_name}{environment}` (lowercase, no hyphens, max 24 chars)
+- **Other Resources**: `{project_name}-{resource_name}-{environment}`
+
+## How to Test
+
+### Prerequisites
+
+1. Azure CLI installed and logged in
+2. GitHub CLI installed and authenticated
+3. PowerShell (for Windows) or Bash (for Linux/Mac)
+
+### Step 1: Verify Azure Resources
+
+```bash
+# Check Service Bus queues
+az servicebus queue list --namespace-name sb-infra-api-rrkkz6a8 \
+  --resource-group rg-infrastructure-api --query "[].name" -o table
+
+# Check Cosmos DB
+az cosmosdb show --name cosmos-infra-api-rrkkz6a8 \
+  --resource-group rg-infrastructure-api --query "{name:name, endpoint:documentEndpoint}" -o json
+
+# Check Terraform state storage
+az storage container list --account-name stfuncapirrkkz6a8 \
+  --query "[].name" -o table
+```
+
+### Step 2: Send a Test Message
+
+Use the `send-test-message.ps1` script to send a test request directly to Service Bus:
+
+```powershell
+# Windows PowerShell
+.\send-test-message.ps1
+```
+
+The script sends a request to provision a storage account in the `dev` environment.
+
+### Step 3: Trigger the Workflow
+
+```bash
+# Trigger the queue consumer workflow
+gh workflow run queue-consumer.yaml --ref main
+
+# Watch the workflow progress
+gh run list --workflow=queue-consumer.yaml --limit 5
+```
+
+### Step 4: Verify Infrastructure Creation
+
+```bash
+# Check if the resource group was created
+az group show --name rg-test01-dev --query "{name:name,location:location}" -o json
+
+# List resources in the group
+az resource list --resource-group rg-test01-dev --output table
+```
+
+### Step 5: Check Terraform State
+
+```bash
+# List state files in storage
+az storage blob list --container-name tfstate \
+  --account-name stfuncapirrkkz6a8 \
+  --query "[].name" -o table
+```
+
+## GitHub Actions Workflows
+
+### Queue Consumer (`queue-consumer.yaml`)
+
+Runs every minute (via cron) to check for messages in Service Bus queues:
+
+```yaml
+on:
+  schedule:
+    - cron: '* * * * *'
+  workflow_dispatch:  # Manual trigger
+```
+
+For each environment with pending messages, it triggers the provision worker.
+
+### Provision Worker (`provision-worker.yaml`)
+
+Called by the queue consumer to process infrastructure requests:
+
+1. Receives message from Service Bus queue
+2. Parses YAML configuration
+3. Updates Cosmos DB status to "processing"
+4. Runs `terraform init`, `plan`, and `apply`
+5. Updates Cosmos DB status to "completed" or "failed"
+6. Completes or abandons the Service Bus message
+
+## Runner Configuration
+
+### Self-Hosted Runners (Recommended for Production)
+
+The platform is designed to work with self-hosted GitHub Actions runners. Configure runner labels in `queue-consumer.yaml`:
+
+```yaml
+# For local k3s cluster runners
+runner_labels: '["self-hosted", "linux", "local"]'
+
+# For AKS runners
+runner_labels: '["self-hosted", "linux", "infrastructure"]'
+```
+
+**Requirements for self-hosted runners:**
+- Azure CLI installed
+- Terraform installed
+- Python 3.11+ with pip
+- Network access to Azure APIs
+
+See `infrastructure/local-runners/` for k3s-based runner deployment.
+
+### GitHub-Hosted Runners (For Testing)
+
+For development/testing, use GitHub-hosted runners:
+
+```yaml
+runner_labels: '["ubuntu-latest"]'
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. State Lock Error
+```
+Error: Error acquiring the state lock
+Error message: state blob is already locked
+```
+
+**Solution**: Break the lease on the state blob:
+```bash
+az storage blob lease break \
+  --blob-name "business_unit/environment/project_name/terraform.tfstate" \
+  --container-name tfstate \
+  --account-name stfuncapirrkkz6a8
+```
+
+#### 2. Authorization Failed
+```
+Error: AuthorizationFailed - does not have authorization to perform action
+```
+
+**Solution**: Ensure the service principal has Contributor role at subscription level:
+```bash
+az role assignment create \
+  --assignee-object-id <service-principal-object-id> \
+  --assignee-principal-type ServicePrincipal \
+  --role "Contributor" \
+  --scope "/subscriptions/<subscription-id>"
+```
+
+#### 3. Storage Account Name Too Long
+```
+Error: name can only consist of lowercase letters and numbers, and must be between 3 and 24 characters
+```
+
+**Solution**: Use shorter project and resource names. The storage account name is generated as:
+`{project_name}{resource_name}{environment}` - total must be <= 24 characters.
+
+#### 4. Messages Going to Dead Letter Queue
+
+Check the dead letter queue count:
+```bash
+az servicebus queue show --name infrastructure-requests-dev \
+  --namespace-name sb-infra-api-rrkkz6a8 \
+  --resource-group rg-infrastructure-api \
+  --query "{active:countDetails.activeMessageCount, deadLetter:countDetails.deadLetterMessageCount}" -o json
+```
+
+View workflow logs for failure details:
+```bash
+gh run view <run-id> --log-failed
+```
+
+### Checking Logs
+
+```bash
+# List recent workflow runs
+gh run list --workflow=queue-consumer.yaml --limit 10
+
+# View specific run logs
+gh run view <run-id> --log
+
+# View only failed job logs
+gh run view <run-id> --log-failed
+```
+
+## Example Requests
+
+See the `examples/` directory for sample infrastructure configurations:
+
+- `web-app-stack.yaml` - Complete web application with PostgreSQL, Key Vault, and Storage
+- `microservices.yaml` - Microservices infrastructure template
+- `data-pipeline.yaml` - Data processing pipeline resources
+
+## Cost Management
+
+The platform includes basic cost estimation and limits:
+
+| Environment | Cost Limit (Monthly) |
+|-------------|---------------------|
+| dev | $500 |
+| staging | $2,000 |
+| prod | $10,000 |
+
+Cost estimates are calculated based on resource types in the request.
+
+## Security
+
+- **OIDC Authentication**: GitHub Actions uses OpenID Connect to authenticate with Azure (no stored credentials)
+- **Federated Credentials**: Each environment can have separate credentials
+- **RBAC**: Service principal has Contributor role for resource provisioning
+- **Terraform State**: Stored in Azure Blob Storage with Azure AD authentication
+- **Service Bus**: Uses Shared Access Signatures for message operations
+
+## Directory Structure
+
+```
+infrastructure-automation/
+├── .github/
+│   └── workflows/
+│       ├── queue-consumer.yaml      # Monitors Service Bus queues
+│       └── provision-worker.yaml    # Runs Terraform
+├── infrastructure/
+│   ├── api-gateway/                 # Azure Function App
+│   ├── local-runners/               # Self-hosted runner setup
+│   └── aks-runners/                 # AKS-based runners
+├── terraform/
+│   ├── catalog/                     # Main Terraform config
+│   └── modules/                     # Resource modules
+│       ├── storage-account/
+│       ├── postgresql/
+│       ├── mongodb/
+│       └── keyvault/
+├── examples/                        # Sample YAML configurations
+├── cli/                             # CLI tool (optional)
+└── send-test-message.ps1           # Test script
+```
+
+## License
+
+Internal use only. Contact the Platform team for questions.
