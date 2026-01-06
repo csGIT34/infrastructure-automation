@@ -2,7 +2,6 @@ import azure.functions as func
 import logging
 import json
 import os
-from azure.identity import DefaultAzureCredential
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 from azure.cosmos import CosmosClient
 import yaml
@@ -11,18 +10,29 @@ import uuid
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
-SERVICEBUS_NAMESPACE = os.getenv("SERVICEBUS_NAMESPACE")
-COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT")
-COSMOS_DATABASE = os.getenv("COSMOS_DATABASE")
+# Environment variables (set in Function App configuration)
+SERVICEBUS_CONNECTION = os.getenv("SERVICE_BUS_CONNECTION")
+COSMOS_ENDPOINT = os.getenv("COSMOS_DB_ENDPOINT")
+COSMOS_KEY = os.getenv("COSMOS_DB_KEY")
+COSMOS_DATABASE = os.getenv("COSMOS_DB_DATABASE", "infrastructure-db")
 
-credential = DefaultAzureCredential()
-servicebus_client = ServiceBusClient(
-        f"{SERVICEBUS_NAMESPACE}.servicebus.windows.net",
-        credential=credential
-)
-cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
-database = cosmos_client.get_database_client(COSMOS_DATABASE)
-requests_container = database.get_container_client("infrastructure-requests")
+# Initialize clients lazily to handle cold starts
+_servicebus_client = None
+_cosmos_container = None
+
+def get_servicebus_client():
+    global _servicebus_client
+    if _servicebus_client is None and SERVICEBUS_CONNECTION:
+        _servicebus_client = ServiceBusClient.from_connection_string(SERVICEBUS_CONNECTION)
+    return _servicebus_client
+
+def get_cosmos_container():
+    global _cosmos_container
+    if _cosmos_container is None and COSMOS_ENDPOINT and COSMOS_KEY:
+        cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
+        database = cosmos_client.get_database_client(COSMOS_DATABASE)
+        _cosmos_container = database.get_container_client("requests")
+    return _cosmos_container
 
 @app.route(route="provision", methods=["POST"])
 def provision_infrastructure(req: func.HttpRequest) -> func.HttpResponse:
@@ -72,6 +82,7 @@ def provision_infrastructure(req: func.HttpRequest) -> func.HttpResponse:
 
                 request_record = {
                         "id": request_id,
+                        "requestId": request_id,  # Partition key
                         "status": "pending",
                         "requester_email": requester_email,
                         "project_name": metadata.get('project_name'),
@@ -85,22 +96,26 @@ def provision_infrastructure(req: func.HttpRequest) -> func.HttpResponse:
                         "resources": [r.get('type') for r in config.get('resources', [])]
                 }
 
-                requests_container.create_item(request_record)
+                requests_container = get_cosmos_container()
+                if requests_container:
+                        requests_container.create_item(request_record)
 
-                queue_name = get_queue_name(metadata.get('environment'))
-                message = ServiceBusMessage(
-                        json.dumps({
-                                "request_id": request_id,
-                                "yaml_content": yaml_content,
-                                "requester_email": requester_email,
-                                "metadata": metadata
-                        }),
-                        content_type="application/json"
-                )
+                queue_name = "infrastructure-requests"  # Single queue for all environments
+                servicebus_client = get_servicebus_client()
+                if servicebus_client:
+                        message = ServiceBusMessage(
+                                json.dumps({
+                                        "request_id": request_id,
+                                        "yaml_content": yaml_content,
+                                        "requester_email": requester_email,
+                                        "metadata": metadata
+                                }),
+                                content_type="application/json"
+                        )
 
-                sender = servicebus_client.get_queue_sender(queue_name)
-                sender.send_messages(message)
-                sender.close()
+                        sender = servicebus_client.get_queue_sender(queue_name)
+                        sender.send_messages(message)
+                        sender.close()
 
                 logging.info(f'Request {request_id} queued successfully')
 
@@ -127,22 +142,44 @@ def provision_infrastructure(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="status/{request_id}", methods=["GET"])
 def get_request_status(req: func.HttpRequest) -> func.HttpResponse:
         request_id = req.route_params.get('request_id')
+        logging.info(f"Status request for ID: {request_id}")
 
         try:
-                request_record = requests_container.read_item(
-                        item=request_id,
-                        partition_key=request_id
-                )
+                requests_container = get_cosmos_container()
+                if not requests_container:
+                        logging.error("Cosmos container not initialized")
+                        return func.HttpResponse(
+                                json.dumps({"error": "Database not configured", "debug": "container_null"}),
+                                status_code=503,
+                                mimetype="application/json"
+                        )
+
+                logging.info(f"Querying Cosmos for ID: {request_id}")
+                # Use query to find by id (works without partition key)
+                items = list(requests_container.query_items(
+                        query="SELECT * FROM c WHERE c.id = @id",
+                        parameters=[{"name": "@id", "value": request_id}],
+                        enable_cross_partition_query=True
+                ))
+                logging.info(f"Query returned {len(items)} items")
+
+                if not items:
+                        return func.HttpResponse(
+                                json.dumps({"error": "Request not found", "debug": "query_empty", "searched_id": request_id}),
+                                status_code=404,
+                                mimetype="application/json"
+                        )
 
                 return func.HttpResponse(
-                        json.dumps(request_record),
+                        json.dumps(items[0]),
                         status_code=200,
                         mimetype="application/json"
                 )
         except Exception as e:
+                logging.error(f"Error getting status: {str(e)}")
                 return func.HttpResponse(
-                        json.dumps({"error": "Request not found"}),
-                        status_code=404,
+                        json.dumps({"error": "Internal server error", "debug": str(e)}),
+                        status_code=500,
                         mimetype="application/json"
                 )
 
@@ -200,10 +237,17 @@ def estimate_cost(config):
 
         return cost
 
-def get_queue_name(environment):
-        queue_map = {
-                'prod': 'infrastructure-requests-prod',
-                'staging': 'infrastructure-requests-staging',
-                'dev': 'infrastructure-requests-dev'
+@app.route(route="health", methods=["GET"])
+def health_check(req: func.HttpRequest) -> func.HttpResponse:
+        """Health check endpoint for monitoring"""
+        status = {
+                "status": "healthy",
+                "timestamp": datetime.utcnow().isoformat(),
+                "cosmos_configured": COSMOS_ENDPOINT is not None,
+                "servicebus_configured": SERVICEBUS_CONNECTION is not None
         }
-        return queue_map.get(environment, 'infrastructure-requests-dev')
+        return func.HttpResponse(
+                json.dumps(status),
+                status_code=200,
+                mimetype="application/json"
+        )
