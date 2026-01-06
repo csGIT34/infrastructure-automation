@@ -89,6 +89,275 @@ Configure these secrets in your GitHub repository:
 | `mongodb` | `terraform/modules/mongodb` | Azure Cosmos DB with MongoDB API |
 | `keyvault` | `terraform/modules/keyvault` | Azure Key Vault for secrets management |
 
+## How YAML Becomes Infrastructure
+
+This section explains how your YAML configuration file is transformed into Azure resources.
+
+### The Transformation Pipeline
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   YAML File     │────>│  Python Worker  │────>│   Terraform     │────>│ Azure Resources │
+│  (Your Config)  │     │ (Writes config) │     │  (Reads YAML)   │     │   (Created)     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+**Step-by-step:**
+
+1. **You submit YAML** via the portal or API
+2. **Worker receives message** from Service Bus containing YAML
+3. **Worker writes** `config.yaml` to the Terraform workspace
+4. **Terraform reads** the YAML using `yamldecode()` function
+5. **Terraform creates** Azure resources based on the configuration
+
+### Terraform Architecture
+
+The Terraform code is organized into two layers:
+
+```
+terraform/
+├── catalog/
+│   └── main.tf          # Main orchestrator - reads YAML, calls modules
+└── modules/
+    ├── storage-account/ # Storage Account module
+    ├── postgresql/      # PostgreSQL module
+    ├── mongodb/         # MongoDB (Cosmos DB) module
+    └── keyvault/        # Key Vault module
+```
+
+### The Catalog (`terraform/catalog/main.tf`)
+
+The catalog is the main Terraform configuration that:
+1. Reads your YAML file
+2. Parses metadata and resources
+3. Creates the resource group
+4. Calls the appropriate modules for each resource
+
+**YAML Parsing:**
+
+```hcl
+variable "config_file" {
+    description = "Path to YAML configuration file"
+    type        = string
+}
+
+locals {
+    # Read and decode the YAML file
+    config   = yamldecode(file(var.config_file))
+    metadata = local.config.metadata
+    resources = local.config.resources
+}
+```
+
+**Resource Filtering:**
+
+The catalog filters resources by type to route them to the correct module:
+
+```hcl
+locals {
+    # Filter resources by type
+    postgresql_resources = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "postgresql"]
+    mongodb_resources    = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "mongodb"]
+    keyvault_resources   = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "keyvault"]
+    storage_resources    = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "storage_account"]
+}
+```
+
+**Resource Group Creation:**
+
+Every project gets its own resource group:
+
+```hcl
+resource "azurerm_resource_group" "main" {
+    name     = "rg-${local.metadata.project_name}-${local.metadata.environment}"
+    location = lookup(local.metadata, "location", "eastus")
+    tags     = local.common_tags
+}
+```
+
+**Module Invocation:**
+
+Each resource type is handled by a module using `for_each`:
+
+```hcl
+module "storage_account" {
+    source   = "../modules/storage-account"
+    for_each = { for r in local.storage_resources : r.index => r }
+
+    name                = lower("${local.metadata.project_name}${each.value.name}${local.metadata.environment}")
+    resource_group_name = azurerm_resource_group.main.name
+    location            = azurerm_resource_group.main.location
+    config              = each.value.config    # Passes your YAML config block
+    tags                = local.common_tags
+}
+```
+
+### Module Structure
+
+Each module follows the same pattern:
+
+```
+modules/storage-account/
+├── main.tf       # Resource definitions
+├── variables.tf  # Input variables
+└── outputs.tf    # Output values
+```
+
+**Standard Module Inputs:**
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `name` | string | Resource name (generated from project + resource + env) |
+| `resource_group_name` | string | Resource group to create resource in |
+| `location` | string | Azure region |
+| `config` | any | Your YAML `config` block (type-specific settings) |
+| `tags` | map(string) | Resource tags (auto-generated from metadata) |
+
+### How Config Maps to Resources
+
+**Example: Storage Account**
+
+Your YAML:
+```yaml
+resources:
+  - type: storage_account
+    name: data
+    config:
+      tier: Standard
+      replication: GRS
+      versioning: true
+      soft_delete_days: 7
+      containers:
+        - name: uploads
+          access_type: private
+```
+
+Terraform module reads `config` and uses `lookup()` with defaults:
+
+```hcl
+resource "azurerm_storage_account" "main" {
+    name                     = var.name
+    resource_group_name      = var.resource_group_name
+    location                 = var.location
+    account_tier             = lookup(var.config, "tier", "Standard")        # From YAML or default
+    account_replication_type = lookup(var.config, "replication", "LRS")      # From YAML or default
+
+    blob_properties {
+        versioning_enabled = lookup(var.config, "versioning", false)         # From YAML or default
+    }
+}
+```
+
+**Example: PostgreSQL**
+
+Your YAML:
+```yaml
+resources:
+  - type: postgresql
+    name: maindb
+    config:
+      version: "14"
+      sku: B_Standard_B1ms
+      storage_mb: 32768
+      backup_retention_days: 7
+```
+
+Terraform module:
+```hcl
+resource "azurerm_postgresql_flexible_server" "main" {
+    name                = var.name
+    resource_group_name = var.resource_group_name
+    location            = var.location
+    version             = lookup(var.config, "version", "14")
+    sku_name            = lookup(var.config, "sku", "B_Standard_B1ms")
+    storage_mb          = lookup(var.config, "storage_mb", 32768)
+    backup_retention_days = lookup(var.config, "backup_retention_days", 7)
+
+    # Auto-generated secure password
+    administrator_login    = "psqladmin"
+    administrator_password = random_password.admin.result
+}
+```
+
+### Config Options by Resource Type
+
+#### Storage Account (`storage_account`)
+
+| Config Key | Type | Default | Description |
+|------------|------|---------|-------------|
+| `tier` | string | `"Standard"` | Account tier (Standard, Premium) |
+| `replication` | string | `"LRS"` | Replication type (LRS, GRS, ZRS, GZRS) |
+| `versioning` | bool | `false` | Enable blob versioning |
+| `soft_delete_days` | number | `null` | Soft delete retention days |
+| `containers` | list | `[]` | List of containers to create |
+
+Container options:
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `name` | string | required | Container name |
+| `access_type` | string | `"private"` | Access level (private, blob, container) |
+
+#### PostgreSQL (`postgresql`)
+
+| Config Key | Type | Default | Description |
+|------------|------|---------|-------------|
+| `version` | string | `"14"` | PostgreSQL version (11, 12, 13, 14, 15) |
+| `sku` | string | `"B_Standard_B1ms"` | Server SKU |
+| `storage_mb` | number | `32768` | Storage size in MB |
+| `backup_retention_days` | number | `7` | Backup retention (7-35 days) |
+| `geo_redundant_backup` | bool | `false` | Enable geo-redundant backups |
+
+#### MongoDB (`mongodb`)
+
+| Config Key | Type | Default | Description |
+|------------|------|---------|-------------|
+| `serverless` | bool | `false` | Use serverless tier |
+| `consistency_level` | string | `"Session"` | Consistency level |
+| `throughput` | number | `400` | Request units (if not serverless) |
+
+#### Key Vault (`keyvault`)
+
+| Config Key | Type | Default | Description |
+|------------|------|---------|-------------|
+| `sku` | string | `"standard"` | SKU (standard, premium) |
+| `soft_delete_days` | number | `7` | Soft delete retention (7-90 days) |
+| `purge_protection` | bool | `false` | Enable purge protection |
+| `rbac_enabled` | bool | `true` | Use RBAC for access control |
+| `default_action` | string | `"Allow"` | Network default action |
+
+### Automatic Tag Generation
+
+All resources receive these tags automatically:
+
+| Tag | Source |
+|-----|--------|
+| `Project` | `metadata.project_name` |
+| `Environment` | `metadata.environment` |
+| `BusinessUnit` | `metadata.business_unit` |
+| `CostCenter` | `metadata.cost_center` |
+| `Owner` | `metadata.owner_email` |
+| `ManagedBy` | `"Terraform-SelfService"` |
+
+Plus any custom tags from `metadata.tags`.
+
+### State Management
+
+Terraform state is stored in Azure Blob Storage:
+
+```
+Storage Account: stfuncapirrkkz6a8
+Container: tfstate
+Blob Path: {business_unit}/{environment}/{project_name}/terraform.tfstate
+```
+
+Example: `engineering/dev/myproject/terraform.tfstate`
+
+This ensures:
+- Each project has isolated state
+- Multiple environments don't conflict
+- State is secure and backed up
+- OIDC authentication (no stored credentials)
+
 ## Request YAML Schema
 
 Infrastructure requests use this YAML structure:
