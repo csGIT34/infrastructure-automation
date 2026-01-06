@@ -169,22 +169,22 @@ $configPath = Join-Path $VMPath "configs"
 New-Item -ItemType Directory -Path $configPath -Force | Out-Null
 
 foreach ($vm in $VMs) {
-    $networkConfig = @"
-# Network configuration for $($vm.Name)
-# Apply this during Ubuntu installation or via /etc/netplan/
-
-network:
-  version: 2
-  ethernets:
-    eth0:
-      addresses:
-        - $($vm.IP)/24
-      gateway4: 10.10.10.1
-      nameservers:
-        addresses:
-          - 8.8.8.8
-          - 8.8.4.4
-"@
+    $networkConfig = @(
+        "# Network configuration for $($vm.Name)",
+        "# Apply this during Ubuntu installation or via /etc/netplan/",
+        "",
+        "network:",
+        "  version: 2",
+        "  ethernets:",
+        "    eth0:",
+        "      addresses:",
+        "        - $($vm.IP)/24",
+        "      gateway4: 10.10.10.1",
+        "      nameservers:",
+        "        addresses:",
+        "          - 8.8.8.8",
+        "          - 8.8.4.4"
+    ) -join "`n"
 
     $networkConfig | Out-File -FilePath (Join-Path $configPath "$($vm.Name)-network.yaml") -Encoding UTF8
 }
