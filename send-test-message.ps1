@@ -2,7 +2,7 @@ $REQUEST_ID = "test-" + (Get-Date -Format "yyyyMMddHHmmss")
 
 $yamlContent = @"
 metadata:
-  project_name: test-project
+  project_name: test01
   environment: dev
   business_unit: engineering
   cost_center: CC-TEST-001
@@ -11,7 +11,7 @@ metadata:
 
 resources:
   - type: storage_account
-    name: testdata
+    name: st
     config:
       tier: Standard
       replication: LRS

@@ -3,7 +3,35 @@
     "allow": [
       "Bash(cat:*)",
       "Bash(az rest:*)",
-      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20753649862 --repo csGIT34/infrastructure-automation --log-failed)"
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20753649862 --repo csGIT34/infrastructure-automation --log-failed)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(powershell -ExecutionPolicy Bypass -File C:/github/infrastructure-automation/send-test-message.ps1)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" workflow run \"Infrastructure Queue Consumer\" --repo csGIT34/infrastructure-automation)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run list --repo csGIT34/infrastructure-automation --limit 1)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view --repo csGIT34/infrastructure-automation)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view --job 59594722918 --repo csGIT34/infrastructure-automation --log)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755162045 --repo csGIT34/infrastructure-automation --log-failed)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run list --repo csGIT34/infrastructure-automation --limit 2)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755251701 --repo csGIT34/infrastructure-automation --log-failed)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755251701 --repo csGIT34/infrastructure-automation)",
+      "Bash(az storage blob lease break:*)",
+      "Bash(az storage account keys list:*)",
+      "Bash(az storage blob delete:*)",
+      "Bash(az storage blob list:*)",
+      "Bash(az servicebus queue show:*)",
+      "Bash(gh workflow run:*)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" workflow run queue-consumer.yaml --ref main -f environment=dev)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" workflow run queue-consumer.yaml --ref main)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run list --workflow=queue-consumer.yaml --limit 3)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755473567 --log-failed)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run list --workflow=queue-consumer.yaml --limit 5)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755477452 --log)",
+      "Bash(az cosmosdb sql query:*)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755473567 --log)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\\\github\\\\infrastructure-automation\\\\send-test-message.ps1\")",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755725897 --log-failed)"
     ]
   }
 }

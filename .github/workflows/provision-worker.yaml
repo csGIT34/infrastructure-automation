@@ -114,14 +114,17 @@ jobs:
                   container = database.get_container_client("infrastructure-requests")
 
                   def update_cosmos_status(request_id, status, extra_fields=None):
-                      """Update request status in Cosmos DB"""
+                      """Update request status in Cosmos DB using upsert"""
                       try:
-                          record = container.read_item(item=request_id, partition_key=request_id)
-                          record['status'] = status
-                          record['updated_at'] = datetime.utcnow().isoformat()
+                          record = {
+                              'id': request_id,
+                              'requestId': request_id,
+                              'status': status,
+                              'updated_at': datetime.utcnow().isoformat()
+                          }
                           if extra_fields:
                               record.update(extra_fields)
-                          container.replace_item(item=request_id, body=record)
+                          container.upsert_item(body=record)
                           print(f"Updated request {request_id} to '{status}'")
                       except Exception as e:
                           print(f"Warning: Failed to update Cosmos DB: {e}")
