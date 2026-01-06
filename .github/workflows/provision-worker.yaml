@@ -51,7 +51,7 @@ jobs:
 
             - name: Install dependencies
               run: |
-                  pip install azure-servicebus azure-identity azure-cosmos pyyaml jinja2
+                  pip install azure-servicebus azure-identity azure-cosmos pyyaml
 
             - name: Azure Login
               uses: azure/login@v1
@@ -60,238 +60,210 @@ jobs:
                   tenant-id: ${{ secrets.AZURE_TENANT_ID }}
                   subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-            - name: Receive message from queue
-              id: receive
-              run: |
-                  python3 << 'PYTHON_SCRIPT'
-                  from azure.servicebus import ServiceBusClient
-                  from azure.identity import DefaultAzureCredential
-                  import os
-                  import json
-
-                  credential = DefaultAzureCredential()
-                  servicebus_client = ServiceBusClient(
-                          f"{os.getenv('SERVICEBUS_NAMESPACE')}.servicebus.windows.net",
-                          credential=credential
-                  )
-
-                  queue_name = "${{ inputs.queue_name }}"
-                  receiver = servicebus_client.get_queue_receiver(queue_name)
-
-                  messages = receiver.receive_messages(max_message_count=1, max_wait_time=5)
-
-                  if messages:
-                          message = messages[0]
-                          body = json.loads(str(message))
-
-                          with open('request_data.json', 'w') as f:
-                                  json.dump(body, f)
-
-                          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                                  f.write(f"has_message=true\n")
-                                  f.write(f"request_id={body['request_id']}\n")
-
-                          with open('message_lock_token.txt', 'w') as f:
-                                  f.write(message.lock_token)
-
-                          print(f"Received request: {body['request_id']}")
-                  else:
-                          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                                  f.write("has_message=false\n")
-                          print("No messages in queue")
-
-                  receiver.close()
-                  servicebus_client.close()
-                  PYTHON_SCRIPT
-
-            - name: Update request status to processing
-              if: steps.receive.outputs.has_message == 'true'
-              run: |
-                  python3 << 'PYTHON_SCRIPT'
-                  from azure.cosmos import CosmosClient
-                  from azure.identity import DefaultAzureCredential
-                  from datetime import datetime
-                  import os
-                  import json
-
-                  with open('request_data.json', 'r') as f:
-                          request_data = json.load(f)
-
-                  request_id = request_data['request_id']
-
-                  credential = DefaultAzureCredential()
-                  cosmos_client = CosmosClient(os.getenv('COSMOS_ENDPOINT'), credential=credential)
-                  database = cosmos_client.get_database_client("infrastructure")
-                  container = database.get_container_client("infrastructure-requests")
-
-                  request_record = container.read_item(item=request_id, partition_key=request_id)
-                  request_record['status'] = 'processing'
-                  request_record['updated_at'] = datetime.utcnow().isoformat()
-                  request_record['github_run_id'] = '${{ github.run_id }}'
-                  request_record['github_run_url'] = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-
-                  container.replace_item(item=request_id, body=request_record)
-                  print(f"Updated request {request_id} to 'processing'")
-                  PYTHON_SCRIPT
-
-            - name: Generate Terraform configuration
-              if: steps.receive.outputs.has_message == 'true'
-              run: |
-                  mkdir -p terraform-workspace
-
-                  python3 << 'PYTHON_SCRIPT'
-                  import yaml
-                  import json
-                  with open('request_data.json', 'r') as f:
-                          request_data = json.load(f)
-                  config = yaml.safe_load(request_data['yaml_content'])
-                  with open('terraform-workspace/config.yaml', 'w') as f:
-                          yaml.dump(config, f)
-                  print(f"Configuration prepared")
-                  PYTHON_SCRIPT
-
             - name: Setup Terraform
-              if: steps.receive.outputs.has_message == 'true'
               uses: hashicorp/setup-terraform@v3
               with:
                   terraform_version: 1.5.7
+                  terraform_wrapper: false
 
-            - name: Copy Terraform modules
-              if: steps.receive.outputs.has_message == 'true'
-              run: |
-                  cp -r terraform/catalog terraform-workspace/
-                  cp -r terraform/modules terraform-workspace/
-
-            - name: Terraform Init
-              if: steps.receive.outputs.has_message == 'true'
-              working-directory: terraform-workspace/catalog
-              run: |
-                  PROJECT_NAME=$(python3 -c "import yaml; print(yaml.safe_load(open('../config.yaml'))['metadata']['project_name'])")
-                  ENVIRONMENT=$(python3 -c "import yaml; print(yaml.safe_load(open('../config.yaml'))['metadata']['environment'])")
-                  BUSINESS_UNIT=$(python3 -c "import yaml; print(yaml.safe_load(open('../config.yaml'))['metadata']['business_unit'])")
-
-                  STATE_KEY="${BUSINESS_UNIT}/${ENVIRONMENT}/${PROJECT_NAME}/terraform.tfstate"
-
-                  terraform init \
-                      -backend-config="storage_account_name=$TF_STATE_STORAGE_ACCOUNT" \
-                      -backend-config="container_name=$TF_STATE_CONTAINER" \
-                      -backend-config="key=$STATE_KEY" \
-                      -backend-config="use_oidc=true"
-
-            - name: Terraform Plan
-              if: steps.receive.outputs.has_message == 'true'
-              working-directory: terraform-workspace/catalog
-              run: |
-                  terraform plan \
-                      -var="config_file=../config.yaml" \
-                      -out=tfplan \
-                      -no-color | tee ../plan_output.txt
-
-            - name: Terraform Apply
-              if: steps.receive.outputs.has_message == 'true'
-              working-directory: terraform-workspace/catalog
-              run: |
-                  terraform apply -auto-approve tfplan | tee ../apply_output.txt
-
-            - name: Capture Terraform Outputs
-              if: steps.receive.outputs.has_message == 'true'
-              working-directory: terraform-workspace/catalog
-              run: |
-                  terraform output -json > ../outputs.json
-
-            - name: Update request status to completed
-              if: steps.receive.outputs.has_message == 'true' && success()
+            - name: Process infrastructure request
+              id: process
+              env:
+                  QUEUE_NAME: ${{ inputs.queue_name }}
+                  ENVIRONMENT: ${{ inputs.environment }}
+                  GITHUB_RUN_ID: ${{ github.run_id }}
+                  GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
               run: |
                   python3 << 'PYTHON_SCRIPT'
-                  from azure.cosmos import CosmosClient
-                  from azure.identity import DefaultAzureCredential
-                  from datetime import datetime
                   import os
+                  import sys
                   import json
+                  import yaml
+                  import subprocess
+                  from datetime import datetime
+                  from azure.servicebus import ServiceBusClient
+                  from azure.identity import DefaultAzureCredential
+                  from azure.cosmos import CosmosClient
 
-                  with open('request_data.json', 'r') as f:
-                          request_data = json.load(f)
-                  request_id = request_data['request_id']
-
-                  with open('terraform-workspace/outputs.json', 'r') as f:
-                          outputs = json.load(f)
+                  # Configuration from environment
+                  SERVICEBUS_NAMESPACE = os.environ['SERVICEBUS_NAMESPACE']
+                  COSMOS_ENDPOINT = os.environ['COSMOS_ENDPOINT']
+                  QUEUE_NAME = os.environ['QUEUE_NAME']
+                  ENVIRONMENT = os.environ['ENVIRONMENT']
+                  GITHUB_RUN_ID = os.environ['GITHUB_RUN_ID']
+                  GITHUB_RUN_URL = os.environ['GITHUB_RUN_URL']
+                  TF_STATE_STORAGE_ACCOUNT = os.environ['TF_STATE_STORAGE_ACCOUNT']
+                  TF_STATE_CONTAINER = os.environ['TF_STATE_CONTAINER']
 
                   credential = DefaultAzureCredential()
-                  cosmos_client = CosmosClient(os.getenv('COSMOS_ENDPOINT'), credential=credential)
+
+                  # Initialize Service Bus client
+                  servicebus_client = ServiceBusClient(
+                      f"{SERVICEBUS_NAMESPACE}.servicebus.windows.net",
+                      credential=credential
+                  )
+
+                  # Initialize Cosmos DB client
+                  cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
                   database = cosmos_client.get_database_client("infrastructure")
                   container = database.get_container_client("infrastructure-requests")
 
-                  request_record = container.read_item(item=request_id, partition_key=request_id)
-                  request_record['status'] = 'completed'
-                  request_record['updated_at'] = datetime.utcnow().isoformat()
-                  request_record['completed_at'] = datetime.utcnow().isoformat()
-                  request_record['terraform_outputs'] = outputs
+                  def update_cosmos_status(request_id, status, extra_fields=None):
+                      """Update request status in Cosmos DB"""
+                      try:
+                          record = container.read_item(item=request_id, partition_key=request_id)
+                          record['status'] = status
+                          record['updated_at'] = datetime.utcnow().isoformat()
+                          if extra_fields:
+                              record.update(extra_fields)
+                          container.replace_item(item=request_id, body=record)
+                          print(f"Updated request {request_id} to '{status}'")
+                      except Exception as e:
+                          print(f"Warning: Failed to update Cosmos DB: {e}")
 
-                  container.replace_item(item=request_id, body=request_record)
-                  print(f"Request {request_id} completed")
-                  PYTHON_SCRIPT
+                  def run_terraform(config, request_id):
+                      """Run Terraform init, plan, and apply"""
+                      # Create workspace directory
+                      os.makedirs('terraform-workspace', exist_ok=True)
 
-            - name: Complete Service Bus message
-              if: steps.receive.outputs.has_message == 'true' && success()
-              run: |
-                  python3 << 'PYTHON_SCRIPT'
-                  from azure.servicebus import ServiceBusClient
-                  from azure.identity import DefaultAzureCredential
-                  import os
+                      # Write config file
+                      with open('terraform-workspace/config.yaml', 'w') as f:
+                          yaml.dump(config, f)
 
-                  with open('message_lock_token.txt', 'r') as f:
-                          lock_token = f.read().strip()
+                      # Copy Terraform files
+                      subprocess.run(['cp', '-r', 'terraform/catalog', 'terraform-workspace/'], check=True)
+                      subprocess.run(['cp', '-r', 'terraform/modules', 'terraform-workspace/'], check=True)
 
-                  credential = DefaultAzureCredential()
-                  servicebus_client = ServiceBusClient(
-                          f"{os.getenv('SERVICEBUS_NAMESPACE')}.servicebus.windows.net",
-                          credential=credential
-                  )
+                      # Extract metadata for state key
+                      metadata = config.get('metadata', {})
+                      project_name = metadata.get('project_name', 'unknown')
+                      environment = metadata.get('environment', 'dev')
+                      business_unit = metadata.get('business_unit', 'default')
+                      state_key = f"{business_unit}/{environment}/{project_name}/terraform.tfstate"
 
-                  receiver = servicebus_client.get_queue_receiver("${{ inputs.queue_name }}")
-                  receiver.complete_message_by_lock_token(lock_token)
-                  receiver.close()
-                  servicebus_client.close()
-                  print("Message completed")
-                  PYTHON_SCRIPT
+                      work_dir = 'terraform-workspace/catalog'
 
-            - name: Handle failure
-              if: steps.receive.outputs.has_message == 'true' && failure()
-              run: |
-                  python3 << 'PYTHON_SCRIPT'
-                  from azure.cosmos import CosmosClient
-                  from azure.servicebus import ServiceBusClient
-                  from azure.identity import DefaultAzureCredential
-                  from datetime import datetime
-                  import os
-                  import json
+                      # Terraform init
+                      print(f"Running terraform init with state key: {state_key}")
+                      init_result = subprocess.run(
+                          [
+                              'terraform', 'init',
+                              f'-backend-config=storage_account_name={TF_STATE_STORAGE_ACCOUNT}',
+                              f'-backend-config=container_name={TF_STATE_CONTAINER}',
+                              f'-backend-config=key={state_key}',
+                              '-backend-config=use_oidc=true'
+                          ],
+                          cwd=work_dir,
+                          capture_output=True,
+                          text=True
+                      )
+                      if init_result.returncode != 0:
+                          raise Exception(f"Terraform init failed: {init_result.stderr}")
+                      print(init_result.stdout)
 
-                  with open('request_data.json', 'r') as f:
-                          request_data = json.load(f)
-                  request_id = request_data['request_id']
+                      # Terraform plan
+                      print("Running terraform plan")
+                      plan_result = subprocess.run(
+                          [
+                              'terraform', 'plan',
+                              '-var=config_file=../config.yaml',
+                              '-out=tfplan',
+                              '-no-color'
+                          ],
+                          cwd=work_dir,
+                          capture_output=True,
+                          text=True
+                      )
+                      if plan_result.returncode != 0:
+                          raise Exception(f"Terraform plan failed: {plan_result.stderr}")
+                      print(plan_result.stdout)
 
-                  credential = DefaultAzureCredential()
-                  cosmos_client = CosmosClient(os.getenv('COSMOS_ENDPOINT'), credential=credential)
-                  database = cosmos_client.get_database_client("infrastructure")
-                  container = database.get_container_client("infrastructure-requests")
+                      # Terraform apply
+                      print("Running terraform apply")
+                      apply_result = subprocess.run(
+                          ['terraform', 'apply', '-auto-approve', 'tfplan'],
+                          cwd=work_dir,
+                          capture_output=True,
+                          text=True
+                      )
+                      if apply_result.returncode != 0:
+                          raise Exception(f"Terraform apply failed: {apply_result.stderr}")
+                      print(apply_result.stdout)
 
-                  request_record = container.read_item(item=request_id, partition_key=request_id)
-                  request_record['status'] = 'failed'
-                  request_record['updated_at'] = datetime.utcnow().isoformat()
+                      # Capture outputs
+                      output_result = subprocess.run(
+                          ['terraform', 'output', '-json'],
+                          cwd=work_dir,
+                          capture_output=True,
+                          text=True
+                      )
+                      outputs = json.loads(output_result.stdout) if output_result.returncode == 0 else {}
 
-                  container.replace_item(item=request_id, body=request_record)
+                      return outputs
 
-                  with open('message_lock_token.txt', 'r') as f:
-                          lock_token = f.read().strip()
+                  # Main processing logic
+                  receiver = servicebus_client.get_queue_receiver(QUEUE_NAME, max_wait_time=5)
 
-                  servicebus_client = ServiceBusClient(
-                          f"{os.getenv('SERVICEBUS_NAMESPACE')}.servicebus.windows.net",
-                          credential=credential
-                  )
+                  try:
+                      # Receive a single message
+                      messages = receiver.receive_messages(max_message_count=1, max_wait_time=5)
 
-                  receiver = servicebus_client.get_queue_receiver("${{ inputs.queue_name }}")
-                  receiver.abandon_message_by_lock_token(lock_token)
-                  receiver.close()
-                  servicebus_client.close()
-                  print(f"Request {request_id} failed")
+                      if not messages:
+                          print("No messages in queue")
+                          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                              f.write("has_message=false\n")
+                          sys.exit(0)
+
+                      message = messages[0]
+
+                      try:
+                          # Parse message body
+                          body = json.loads(str(message))
+                          request_id = body['request_id']
+                          yaml_content = body['yaml_content']
+                          config = yaml.safe_load(yaml_content)
+
+                          print(f"Processing request: {request_id}")
+
+                          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                              f.write("has_message=true\n")
+                              f.write(f"request_id={request_id}\n")
+
+                          # Update status to processing
+                          update_cosmos_status(request_id, 'processing', {
+                              'github_run_id': GITHUB_RUN_ID,
+                              'github_run_url': GITHUB_RUN_URL
+                          })
+
+                          # Run Terraform
+                          outputs = run_terraform(config, request_id)
+
+                          # Update status to completed
+                          update_cosmos_status(request_id, 'completed', {
+                              'completed_at': datetime.utcnow().isoformat(),
+                              'terraform_outputs': outputs
+                          })
+
+                          # Complete the message (remove from queue)
+                          receiver.complete_message(message)
+                          print(f"Request {request_id} completed successfully")
+
+                      except Exception as e:
+                          print(f"Error processing request: {e}")
+
+                          # Update status to failed
+                          if 'request_id' in dir():
+                              update_cosmos_status(request_id, 'failed', {
+                                  'error_message': str(e)
+                              })
+
+                          # Abandon the message (return to queue for retry)
+                          receiver.abandon_message(message)
+                          print("Message abandoned for retry")
+                          sys.exit(1)
+
+                  finally:
+                      receiver.close()
+                      servicebus_client.close()
+
                   PYTHON_SCRIPT
