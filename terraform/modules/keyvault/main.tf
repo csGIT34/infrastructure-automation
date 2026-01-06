@@ -11,7 +11,10 @@ variable "name" { type = string }
 variable "resource_group_name" { type = string }
 variable "location" { type = string }
 variable "config" { type = any }
-variable "tags" { type = map(string); default = {} }
+variable "tags" {
+    type    = map(string)
+    default = {}
+}
 
 data "azurerm_client_config" "current" {}
 
