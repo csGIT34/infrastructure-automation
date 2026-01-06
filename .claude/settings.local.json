@@ -31,7 +31,27 @@
       "Bash(az cosmosdb sql query:*)",
       "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755473567 --log)",
       "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\\\github\\\\infrastructure-automation\\\\send-test-message.ps1\")",
-      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755725897 --log-failed)"
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755725897 --log-failed)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755884692 --log)",
+      "Bash(az storage account:*)",
+      "Bash(az storage account list:*)",
+      "Bash(az group list:*)",
+      "Bash(az group show:*)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20755873858 --log-failed)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20756053422 --log-failed)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20756161094 --log-failed)",
+      "Bash(az role assignment create:*)",
+      "Bash(az account show:*)",
+      "Bash(az role assignment list:*)",
+      "Bash(az ad sp show:*)",
+      "Bash(ASSIGNMENT_ID=\"f7e8d9c0-a1b2-3c4d-5e6f-718293a4b5c6\")",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20756352963 --log-failed)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run list --workflow=queue-consumer.yaml --status in_progress --json databaseId -q \".[].databaseId\")",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20756464345 --log)",
+      "Bash(az staticwebapp secrets list:*)",
+      "Bash(git pull:*)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run list --limit 5)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20757048648 --log-failed)"
     ]
   }
 }
