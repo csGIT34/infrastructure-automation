@@ -276,7 +276,9 @@ az storage blob list --container-name tfstate \
 
 ### Queue Consumer (`queue-consumer.yaml`)
 
-Runs every minute (via cron) to check for messages in Service Bus queues:
+The queue consumer is the orchestrator that monitors Service Bus queues and triggers workers.
+
+**Schedule:** Runs every minute via cron, or can be triggered manually.
 
 ```yaml
 on:
@@ -285,18 +287,129 @@ on:
   workflow_dispatch:  # Manual trigger
 ```
 
-For each environment with pending messages, it triggers the provision worker.
+**Jobs:**
+
+| Job | Purpose |
+|-----|---------|
+| `check-queues` | Checks message count in each environment's queue |
+| `trigger-prod-workers` | Triggers workers for production queue (if messages exist) |
+| `trigger-staging-workers` | Triggers workers for staging queue (if messages exist) |
+| `trigger-dev-workers` | Triggers workers for dev queue (if messages exist) |
+
+**Flow:**
+```
+check-queues
+    │
+    ├── has_prod_messages? ──yes──> trigger-prod-workers
+    │
+    ├── has_staging_messages? ──yes──> trigger-staging-workers
+    │
+    └── has_dev_messages? ──yes──> trigger-dev-workers
+```
+
+Each trigger job only runs if there are messages in that environment's queue.
 
 ### Provision Worker (`provision-worker.yaml`)
 
-Called by the queue consumer to process infrastructure requests:
+The provision worker is a reusable workflow that processes infrastructure requests.
 
-1. Receives message from Service Bus queue
-2. Parses YAML configuration
-3. Updates Cosmos DB status to "processing"
-4. Runs `terraform init`, `plan`, and `apply`
-5. Updates Cosmos DB status to "completed" or "failed"
-6. Completes or abandons the Service Bus message
+**Inputs:**
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `queue_name` | string | Service Bus queue to consume from |
+| `environment` | string | Environment name (dev/staging/prod) |
+| `runner_labels` | string | JSON array of runner labels |
+| `max_parallel` | number | Maximum concurrent workers (default: 10) |
+
+**Worker Matrix:**
+
+The worker uses a matrix strategy to spawn multiple parallel workers:
+
+```yaml
+strategy:
+    max-parallel: ${{ inputs.max_parallel }}
+    matrix:
+        worker: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+```
+
+This creates up to 10 worker jobs that run in parallel, each competing to consume messages from the queue.
+
+**Why Multiple Workers?**
+
+- **Parallel processing**: Multiple requests can be processed simultaneously
+- **Scalability**: Handle bursts of requests efficiently
+- **Competing consumers**: Workers use Service Bus peek-lock to ensure each message is processed by only one worker
+- **Fault tolerance**: If one worker fails, others continue processing
+
+**Worker Behavior:**
+
+```
+Worker 1 ──┐
+Worker 2 ──┼──> Service Bus Queue ──> Only ONE worker gets each message
+Worker 3 ──┤
+...        │
+Worker 10 ─┘
+```
+
+Each worker:
+1. Attempts to receive ONE message from the queue (with 5-second timeout)
+2. If no message available → exits successfully (job shows as green)
+3. If message received → processes it exclusively via peek-lock
+
+**Processing Steps:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Receive Message (peek-lock)                              │
+│    └─ Message is locked, invisible to other workers         │
+├─────────────────────────────────────────────────────────────┤
+│ 2. Parse YAML Configuration                                 │
+│    └─ Extract metadata and resource definitions             │
+├─────────────────────────────────────────────────────────────┤
+│ 3. Update Cosmos DB → status: "processing"                  │
+│    └─ Records github_run_id and github_run_url              │
+├─────────────────────────────────────────────────────────────┤
+│ 4. Run Terraform                                            │
+│    ├─ terraform init (with remote state backend)            │
+│    ├─ terraform plan (generates execution plan)             │
+│    └─ terraform apply (provisions infrastructure)           │
+├─────────────────────────────────────────────────────────────┤
+│ 5a. SUCCESS:                                                │
+│     ├─ Update Cosmos DB → status: "completed"               │
+│     ├─ Store terraform_outputs in Cosmos DB                 │
+│     └─ Complete message (removes from queue)                │
+├─────────────────────────────────────────────────────────────┤
+│ 5b. FAILURE:                                                │
+│     ├─ Update Cosmos DB → status: "failed"                  │
+│     ├─ Store error_message in Cosmos DB                     │
+│     └─ Abandon message (returns to queue for retry)         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Environment Configuration:**
+
+| Environment | Queue Name | Max Parallel | Runner Labels |
+|-------------|------------|--------------|---------------|
+| prod | `infrastructure-requests-prod` | 3 | `["self-hosted", "linux", "local"]` |
+| staging | `infrastructure-requests-staging` | 3 | `["self-hosted", "linux", "local"]` |
+| dev | `infrastructure-requests-dev` | 5 | `["ubuntu-latest"]` |
+
+**Understanding Workflow Runs:**
+
+When you see workflow runs like:
+```
+trigger-dev-workers / process-requests (1)  ✓
+trigger-dev-workers / process-requests (2)  ✓
+trigger-dev-workers / process-requests (3)  ✓
+...
+trigger-dev-workers / process-requests (10) ✓
+```
+
+This is normal! Each number represents a worker in the matrix:
+- Workers that found and processed a message will show actual Terraform output
+- Workers that found no messages will show "No messages in queue" and exit cleanly
+- Only workers that encounter errors will show as failed (red)
 
 ## Runner Configuration
 
