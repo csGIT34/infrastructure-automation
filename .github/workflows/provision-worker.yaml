@@ -73,6 +73,11 @@ jobs:
                   ENVIRONMENT: ${{ inputs.environment }}
                   GITHUB_RUN_ID: ${{ github.run_id }}
                   GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                  # Terraform OIDC authentication
+                  ARM_USE_OIDC: true
+                  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+                  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+                  ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', inputs.environment)] }}
               run: |
                   python3 << 'PYTHON_SCRIPT'
                   import os
