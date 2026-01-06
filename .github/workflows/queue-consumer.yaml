@@ -52,6 +52,16 @@ jobs:
                   echo "has_staging=$( [ $STAGING_COUNT -gt 0 ] && echo 'true' || echo 'false' )" >> $GITHUB_OUTPUT
                   echo "has_dev=$( [ $DEV_COUNT -gt 0 ] && echo 'true' || echo 'false' )" >> $GITHUB_OUTPUT
 
+    # ============================================================
+    # RUNNER CONFIGURATION
+    # ============================================================
+    # For LOCAL k3s cluster runners, use:
+    #   runner_labels: '["self-hosted", "linux", "local"]'
+    #
+    # For AKS runners (production), use:
+    #   runner_labels: '["self-hosted", "linux", "infrastructure"]'
+    # ============================================================
+
     trigger-prod-workers:
         needs: check-queues
         if: needs.check-queues.outputs.has_prod_messages == 'true'
@@ -59,8 +69,8 @@ jobs:
         with:
             queue_name: "infrastructure-requests-prod"
             environment: "prod"
-            runner_labels: '["self-hosted", "linux", "infrastructure"]'
-            max_parallel: 5
+            runner_labels: '["self-hosted", "linux", "local"]'
+            max_parallel: 3
         secrets: inherit
 
     trigger-staging-workers:
@@ -70,8 +80,8 @@ jobs:
         with:
             queue_name: "infrastructure-requests-staging"
             environment: "staging"
-            runner_labels: '["self-hosted", "linux", "infrastructure"]'
-            max_parallel: 10
+            runner_labels: '["self-hosted", "linux", "local"]'
+            max_parallel: 3
         secrets: inherit
 
     trigger-dev-workers:
@@ -81,6 +91,6 @@ jobs:
         with:
             queue_name: "infrastructure-requests-dev"
             environment: "dev"
-            runner_labels: '["self-hosted", "linux", "infrastructure"]'
-            max_parallel: 20
+            runner_labels: '["self-hosted", "linux", "local"]'
+            max_parallel: 5
         secrets: inherit
