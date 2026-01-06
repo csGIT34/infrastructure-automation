@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infrastructure Self-Service Portal</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e7;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: #a1a1aa;
+            font-size: 1rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .panel h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #a1a1aa;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.875rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        textarea {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            resize: vertical;
+        }
+
+        .yaml-editor {
+            min-height: 400px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #fff;
+            border: none;
+            padding: 0.875rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            margin-top: 0.5rem;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: none;
+        }
+
+        .status-panel {
+            margin-top: 1rem;
+        }
+
+        .status-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .status-success {
+            border-left: 3px solid #22c55e;
+        }
+
+        .status-error {
+            border-left: 3px solid #ef4444;
+        }
+
+        .status-pending {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .template-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .template-btn {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            width: auto;
+        }
+
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.8rem;
+            color: #93c5fd;
+        }
+
+        .config-section {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-dev { background: #22c55e; color: #000; }
+        .badge-staging { background: #f59e0b; color: #000; }
+        .badge-prod { background: #ef4444; color: #fff; }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Infrastructure Self-Service Portal</h1>
+            <p>Submit infrastructure requests using YAML configuration</p>
+        </header>
+
+        <div class="main-content">
+            <div class="panel">
+                <h2>Request Configuration</h2>
+
+                <div class="config-section">
+                    <div class="form-group">
+                        <label for="email">Requester Email</label>
+                        <input type="email" id="email" placeholder="your.email@company.com" value="test@example.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="environment">Environment</label>
+                        <select id="environment">
+                            <option value="dev">Development (dev)</option>
+                            <option value="staging">Staging</option>
+                            <option value="prod">Production</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Quick Templates</label>
+                    <div class="template-buttons">
+                        <button class="template-btn" onclick="loadTemplate('storage')">Storage Account</button>
+                        <button class="template-btn" onclick="loadTemplate('webapp')">Web App Stack</button>
+                        <button class="template-btn" onclick="loadTemplate('database')">Database</button>
+                        <button class="template-btn" onclick="loadTemplate('full')">Full Stack</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="yaml">YAML Configuration</label>
+                    <textarea id="yaml" class="yaml-editor" placeholder="Enter your infrastructure YAML here..."></textarea>
+                </div>
+
+                <button id="submitBtn" onclick="submitRequest()">
+                    Submit Request
+                </button>
+                <button class="btn-secondary" onclick="validateYaml()">
+                    Validate YAML
+                </button>
+            </div>
+
+            <div class="panel">
+                <h2>Request Status</h2>
+
+                <div class="info-box">
+                    <strong>How it works:</strong><br>
+                    1. Configure your infrastructure using YAML<br>
+                    2. Submit the request to the queue<br>
+                    3. GitHub Actions processes the request<br>
+                    4. Terraform provisions your resources
+                </div>
+
+                <div class="form-group">
+                    <label for="servicebusNs">Service Bus Namespace</label>
+                    <input type="text" id="servicebusNs" value="sb-infra-api-rrkkz6a8">
+                </div>
+
+                <div class="form-group">
+                    <label for="sasKey">SAS Key (RootManageSharedAccessKey)</label>
+                    <input type="password" id="sasKey" placeholder="Enter your SAS key">
+                </div>
+
+                <div class="status-panel">
+                    <label>Response</label>
+                    <div id="statusBox" class="status-box">
+Ready to submit requests.
+
+Tip: Get your SAS key with:
+az servicebus namespace authorization-rule keys list \
+  --namespace-name sb-infra-api-rrkkz6a8 \
+  --resource-group rg-infrastructure-api \
+  --name RootManageSharedAccessKey \
+  --query primaryKey -o tsv
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const templates = {
+            storage: `metadata:
+  project_name: myproject
+  environment: dev
+  business_unit: engineering
+  cost_center: CC-ENG-001
+  owner_email: team@company.com
+  location: centralus
+
+resources:
+  - type: storage_account
+    name: data
+    config:
+      tier: Standard
+      replication: LRS
+      versioning: true
+      containers:
+        - name: uploads
+          access_type: private`,
+
+            webapp: `metadata:
+  project_name: mywebapp
+  environment: dev
+  business_unit: engineering
+  cost_center: CC-ENG-001
+  owner_email: team@company.com
+  location: centralus
+
+resources:
+  - type: storage_account
+    name: static
+    config:
+      tier: Standard
+      replication: LRS
+      containers:
+        - name: assets
+          access_type: blob
+
+  - type: keyvault
+    name: secrets
+    config:
+      sku: standard
+      rbac_enabled: true`,
+
+            database: `metadata:
+  project_name: myapp
+  environment: dev
+  business_unit: engineering
+  cost_center: CC-ENG-001
+  owner_email: team@company.com
+  location: centralus
+
+resources:
+  - type: postgresql
+    name: maindb
+    config:
+      version: "14"
+      sku: B_Standard_B1ms
+      storage_mb: 32768
+      backup_retention_days: 7`,
+
+            full: `metadata:
+  project_name: fullstack
+  environment: dev
+  business_unit: engineering
+  cost_center: CC-ENG-001
+  owner_email: team@company.com
+  location: centralus
+  tags:
+    Application: MyFullStackApp
+    Team: Platform
+
+resources:
+  - type: postgresql
+    name: db
+    config:
+      version: "14"
+      sku: B_Standard_B1ms
+      storage_mb: 32768
+
+  - type: keyvault
+    name: kv
+    config:
+      sku: standard
+      rbac_enabled: true
+
+  - type: storage_account
+    name: st
+    config:
+      tier: Standard
+      replication: LRS
+      containers:
+        - name: uploads
+          access_type: private
+        - name: backups
+          access_type: private`
+        };
+
+        function loadTemplate(name) {
+            document.getElementById('yaml').value = templates[name];
+            updateEnvironmentFromYaml();
+        }
+
+        function updateEnvironmentFromYaml() {
+            const yaml = document.getElementById('yaml').value;
+            const match = yaml.match(/environment:\s*(\w+)/);
+            if (match) {
+                document.getElementById('environment').value = match[1];
+            }
+        }
+
+        function validateYaml() {
+            const yaml = document.getElementById('yaml').value;
+            const statusBox = document.getElementById('statusBox');
+
+            try {
+                // Basic YAML validation
+                const lines = yaml.split('\n');
+                let hasMetadata = false;
+                let hasResources = false;
+                let hasProjectName = false;
+                let hasEnvironment = false;
+                let hasCostCenter = false;
+                let hasOwnerEmail = false;
+                let hasBusinessUnit = false;
+
+                for (const line of lines) {
+                    if (line.match(/^metadata:/)) hasMetadata = true;
+                    if (line.match(/^resources:/)) hasResources = true;
+                    if (line.match(/project_name:/)) hasProjectName = true;
+                    if (line.match(/environment:/)) hasEnvironment = true;
+                    if (line.match(/cost_center:/)) hasCostCenter = true;
+                    if (line.match(/owner_email:/)) hasOwnerEmail = true;
+                    if (line.match(/business_unit:/)) hasBusinessUnit = true;
+                }
+
+                const errors = [];
+                if (!hasMetadata) errors.push('Missing "metadata:" section');
+                if (!hasResources) errors.push('Missing "resources:" section');
+                if (!hasProjectName) errors.push('Missing "project_name" in metadata');
+                if (!hasEnvironment) errors.push('Missing "environment" in metadata');
+                if (!hasBusinessUnit) errors.push('Missing "business_unit" in metadata');
+                if (!hasCostCenter) errors.push('Missing "cost_center" in metadata');
+                if (!hasOwnerEmail) errors.push('Missing "owner_email" in metadata');
+
+                if (errors.length > 0) {
+                    statusBox.className = 'status-box status-error';
+                    statusBox.textContent = 'Validation Errors:\n\n' + errors.join('\n');
+                } else {
+                    statusBox.className = 'status-box status-success';
+                    statusBox.textContent = 'YAML validation passed!\n\nAll required fields present:\n- metadata section\n- resources section\n- project_name\n- environment\n- business_unit\n- cost_center\n- owner_email';
+                }
+            } catch (e) {
+                statusBox.className = 'status-box status-error';
+                statusBox.textContent = 'Validation Error:\n\n' + e.message;
+            }
+        }
+
+        function generateSasToken(namespace, sasKey, queueName) {
+            const uri = `https://${namespace}.servicebus.windows.net/${queueName}`.toLowerCase();
+            const expiry = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+
+            const encoder = new TextEncoder();
+            const encodedUri = encodeURIComponent(uri);
+            const stringToSign = `${encodedUri}\n${expiry}`;
+
+            return crypto.subtle.importKey(
+                'raw',
+                encoder.encode(sasKey),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            ).then(key => {
+                return crypto.subtle.sign('HMAC', key, encoder.encode(stringToSign));
+            }).then(signature => {
+                const base64Signature = btoa(String.fromCharCode(...new Uint8Array(signature)));
+                const encodedSignature = encodeURIComponent(base64Signature);
+                return `SharedAccessSignature sr=${encodedUri}&sig=${encodedSignature}&se=${expiry}&skn=RootManageSharedAccessKey`;
+            });
+        }
+
+        async function submitRequest() {
+            const submitBtn = document.getElementById('submitBtn');
+            const statusBox = document.getElementById('statusBox');
+            const yaml = document.getElementById('yaml').value;
+            const email = document.getElementById('email').value;
+            const environment = document.getElementById('environment').value;
+            const namespace = document.getElementById('servicebusNs').value;
+            const sasKey = document.getElementById('sasKey').value;
+
+            if (!yaml.trim()) {
+                statusBox.className = 'status-box status-error';
+                statusBox.textContent = 'Error: Please enter YAML configuration';
+                return;
+            }
+
+            if (!sasKey.trim()) {
+                statusBox.className = 'status-box status-error';
+                statusBox.textContent = 'Error: Please enter SAS key\n\nGet it with:\naz servicebus namespace authorization-rule keys list \\\n  --namespace-name ' + namespace + ' \\\n  --resource-group rg-infrastructure-api \\\n  --name RootManageSharedAccessKey \\\n  --query primaryKey -o tsv';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span>Submitting...';
+            statusBox.className = 'status-box status-pending';
+            statusBox.textContent = 'Generating SAS token and submitting request...';
+
+            try {
+                const queueName = `infrastructure-requests-${environment}`;
+                const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+                const sasToken = await generateSasToken(namespace, sasKey, queueName);
+
+                // Update YAML with selected environment
+                let updatedYaml = yaml;
+                if (yaml.includes('environment:')) {
+                    updatedYaml = yaml.replace(/environment:\s*\w+/, `environment: ${environment}`);
+                }
+
+                const body = JSON.stringify({
+                    request_id: requestId,
+                    yaml_content: updatedYaml,
+                    requester_email: email,
+                    metadata: {
+                        environment: environment,
+                        submitted_at: new Date().toISOString()
+                    }
+                });
+
+                const response = await fetch(`https://${namespace}.servicebus.windows.net/${queueName}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sasToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: body
+                });
+
+                if (response.ok || response.status === 201) {
+                    statusBox.className = 'status-box status-success';
+                    statusBox.textContent = `Request Submitted Successfully!
+
+Request ID: ${requestId}
+Queue: ${queueName}
+Environment: ${environment}
+Time: ${new Date().toLocaleString()}
+
+Next Steps:
+1. The queue consumer workflow runs every minute
+2. Or trigger manually: gh workflow run queue-consumer.yaml
+3. Monitor: gh run list --workflow=queue-consumer.yaml
+
+Your infrastructure will be provisioned shortly!`;
+                } else {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+            } catch (error) {
+                statusBox.className = 'status-box status-error';
+                statusBox.textContent = `Error Submitting Request:
+
+${error.message}
+
+Common issues:
+- Invalid SAS key
+- CORS policy (try from same domain or use CLI)
+- Network connectivity`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Submit Request';
+            }
+        }
+
+        // Load default template on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTemplate('storage');
+        });
+
+        // Update environment dropdown when YAML changes
+        document.getElementById('yaml').addEventListener('blur', updateEnvironmentFromYaml);
+    </script>
+</body>
+</html>
