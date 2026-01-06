@@ -1,0 +1,21 @@
+name: Test Local Runner
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: [self-hosted, linux, local]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Runner Info
+        run: |
+          echo "Runner: $RUNNER_NAME"
+          echo "OS: $(uname -a)"
+          hostname
+
+      - name: Test Complete
+        run: echo "Local runner is working!"
