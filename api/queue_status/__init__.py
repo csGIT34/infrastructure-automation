@@ -2,8 +2,7 @@ import azure.functions as func
 import json
 import os
 import logging
-from azure.servicebus.management import ServiceBusAdministrationClient
-from azure.identity import DefaultAzureCredential
+import traceback
 
 SERVICEBUS_NAMESPACE = os.environ.get('SERVICEBUS_NAMESPACE', 'sb-infra-api-rrkkz6a8')
 
@@ -24,6 +23,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         return cors_response("")
 
     try:
+        from azure.servicebus.management import ServiceBusAdministrationClient
+        from azure.identity import DefaultAzureCredential
+
         credential = DefaultAzureCredential()
         admin_client = ServiceBusAdministrationClient(
             f"{SERVICEBUS_NAMESPACE}.servicebus.windows.net",
@@ -51,4 +53,5 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     except Exception as e:
         logging.error(f"Error getting queue status: {e}")
-        return cors_response({'error': str(e)}, status_code=500)
+        logging.error(traceback.format_exc())
+        return cors_response({'error': str(e), 'traceback': traceback.format_exc()}, status_code=500)
