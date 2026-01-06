@@ -41,14 +41,12 @@ Write-Host ""
 Write-Host "[1/6] Checking prerequisites..." -ForegroundColor Yellow
 
 if (-not (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq "Enabled") {
-    Write-Error "Hyper-V is not enabled. Please enable it first:
-    Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All"
+    Write-Error "Hyper-V is not enabled. Please enable it first: Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All"
     exit 1
 }
 
 if (-not (Test-Path $ISOPath)) {
-    Write-Error "Ubuntu ISO not found at: $ISOPath
-    Download from: https://ubuntu.com/download/server"
+    Write-Error "Ubuntu ISO not found at: $ISOPath - Download from: https://ubuntu.com/download/server"
     exit 1
 }
 
@@ -115,7 +113,7 @@ for ($i = 1; $i -le $WorkerCount; $i++) {
         CPU = 4
         MemoryGB = 8
         DiskGB = 100
-        IP = "10.10.10.$($10 + $i)"
+        IP = "10.10.10.$(10 + $i)"
         Role = "worker"
     }
 }
