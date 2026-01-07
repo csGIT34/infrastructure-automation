@@ -445,6 +445,7 @@
                             <button class="template-btn" onclick="loadTemplate('storage')">Storage Account</button>
                             <button class="template-btn" onclick="loadTemplate('webapp')">Web App Stack</button>
                             <button class="template-btn" onclick="loadTemplate('database')">Database</button>
+                            <button class="template-btn" onclick="loadTemplate('staticwebapp')">Static Web App</button>
                             <button class="template-btn" onclick="loadTemplate('full')">Full Stack</button>
                         </div>
                     </div>
@@ -676,6 +677,21 @@ resources:
       sku: B_Standard_B1ms
       storage_mb: 32768
       backup_retention_days: 7`,
+
+            staticwebapp: `metadata:
+  project_name: mysite
+  environment: dev
+  business_unit: engineering
+  cost_center: CC-ENG-001
+  owner_email: team@company.com
+  location: centralus
+
+resources:
+  - type: static_web_app
+    name: frontend
+    config:
+      sku_tier: Free
+      sku_size: Free`,
 
             full: `metadata:
   project_name: fullstack
