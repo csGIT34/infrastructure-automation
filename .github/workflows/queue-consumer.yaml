@@ -2,8 +2,10 @@ name: Infrastructure Queue Consumer
 
 on:
     schedule:
-        - cron: '* * * * *'
+        - cron: '*/15 * * * *'
     workflow_dispatch:
+    repository_dispatch:
+        types: [infrastructure-request]
 
 permissions:
     id-token: write

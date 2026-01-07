@@ -1,18 +1,23 @@
 # Infrastructure GitOps Workflow Template
 # Copy this file to your repository: .github/workflows/infrastructure.yaml
 #
-# Required secret: INFRA_SERVICE_BUS_SAS_KEY
-# Get it from your platform team or run:
-#   az servicebus namespace authorization-rule keys list \
-#     --namespace-name sb-infra-api-rrkkz6a8 \
-#     --resource-group rg-infrastructure-api \
-#     --name RootManageSharedAccessKey \
-#     --query primaryKey -o tsv
+# Required secrets:
+#   INFRA_SERVICE_BUS_SAS_KEY - Service Bus SAS key for submitting requests
+#     Get it from your platform team or run:
+#       az servicebus namespace authorization-rule keys list \
+#         --namespace-name sb-infra-api-rrkkz6a8 \
+#         --resource-group rg-infrastructure-api \
+#         --name RootManageSharedAccessKey \
+#         --query primaryKey -o tsv
+#
+#   INFRA_DISPATCH_TOKEN - GitHub PAT with 'repo' scope to trigger queue consumer
+#     Create at: https://github.com/settings/tokens
+#     Required scope: repo (to trigger workflow in infrastructure-automation)
 #
 # Usage:
 # 1. Create infrastructure.yaml in your repo root (see templates/infrastructure.yaml)
 # 2. Create a PR to see the plan preview with additions/deletions
-# 3. Merge to main to provision resources
+# 3. Merge to main to provision resources (triggers immediate processing)
 #
 # Features:
 # - Validates YAML syntax and required fields
@@ -405,3 +410,14 @@ jobs:
               print(e.read().decode())
               exit(1)
           EOF
+
+      - name: Trigger Queue Consumer
+        env:
+          GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+        run: |
+          curl -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/csGIT34/infrastructure-automation/dispatches \
+            -d '{"event_type":"infrastructure-request","client_payload":{"source":"${{ github.repository }}","sha":"${{ github.sha }}"}}'
+          echo "Triggered infrastructure queue consumer"
