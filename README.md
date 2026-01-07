@@ -44,12 +44,14 @@ An enterprise-grade platform that enables development teams to provision Azure i
 
 | Component | Description | Location |
 |-----------|-------------|----------|
-| **API Gateway** | Azure Function App that validates requests and queues them | `infrastructure/api-gateway/` |
+| **API Gateway** | Azure Function App that validates requests and queues them | `api/` |
 | **Service Bus** | Message queues for dev/staging/prod environments | Azure resource |
 | **Cosmos DB** | Tracks request status and history | Azure resource |
 | **Queue Consumer** | GitHub Actions workflow that monitors queues | `.github/workflows/queue-consumer.yaml` |
 | **Provision Worker** | Runs Terraform to create infrastructure | `.github/workflows/provision-worker.yaml` |
 | **Terraform Catalog** | Modular Terraform configs for each resource type | `terraform/catalog/` |
+| **MCP Server** | AI-powered infrastructure analysis and generation | `mcp-server/` |
+| **Web Portal** | Self-service UI for submitting requests | `web/` |
 
 ## Azure Resources Required
 
@@ -697,6 +699,73 @@ See [github.com/csGIT34/BillTracker](https://github.com/csGIT34/BillTracker) for
 | "No previous deployment found" | This is normal for first-time deployments. All resources show as additions. |
 | Merge succeeded but no resources created | Check the [queue consumer workflow](https://github.com/csGIT34/infrastructure-automation/actions/workflows/queue-consumer.yaml) for errors. |
 | Resources created but status shows "failed" | Check the workflow logs for Terraform errors. The resources may have been partially created. |
+
+## AI-Powered Infrastructure Generation (MCP Server)
+
+The platform includes an MCP (Model Context Protocol) server that enables AI assistants like Claude to analyze codebases and generate infrastructure configurations.
+
+### Features
+
+- **Analyze Codebases**: Scans for database connections, storage usage, frameworks, and environment variables
+- **Generate YAML**: Creates valid `infrastructure.yaml` files based on detected needs
+- **Validate Configurations**: Checks YAML against the schema before deployment
+- **Module Documentation**: Provides detailed info about available Terraform modules
+
+### Setup
+
+```bash
+cd mcp-server
+npm install
+npm run build
+```
+
+### Configure Claude Code
+
+Add to your MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "infrastructure": {
+      "command": "node",
+      "args": ["/path/to/infrastructure-automation/mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+### Example Conversation
+
+```
+You: "What infrastructure does my project need?"
+
+Claude: [analyzes codebase]
+"Based on your Next.js app with Prisma and file uploads, I recommend:
+- postgresql for your database
+- storage_account for file uploads
+- static_web_app for hosting
+- keyvault for secrets
+
+Would you like me to generate the infrastructure.yaml?"
+
+You: "Yes, generate it"
+
+Claude: [generates YAML]
+"Here's your infrastructure.yaml. Add this to your repo root
+and follow the GitOps setup guide to enable automatic provisioning."
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_available_modules` | List Terraform modules with config options |
+| `analyze_codebase` | Detect infrastructure needs from code |
+| `generate_infrastructure_yaml` | Create valid GitOps configuration |
+| `validate_infrastructure_yaml` | Validate against schema |
+| `get_module_details` | Get detailed module documentation |
+
+See [mcp-server/README.md](mcp-server/README.md) for full documentation.
 
 ## How to Test
 
