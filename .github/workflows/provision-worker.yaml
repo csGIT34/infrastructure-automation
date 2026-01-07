@@ -232,7 +232,14 @@ jobs:
                           yaml_content = body['yaml_content']
                           config = yaml.safe_load(yaml_content)
 
+                          # Extract metadata for tracking
+                          metadata = config.get('metadata', {})
+                          project_name = metadata.get('project_name', 'unknown')
+                          environment = metadata.get('environment', 'dev')
+                          requester_email = body.get('requester_email', metadata.get('owner_email', 'unknown'))
+
                           print(f"Processing request: {request_id}")
+                          print(f"  Project: {project_name}, Environment: {environment}")
 
                           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                               f.write("has_message=true\n")
@@ -240,6 +247,9 @@ jobs:
 
                           # Update status to processing
                           update_cosmos_status(request_id, 'processing', {
+                              'project_name': project_name,
+                              'environment': environment,
+                              'requester_email': requester_email,
                               'github_run_id': GITHUB_RUN_ID,
                               'github_run_url': GITHUB_RUN_URL
                           })
@@ -247,8 +257,13 @@ jobs:
                           # Run Terraform
                           outputs = run_terraform(config, request_id)
 
-                          # Update status to completed
+                          # Update status to completed with full deployment state
                           update_cosmos_status(request_id, 'completed', {
+                              'project_name': project_name,
+                              'environment': environment,
+                              'requester_email': requester_email,
+                              'yaml_content': yaml_content,
+                              'resources': config.get('resources', []),
                               'completed_at': datetime.utcnow().isoformat(),
                               'terraform_outputs': outputs
                           })
@@ -262,9 +277,11 @@ jobs:
 
                           # Update status to failed
                           if 'request_id' in dir():
-                              update_cosmos_status(request_id, 'failed', {
-                                  'error_message': str(e)
-                              })
+                              failed_fields = {'error_message': str(e)}
+                              if 'project_name' in dir():
+                                  failed_fields['project_name'] = project_name
+                                  failed_fields['environment'] = environment
+                              update_cosmos_status(request_id, 'failed', failed_fields)
 
                           # Abandon the message (return to queue for retry)
                           receiver.abandon_message(message)
