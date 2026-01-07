@@ -22,7 +22,7 @@
 #
 # Features:
 # - Validates YAML syntax and required fields
-# - Shows plan preview comparing against base branch
+# - Shows plan preview comparing against last successful deployment
 # - Indicates which resources will be added, removed, or unchanged
 # - Posts plan as PR comment
 # - Submits to provisioning queue on merge
@@ -53,17 +53,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Get base branch config
-        id: base
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git show origin/${{ github.base_ref }}:infrastructure.yaml > base_infrastructure.yaml 2>/dev/null || echo "" > base_infrastructure.yaml
-          else
-            git show HEAD~1:infrastructure.yaml > base_infrastructure.yaml 2>/dev/null || echo "" > base_infrastructure.yaml
-          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -71,7 +60,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install pyyaml
+        run: pip install pyyaml requests
 
       - name: Validate infrastructure YAML
         id: validate
@@ -143,112 +132,114 @@ jobs:
 
       - name: Generate Plan Preview
         id: plan
+        env:
+          PLAN_API_URL: https://func-infra-api-rrkkz6a8.azurewebsites.net/api/plan
         run: |
           python << 'PLANEOF'
           import yaml
+          import json
           import os
+          import requests
 
-          def get_azure_name(rtype, rname, project, env):
-              if rtype == 'storage_account':
-                  return f"{project}{rname}{env}".replace('-', '').replace('_', '')[:24]
-              elif rtype == 'keyvault':
-                  return f"{project}-{rname}-{env}"[:24]
-              elif rtype == 'postgresql':
-                  return f"{project}-{rname}-{env}"
-              elif rtype == 'static_web_app':
-                  return f"swa-{project}-{rname}-{env}"
-              else:
-                  return f"{rtype}-{project}-{rname}-{env}"
+          PLAN_API_URL = os.environ['PLAN_API_URL']
 
           # Load current config
           with open("infrastructure.yaml", 'r') as f:
-              config = yaml.safe_load(f)
-
-          # Load base config (previous state)
-          base_resources = {}
-          try:
-              with open("base_infrastructure.yaml", 'r') as f:
-                  content = f.read().strip()
-                  if content:
-                      base_config = yaml.safe_load(content)
-                      if base_config and 'resources' in base_config:
-                          for r in base_config['resources']:
-                              key = f"{r['type']}:{r['name']}"
-                              base_resources[key] = r
-          except:
-              pass
+              yaml_content = f.read()
+              config = yaml.safe_load(yaml_content)
 
           metadata = config['metadata']
-          resources = config.get('resources', [])
-
           project = metadata.get('project_name', 'unknown')
           env = metadata.get('environment', 'dev')
 
-          # Categorize resources
-          current_keys = set()
-          for r in resources:
-              key = f"{r['type']}:{r['name']}"
-              current_keys.add(key)
+          # Call the plan API to compare against last successful deployment
+          try:
+              response = requests.post(PLAN_API_URL, json={
+                  'project_name': project,
+                  'environment': env,
+                  'proposed_yaml': yaml_content
+              }, timeout=30)
+              response.raise_for_status()
+              plan_data = response.json()
+          except Exception as e:
+              print(f"Warning: Could not reach plan API: {e}")
+              print("Falling back to showing all resources as new")
+              plan_data = {
+                  'changes': {
+                      'added': [{'type': r['type'], 'name': r['name'], 'azure_name': 'unknown'} for r in config.get('resources', [])],
+                      'removed': [],
+                      'unchanged': []
+                  },
+                  'summary': {'added': len(config.get('resources', [])), 'removed': 0, 'unchanged': 0},
+                  'warnings': ['Could not connect to plan API. Showing all resources as additions.'],
+                  'last_deployment': None
+              }
 
-          base_keys = set(base_resources.keys())
-
-          added = current_keys - base_keys
-          removed = base_keys - current_keys
-          unchanged = current_keys & base_keys
+          changes = plan_data.get('changes', {})
+          summary = plan_data.get('summary', {})
+          warnings = plan_data.get('warnings', [])
+          last_deployment = plan_data.get('last_deployment')
 
           # Generate markdown preview
           preview = f"""## Infrastructure Plan Preview
 
-          ### Project Information
-          | Property | Value |
-          |----------|-------|
-          | Project Name | `{metadata.get('project_name')}` |
-          | Environment | `{metadata.get('environment')}` |
-          | Business Unit | `{metadata.get('business_unit')}` |
-          | Cost Center | `{metadata.get('cost_center')}` |
-          | Owner | `{metadata.get('owner_email')}` |
-          | Location | `{metadata.get('location', 'centralus')}` |
+### Project Information
+| Property | Value |
+|----------|-------|
+| Project Name | `{metadata.get('project_name')}` |
+| Environment | `{metadata.get('environment')}` |
+| Business Unit | `{metadata.get('business_unit')}` |
+| Cost Center | `{metadata.get('cost_center')}` |
+| Owner | `{metadata.get('owner_email')}` |
+| Location | `{metadata.get('location', 'centralus')}` |
 
-          ### Changes Summary
-          | Added | Removed | Unchanged |
-          |-------|---------|-----------|
-          | {len(added)} | {len(removed)} | {len(unchanged)} |
-
-          ### Resource Changes
-
-          | Status | Type | Name | Azure Resource |
-          |--------|------|------|----------------|
-          """
-
-          # Show added resources
-          for r in resources:
-              key = f"{r['type']}:{r['name']}"
-              azure_name = get_azure_name(r['type'], r['name'], project, env)
-              if key in added:
-                  preview += f"| + **Add** | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
-
-          # Show removed resources
-          for key in removed:
-              r = base_resources[key]
-              azure_name = get_azure_name(r['type'], r['name'], project, env)
-              preview += f"| - **Remove** | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
-
-          # Show unchanged resources
-          for r in resources:
-              key = f"{r['type']}:{r['name']}"
-              azure_name = get_azure_name(r['type'], r['name'], project, env)
-              if key in unchanged:
-                  preview += f"| = No change | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
+### Last Successful Deployment
+"""
+          if last_deployment:
+              preview += f"| Property | Value |\n|----------|-------|\n"
+              preview += f"| Request ID | `{last_deployment.get('request_id', 'N/A')}` |\n"
+              preview += f"| Deployed At | `{last_deployment.get('deployed_at', 'N/A')}` |\n"
+          else:
+              preview += "_No previous deployment found for this project/environment._\n"
 
           preview += f"""
-          ### Resource Group
-          `rg-{project}-{env}`
+### Changes Summary (vs. Last Deployment)
+| Added | Removed | Unchanged |
+|-------|---------|-----------|
+| {summary.get('added', 0)} | {summary.get('removed', 0)} | {summary.get('unchanged', 0)} |
 
-          ---
-          """
+### Resource Changes
 
-          if added or removed:
-              preview += "**Warning: This PR will modify infrastructure.** Review changes carefully before merging.\n\n"
+| Status | Type | Name | Azure Resource |
+|--------|------|------|----------------|
+"""
+
+          # Show added resources
+          for r in changes.get('added', []):
+              preview += f"| + **Add** | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
+
+          # Show removed resources
+          for r in changes.get('removed', []):
+              preview += f"| - **Remove** | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
+
+          # Show unchanged resources
+          for r in changes.get('unchanged', []):
+              preview += f"| = No change | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
+
+          preview += f"""
+### Resource Group
+`rg-{project}-{env}`
+
+---
+"""
+
+          # Show warnings
+          if warnings:
+              for warning in warnings:
+                  preview += f"**Note:** {warning}\n\n"
+
+          if summary.get('added', 0) > 0 or summary.get('removed', 0) > 0:
+              preview += "**This PR will modify infrastructure.** Review changes carefully before merging.\n\n"
           else:
               preview += "**No infrastructure changes detected.**\n\n"
 
