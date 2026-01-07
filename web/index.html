@@ -402,6 +402,106 @@
             width: auto;
             white-space: nowrap;
         }
+
+        /* Export Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #1e1e2e;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal h2 {
+            color: #fff;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        .modal-close {
+            float: right;
+            background: transparent;
+            border: none;
+            color: #a1a1aa;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: auto;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #fff;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .export-step {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .export-step h3 {
+            color: #3b82f6;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .export-step p {
+            color: #a1a1aa;
+            font-size: 0.85rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .export-step code {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: #93c5fd;
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            margin-top: 0.5rem;
+        }
+
+        .btn-export:hover {
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+        }
+
+        .button-row {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .button-row button {
+            flex: 1;
+            min-width: 150px;
+        }
     </style>
 </head>
 <body>
@@ -455,7 +555,10 @@
                         <textarea id="yaml" class="yaml-editor" placeholder="Enter your infrastructure YAML here..."></textarea>
                     </div>
 
-                    <button id="submitBtn" onclick="submitRequest()">Submit Request</button>
+                    <div class="button-row">
+                        <button id="submitBtn" onclick="submitRequest()">Submit Request</button>
+                        <button class="btn-export" onclick="showExportModal()">Export for GitOps</button>
+                    </div>
                     <button class="btn-secondary" onclick="validateYaml()">Validate YAML</button>
                 </div>
 
@@ -607,6 +710,61 @@ req-1704567890123-abc123def</div>
                 <h2 style="margin-top: 2rem;">Recent Requests</h2>
                 <button class="btn-secondary" onclick="loadRecentRequests()" style="margin-bottom: 1rem;">Load Recent Requests</button>
                 <div id="recentRequests"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal-overlay" onclick="if(event.target === this) closeExportModal()">
+        <div class="modal">
+            <button class="modal-close" onclick="closeExportModal()">&times;</button>
+            <h2>Export for GitOps</h2>
+
+            <p style="color: #a1a1aa; margin-bottom: 1.5rem;">
+                Set up infrastructure-as-code in your repository. Changes to your infrastructure.yaml
+                will automatically provision resources when merged to main.
+            </p>
+
+            <div class="export-step">
+                <h3>Step 1: Download Infrastructure Config</h3>
+                <p>Save this file to your repository root as <code>infrastructure.yaml</code></p>
+                <button class="btn-small" onclick="downloadInfrastructureYaml()">Download infrastructure.yaml</button>
+            </div>
+
+            <div class="export-step">
+                <h3>Step 2: Add GitHub Workflow</h3>
+                <p>Download the workflow file to <code>.github/workflows/infrastructure.yaml</code></p>
+                <button class="btn-small" onclick="downloadWorkflowYaml()">Download Workflow</button>
+                <p style="margin-top: 0.5rem; font-size: 0.75rem;">
+                    Or run: <code>mkdir -p .github/workflows && curl -o .github/workflows/infrastructure.yaml https://raw.githubusercontent.com/csGIT34/infrastructure-automation/main/templates/infrastructure-workflow.yaml</code>
+                </p>
+            </div>
+
+            <div class="export-step">
+                <h3>Step 3: Configure Repository Secrets</h3>
+                <p>Add these secrets in your repo's Settings > Secrets > Actions:</p>
+                <ul style="color: #a1a1aa; font-size: 0.85rem; margin-left: 1rem;">
+                    <li><code>INFRA_SERVICE_BUS_SAS_KEY</code> - Service Bus key</li>
+                    <li><code>INFRA_APP_ID</code> - GitHub App ID</li>
+                    <li><code>INFRA_APP_PRIVATE_KEY</code> - GitHub App private key</li>
+                </ul>
+                <p style="margin-top: 0.5rem; font-size: 0.75rem; color: #71717a;">
+                    Contact your platform team for these credentials.
+                </p>
+            </div>
+
+            <div class="export-step">
+                <h3>Step 4: Create a Pull Request</h3>
+                <p>
+                    Commit your changes, push to a branch, and open a PR.
+                    The workflow will validate your config and post a plan preview as a comment.
+                </p>
+            </div>
+
+            <div class="info-box" style="margin-top: 1rem;">
+                <strong>What happens next?</strong><br>
+                When you merge the PR, your infrastructure will be automatically provisioned.
+                Track status at the <a href="https://wonderful-field-088efae10.1.azurestaticapps.net" target="_blank" style="color: #93c5fd;">Infrastructure Portal</a>.
             </div>
         </div>
     </div>
@@ -1030,6 +1188,75 @@ Copy the Request ID to track status in the "Request Lookup" tab.`;
                 container.innerHTML = `<div class="status-box status-error">Error: ${error.message}</div>`;
             }
         }
+
+        // Export Modal Functions
+        function showExportModal() {
+            const yaml = document.getElementById('yaml').value;
+            if (!yaml.trim()) {
+                alert('Please enter a YAML configuration first');
+                return;
+            }
+            document.getElementById('exportModal').classList.add('active');
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportModal').classList.remove('active');
+        }
+
+        function downloadInfrastructureYaml() {
+            const yaml = document.getElementById('yaml').value;
+            if (!yaml.trim()) {
+                alert('No YAML configuration to export');
+                return;
+            }
+
+            // Add header comment
+            const header = `# Infrastructure Configuration
+# Managed by GitOps - changes trigger automatic provisioning
+# Documentation: https://github.com/csGIT34/infrastructure-automation
+
+`;
+            const content = header + yaml;
+
+            const blob = new Blob([content], { type: 'text/yaml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'infrastructure.yaml';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function downloadWorkflowYaml() {
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/csGIT34/infrastructure-automation/main/templates/infrastructure-workflow.yaml');
+                if (!response.ok) throw new Error('Failed to fetch workflow template');
+
+                const content = await response.text();
+                const blob = new Blob([content], { type: 'text/yaml' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                // Use a descriptive name - user should rename/move to .github/workflows/
+                a.download = 'infrastructure-workflow.yaml';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                // Show reminder about where to place the file
+                alert('Downloaded! Move this file to:\n.github/workflows/infrastructure.yaml\n\nin your repository.');
+            } catch (error) {
+                alert('Error downloading workflow: ' + error.message + '\n\nPlease use the curl command shown below the button.');
+            }
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeExportModal();
+        });
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
