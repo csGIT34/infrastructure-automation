@@ -1,12 +1,25 @@
+# Infrastructure GitOps Workflow Template
 # Copy this file to your repository: .github/workflows/infrastructure.yaml
 #
 # Required secret: INFRA_SERVICE_BUS_SAS_KEY
-# Get it from your platform team or the infrastructure portal
+# Get it from your platform team or run:
+#   az servicebus namespace authorization-rule keys list \
+#     --namespace-name sb-infra-api-rrkkz6a8 \
+#     --resource-group rg-infrastructure-api \
+#     --name RootManageSharedAccessKey \
+#     --query primaryKey -o tsv
 #
 # Usage:
-# 1. Create infrastructure.yaml in your repo root
-# 2. Create a PR to see the plan preview
+# 1. Create infrastructure.yaml in your repo root (see templates/infrastructure.yaml)
+# 2. Create a PR to see the plan preview with additions/deletions
 # 3. Merge to main to provision resources
+#
+# Features:
+# - Validates YAML syntax and required fields
+# - Shows plan preview comparing against base branch
+# - Indicates which resources will be added, removed, or unchanged
+# - Posts plan as PR comment
+# - Submits to provisioning queue on merge
 
 name: Infrastructure GitOps
 
@@ -20,32 +33,229 @@ on:
     paths:
       - 'infrastructure.yaml'
 
-jobs:
-  # On PR: Validate and show plan preview
-  plan:
-    if: github.event_name == 'pull_request'
-    uses: csGIT34/infrastructure-automation/.github/workflows/gitops-infrastructure.yaml@main
-    with:
-      infrastructure_file: 'infrastructure.yaml'
-      action: 'plan'
-    secrets:
-      INFRA_SERVICE_BUS_SAS_KEY: ${{ secrets.INFRA_SERVICE_BUS_SAS_KEY }}
+permissions:
+  contents: read
+  pull-requests: write
 
-  # Post plan as PR comment
-  comment:
-    needs: plan
-    if: github.event_name == 'pull_request'
+jobs:
+  validate-and-plan:
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
+    outputs:
+      validation_result: ${{ steps.validate.outputs.result }}
+      plan_markdown: ${{ steps.plan.outputs.markdown }}
+
     steps:
-      - name: Download plan
-        uses: actions/download-artifact@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          name: infrastructure-plan
-        continue-on-error: true
+          fetch-depth: 0
+
+      - name: Get base branch config
+        id: base
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git show origin/${{ github.base_ref }}:infrastructure.yaml > base_infrastructure.yaml 2>/dev/null || echo "" > base_infrastructure.yaml
+          else
+            git show HEAD~1:infrastructure.yaml > base_infrastructure.yaml 2>/dev/null || echo "" > base_infrastructure.yaml
+          fi
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate infrastructure YAML
+        id: validate
+        run: |
+          python << 'EOF'
+          import yaml
+          import json
+          import sys
+          import os
+
+          infra_file = "infrastructure.yaml"
+
+          if not os.path.exists(infra_file):
+              print(f"::error::Infrastructure file not found: {infra_file}")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("result=failed\n")
+              sys.exit(1)
+
+          try:
+              with open(infra_file, 'r') as f:
+                  config = yaml.safe_load(f)
+          except yaml.YAMLError as e:
+              print(f"::error::Invalid YAML syntax: {e}")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("result=failed\n")
+              sys.exit(1)
+
+          # Validate required fields
+          errors = []
+
+          if 'metadata' not in config:
+              errors.append("Missing 'metadata' section")
+          else:
+              metadata = config['metadata']
+              required_meta = ['project_name', 'environment', 'business_unit', 'cost_center', 'owner_email']
+              for field in required_meta:
+                  if field not in metadata:
+                      errors.append(f"Missing metadata.{field}")
+
+          if 'resources' not in config:
+              errors.append("Missing 'resources' section")
+          elif not isinstance(config.get('resources'), list):
+              errors.append("'resources' must be a list")
+          elif len(config.get('resources', [])) == 0:
+              errors.append("'resources' list is empty")
+          else:
+              valid_types = ['storage_account', 'keyvault', 'postgresql', 'mongodb', 'eventhub', 'function_app', 'linux_vm', 'aks_namespace', 'static_web_app']
+              for i, resource in enumerate(config['resources']):
+                  if 'type' not in resource:
+                      errors.append(f"Resource {i+1}: missing 'type'")
+                  elif resource['type'] not in valid_types:
+                      errors.append(f"Resource {i+1}: invalid type '{resource['type']}'. Valid: {', '.join(valid_types)}")
+                  if 'name' not in resource:
+                      errors.append(f"Resource {i+1}: missing 'name'")
+
+          if errors:
+              print("::error::Validation failed")
+              for err in errors:
+                  print(f"  - {err}")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("result=failed\n")
+                  f.write(f"errors={json.dumps(errors)}\n")
+              sys.exit(1)
+
+          print("Validation passed!")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write("result=passed\n")
+          EOF
+
+      - name: Generate Plan Preview
+        id: plan
+        run: |
+          python << 'PLANEOF'
+          import yaml
+          import os
+
+          def get_azure_name(rtype, rname, project, env):
+              if rtype == 'storage_account':
+                  return f"{project}{rname}{env}".replace('-', '').replace('_', '')[:24]
+              elif rtype == 'keyvault':
+                  return f"{project}-{rname}-{env}"[:24]
+              elif rtype == 'postgresql':
+                  return f"{project}-{rname}-{env}"
+              elif rtype == 'static_web_app':
+                  return f"swa-{project}-{rname}-{env}"
+              else:
+                  return f"{rtype}-{project}-{rname}-{env}"
+
+          # Load current config
+          with open("infrastructure.yaml", 'r') as f:
+              config = yaml.safe_load(f)
+
+          # Load base config (previous state)
+          base_resources = {}
+          try:
+              with open("base_infrastructure.yaml", 'r') as f:
+                  content = f.read().strip()
+                  if content:
+                      base_config = yaml.safe_load(content)
+                      if base_config and 'resources' in base_config:
+                          for r in base_config['resources']:
+                              key = f"{r['type']}:{r['name']}"
+                              base_resources[key] = r
+          except:
+              pass
+
+          metadata = config['metadata']
+          resources = config.get('resources', [])
+
+          project = metadata.get('project_name', 'unknown')
+          env = metadata.get('environment', 'dev')
+
+          # Categorize resources
+          current_keys = set()
+          for r in resources:
+              key = f"{r['type']}:{r['name']}"
+              current_keys.add(key)
+
+          base_keys = set(base_resources.keys())
+
+          added = current_keys - base_keys
+          removed = base_keys - current_keys
+          unchanged = current_keys & base_keys
+
+          # Generate markdown preview
+          preview = f"""## Infrastructure Plan Preview
+
+### Project Information
+| Property | Value |
+|----------|-------|
+| Project Name | `{metadata.get('project_name')}` |
+| Environment | `{metadata.get('environment')}` |
+| Business Unit | `{metadata.get('business_unit')}` |
+| Cost Center | `{metadata.get('cost_center')}` |
+| Owner | `{metadata.get('owner_email')}` |
+| Location | `{metadata.get('location', 'centralus')}` |
+
+### Changes Summary
+| Added | Removed | Unchanged |
+|-------|---------|-----------|
+| {len(added)} | {len(removed)} | {len(unchanged)} |
+
+### Resource Changes
+
+| Status | Type | Name | Azure Resource |
+|--------|------|------|----------------|
+"""
+
+          # Show added resources
+          for r in resources:
+              key = f"{r['type']}:{r['name']}"
+              azure_name = get_azure_name(r['type'], r['name'], project, env)
+              if key in added:
+                  preview += f"| :heavy_plus_sign: **Add** | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
+
+          # Show removed resources
+          for key in removed:
+              r = base_resources[key]
+              azure_name = get_azure_name(r['type'], r['name'], project, env)
+              preview += f"| :heavy_minus_sign: **Remove** | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
+
+          # Show unchanged resources
+          for r in resources:
+              key = f"{r['type']}:{r['name']}"
+              azure_name = get_azure_name(r['type'], r['name'], project, env)
+              if key in unchanged:
+                  preview += f"| :white_check_mark: No change | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
+
+          preview += f"""
+### Resource Group
+`rg-{project}-{env}`
+
+---
+"""
+          if added or removed:
+              preview += "**:warning: This PR will modify infrastructure.** Review changes carefully before merging.\n\n"
+          else:
+              preview += "**No infrastructure changes detected.**\n\n"
+
+          preview += "**On merge to main**, these changes will be automatically applied.\n\n"
+          preview += "Track provisioning status at: https://wonderful-field-088efae10.1.azurestaticapps.net\n"
+
+          with open('plan_preview.md', 'w') as f:
+              f.write(preview)
+
+          print(preview)
+          PLANEOF
 
       - name: Comment on PR
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
@@ -63,7 +273,6 @@ jobs:
               body += '✅ Validation passed. See workflow summary for details.';
             }
 
-            // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -90,12 +299,108 @@ jobs:
               });
             }
 
-  # On merge to main: Apply infrastructure
-  apply:
+      - name: Create Job Summary
+        if: always()
+        run: |
+          if [ -f plan_preview.md ]; then
+            cat plan_preview.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Submit to queue on merge to main
+  provision:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: csGIT34/infrastructure-automation/.github/workflows/gitops-infrastructure.yaml@main
-    with:
-      infrastructure_file: 'infrastructure.yaml'
-      action: 'apply'
-    secrets:
-      INFRA_SERVICE_BUS_SAS_KEY: ${{ secrets.INFRA_SERVICE_BUS_SAS_KEY }}
+    runs-on: ubuntu-latest
+    needs: validate-and-plan
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Submit to Infrastructure Queue
+        env:
+          SAS_KEY: ${{ secrets.INFRA_SERVICE_BUS_SAS_KEY }}
+        run: |
+          python << 'EOF'
+          import yaml
+          import json
+          import hashlib
+          import hmac
+          import base64
+          import time
+          import urllib.parse
+          import urllib.request
+          import os
+
+          with open("infrastructure.yaml", 'r') as f:
+              yaml_content = f.read()
+              config = yaml.safe_load(yaml_content)
+
+          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
+          sha = os.environ.get('GITHUB_SHA', 'unknown')[:8]
+          timestamp = int(time.time())
+          request_id = f"gitops-{repo.replace('/', '-')}-{sha}-{timestamp}"
+
+          namespace = "sb-infra-api-rrkkz6a8"
+          queue_name = f"infrastructure-requests-{config['metadata']['environment']}"
+          sas_key = os.environ['SAS_KEY']
+          sas_key_name = "RootManageSharedAccessKey"
+
+          uri = f"https://{namespace}.servicebus.windows.net/{queue_name}".lower()
+          expiry = int(time.time()) + 3600
+          string_to_sign = f"{urllib.parse.quote_plus(uri)}\n{expiry}"
+          signature = base64.b64encode(
+              hmac.new(sas_key.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).digest()
+          ).decode('utf-8')
+          sas_token = f"SharedAccessSignature sr={urllib.parse.quote_plus(uri)}&sig={urllib.parse.quote_plus(signature)}&se={expiry}&skn={sas_key_name}"
+
+          message = {
+              'request_id': request_id,
+              'yaml_content': yaml_content,
+              'requester_email': config['metadata'].get('owner_email', 'gitops@automation'),
+              'metadata': {
+                  'source': 'gitops',
+                  'repository': repo,
+                  'commit_sha': os.environ.get('GITHUB_SHA'),
+                  'triggered_by': os.environ.get('GITHUB_ACTOR'),
+                  'environment': config['metadata']['environment'],
+                  'submitted_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+              }
+          }
+
+          url = f"https://{namespace}.servicebus.windows.net/{queue_name}/messages"
+          data = json.dumps(message).encode('utf-8')
+
+          req = urllib.request.Request(url, data=data, method='POST')
+          req.add_header('Authorization', sas_token)
+          req.add_header('Content-Type', 'application/json')
+
+          try:
+              response = urllib.request.urlopen(req)
+              print(f"Successfully submitted infrastructure request!")
+              print(f"   Request ID: {request_id}")
+              print(f"   Queue: {queue_name}")
+              print(f"   Repository: {repo}")
+              print(f"\nTrack status at: https://wonderful-field-088efae10.1.azurestaticapps.net")
+
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                  f.write("## Infrastructure Request Submitted\n\n")
+                  f.write(f"| Property | Value |\n")
+                  f.write(f"|----------|-------|\n")
+                  f.write(f"| Request ID | `{request_id}` |\n")
+                  f.write(f"| Queue | `{queue_name}` |\n")
+                  f.write(f"| Repository | `{repo}` |\n")
+                  f.write(f"\n[Track Status](https://wonderful-field-088efae10.1.azurestaticapps.net)\n")
+
+          except urllib.error.HTTPError as e:
+              print(f"::error::Failed to submit: {e.code} {e.reason}")
+              print(e.read().decode())
+              exit(1)
+          EOF
