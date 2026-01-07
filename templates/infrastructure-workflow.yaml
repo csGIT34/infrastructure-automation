@@ -181,38 +181,30 @@ jobs:
           last_deployment = plan_data.get('last_deployment')
 
           # Generate markdown preview
-          preview = f"""## Infrastructure Plan Preview
-
-### Project Information
-| Property | Value |
-|----------|-------|
-| Project Name | `{metadata.get('project_name')}` |
-| Environment | `{metadata.get('environment')}` |
-| Business Unit | `{metadata.get('business_unit')}` |
-| Cost Center | `{metadata.get('cost_center')}` |
-| Owner | `{metadata.get('owner_email')}` |
-| Location | `{metadata.get('location', 'centralus')}` |
-
-### Last Successful Deployment
-"""
+          preview = "## Infrastructure Plan Preview\n\n"
+          preview += "### Project Information\n"
+          preview += "| Property | Value |\n"
+          preview += "|----------|-------|\n"
+          preview += f"| Project Name | `{metadata.get('project_name')}` |\n"
+          preview += f"| Environment | `{metadata.get('environment')}` |\n"
+          preview += f"| Business Unit | `{metadata.get('business_unit')}` |\n"
+          preview += f"| Cost Center | `{metadata.get('cost_center')}` |\n"
+          preview += f"| Owner | `{metadata.get('owner_email')}` |\n"
+          preview += f"| Location | `{metadata.get('location', 'centralus')}` |\n\n"
+          preview += "### Last Successful Deployment\n"
           if last_deployment:
-              preview += f"| Property | Value |\n|----------|-------|\n"
+              preview += "| Property | Value |\n|----------|-------|\n"
               preview += f"| Request ID | `{last_deployment.get('request_id', 'N/A')}` |\n"
               preview += f"| Deployed At | `{last_deployment.get('deployed_at', 'N/A')}` |\n"
           else:
               preview += "_No previous deployment found for this project/environment._\n"
-
-          preview += f"""
-### Changes Summary (vs. Last Deployment)
-| Added | Removed | Unchanged |
-|-------|---------|-----------|
-| {summary.get('added', 0)} | {summary.get('removed', 0)} | {summary.get('unchanged', 0)} |
-
-### Resource Changes
-
-| Status | Type | Name | Azure Resource |
-|--------|------|------|----------------|
-"""
+          preview += "\n### Changes Summary (vs. Last Deployment)\n"
+          preview += "| Added | Removed | Unchanged |\n"
+          preview += "|-------|---------|----------|\n"
+          preview += f"| {summary.get('added', 0)} | {summary.get('removed', 0)} | {summary.get('unchanged', 0)} |\n\n"
+          preview += "### Resource Changes\n\n"
+          preview += "| Status | Type | Name | Azure Resource |\n"
+          preview += "|--------|------|------|----------------|\n"
 
           # Show added resources
           for r in changes.get('added', []):
@@ -226,12 +218,9 @@ jobs:
           for r in changes.get('unchanged', []):
               preview += f"| = No change | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
 
-          preview += f"""
-### Resource Group
-`rg-{project}-{env}`
-
----
-"""
+          preview += f"\n### Resource Group\n"
+          preview += f"`rg-{project}-{env}`\n\n"
+          preview += "---\n"
 
           # Show warnings
           if warnings:
