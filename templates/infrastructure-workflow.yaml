@@ -10,9 +10,10 @@
 #         --name RootManageSharedAccessKey \
 #         --query primaryKey -o tsv
 #
-#   INFRA_DISPATCH_TOKEN - GitHub PAT with 'repo' scope to trigger queue consumer
-#     Create at: https://github.com/settings/tokens
-#     Required scope: repo (to trigger workflow in infrastructure-automation)
+#   INFRA_APP_ID - GitHub App ID for Infrastructure Dispatch app
+#   INFRA_APP_PRIVATE_KEY - GitHub App private key (PEM format)
+#     Get these from your platform team or create the app at:
+#     https://github.com/settings/apps
 #
 # Usage:
 # 1. Create infrastructure.yaml in your repo root (see templates/infrastructure.yaml)
@@ -411,9 +412,18 @@ jobs:
               exit(1)
           EOF
 
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.INFRA_APP_ID }}
+          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+          owner: csGIT34
+          repositories: infrastructure-automation
+
       - name: Trigger Queue Consumer
         env:
-          GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           curl -X POST \
             -H "Authorization: token $GH_TOKEN" \
