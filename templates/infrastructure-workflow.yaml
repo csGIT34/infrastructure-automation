@@ -193,55 +193,56 @@ jobs:
           # Generate markdown preview
           preview = f"""## Infrastructure Plan Preview
 
-### Project Information
-| Property | Value |
-|----------|-------|
-| Project Name | `{metadata.get('project_name')}` |
-| Environment | `{metadata.get('environment')}` |
-| Business Unit | `{metadata.get('business_unit')}` |
-| Cost Center | `{metadata.get('cost_center')}` |
-| Owner | `{metadata.get('owner_email')}` |
-| Location | `{metadata.get('location', 'centralus')}` |
+          ### Project Information
+          | Property | Value |
+          |----------|-------|
+          | Project Name | `{metadata.get('project_name')}` |
+          | Environment | `{metadata.get('environment')}` |
+          | Business Unit | `{metadata.get('business_unit')}` |
+          | Cost Center | `{metadata.get('cost_center')}` |
+          | Owner | `{metadata.get('owner_email')}` |
+          | Location | `{metadata.get('location', 'centralus')}` |
 
-### Changes Summary
-| Added | Removed | Unchanged |
-|-------|---------|-----------|
-| {len(added)} | {len(removed)} | {len(unchanged)} |
+          ### Changes Summary
+          | Added | Removed | Unchanged |
+          |-------|---------|-----------|
+          | {len(added)} | {len(removed)} | {len(unchanged)} |
 
-### Resource Changes
+          ### Resource Changes
 
-| Status | Type | Name | Azure Resource |
-|--------|------|------|----------------|
-"""
+          | Status | Type | Name | Azure Resource |
+          |--------|------|------|----------------|
+          """
 
           # Show added resources
           for r in resources:
               key = f"{r['type']}:{r['name']}"
               azure_name = get_azure_name(r['type'], r['name'], project, env)
               if key in added:
-                  preview += f"| :heavy_plus_sign: **Add** | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
+                  preview += f"| + **Add** | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
 
           # Show removed resources
           for key in removed:
               r = base_resources[key]
               azure_name = get_azure_name(r['type'], r['name'], project, env)
-              preview += f"| :heavy_minus_sign: **Remove** | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
+              preview += f"| - **Remove** | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
 
           # Show unchanged resources
           for r in resources:
               key = f"{r['type']}:{r['name']}"
               azure_name = get_azure_name(r['type'], r['name'], project, env)
               if key in unchanged:
-                  preview += f"| :white_check_mark: No change | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
+                  preview += f"| = No change | `{r['type']}` | `{r['name']}` | `{azure_name}` |\n"
 
           preview += f"""
-### Resource Group
-`rg-{project}-{env}`
+          ### Resource Group
+          `rg-{project}-{env}`
 
----
-"""
+          ---
+          """
+
           if added or removed:
-              preview += "**:warning: This PR will modify infrastructure.** Review changes carefully before merging.\n\n"
+              preview += "**Warning: This PR will modify infrastructure.** Review changes carefully before merging.\n\n"
           else:
               preview += "**No infrastructure changes detected.**\n\n"
 
@@ -266,11 +267,11 @@ jobs:
               if (fs.existsSync('plan_preview.md')) {
                 body = fs.readFileSync('plan_preview.md', 'utf8');
               } else {
-                body += '✅ Infrastructure configuration validated successfully.\n\n';
+                body += 'Infrastructure configuration validated successfully.\n\n';
                 body += 'Merge this PR to provision the infrastructure.';
               }
             } catch (e) {
-              body += '✅ Validation passed. See workflow summary for details.';
+              body += 'Validation passed. See workflow summary for details.';
             }
 
             const { data: comments } = await github.rest.issues.listComments({
