@@ -53,15 +53,16 @@ locals {
     resource_group_name = "rg-${local.metadata.project_name}-${local.metadata.environment}"
     location            = lookup(local.metadata, "location", "eastus")
 
-    postgresql_resources    = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "postgresql"]
-    mongodb_resources       = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "mongodb"]
-    keyvault_resources      = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "keyvault"]
-    aks_namespace_resources = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "aks_namespace"]
-    eventhub_resources      = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "eventhub"]
-    function_resources      = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "function_app"]
-    vm_resources            = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "linux_vm"]
-    storage_resources       = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "storage_account"]
-    static_web_app_resources = [for idx, r in local.resources : merge(r, { index = idx }) if r.type == "static_web_app"]
+    # Use resource name as key (stable) instead of index (shifts when resources removed)
+    postgresql_resources    = { for r in local.resources : r.name => r if r.type == "postgresql" }
+    mongodb_resources       = { for r in local.resources : r.name => r if r.type == "mongodb" }
+    keyvault_resources      = { for r in local.resources : r.name => r if r.type == "keyvault" }
+    aks_namespace_resources = { for r in local.resources : r.name => r if r.type == "aks_namespace" }
+    eventhub_resources      = { for r in local.resources : r.name => r if r.type == "eventhub" }
+    function_resources      = { for r in local.resources : r.name => r if r.type == "function_app" }
+    vm_resources            = { for r in local.resources : r.name => r if r.type == "linux_vm" }
+    storage_resources       = { for r in local.resources : r.name => r if r.type == "storage_account" }
+    static_web_app_resources = { for r in local.resources : r.name => r if r.type == "static_web_app" }
 }
 
 resource "azurerm_resource_group" "main" {
@@ -73,9 +74,9 @@ resource "azurerm_resource_group" "main" {
 module "postgresql" {
     source = "../modules/postgresql"
 
-    for_each = { for r in local.postgresql_resources : r.index => r }
+    for_each = local.postgresql_resources
 
-    name                = "${local.metadata.project_name}-${each.value.name}-${local.metadata.environment}"
+    name                = "${local.metadata.project_name}-${each.key}-${local.metadata.environment}"
     resource_group_name = azurerm_resource_group.main.name
     location            = azurerm_resource_group.main.location
     config              = each.value.config
@@ -85,9 +86,9 @@ module "postgresql" {
 module "mongodb" {
     source = "../modules/mongodb"
 
-    for_each = { for r in local.mongodb_resources : r.index => r }
+    for_each = local.mongodb_resources
 
-    name                = "${local.metadata.project_name}-${each.value.name}-${local.metadata.environment}"
+    name                = "${local.metadata.project_name}-${each.key}-${local.metadata.environment}"
     resource_group_name = azurerm_resource_group.main.name
     location            = azurerm_resource_group.main.location
     config              = each.value.config
@@ -97,9 +98,9 @@ module "mongodb" {
 module "keyvault" {
     source = "../modules/keyvault"
 
-    for_each = { for r in local.keyvault_resources : r.index => r }
+    for_each = local.keyvault_resources
 
-    name                = "${local.metadata.project_name}-${each.value.name}-${local.metadata.environment}"
+    name                = "${local.metadata.project_name}-${each.key}-${local.metadata.environment}"
     resource_group_name = azurerm_resource_group.main.name
     location            = azurerm_resource_group.main.location
     config              = each.value.config
@@ -109,9 +110,9 @@ module "keyvault" {
 module "storage_account" {
     source = "../modules/storage-account"
 
-    for_each = { for r in local.storage_resources : r.index => r }
+    for_each = local.storage_resources
 
-    name                = lower("${local.metadata.project_name}${each.value.name}${local.metadata.environment}")
+    name                = lower("${local.metadata.project_name}${each.key}${local.metadata.environment}")
     resource_group_name = azurerm_resource_group.main.name
     location            = azurerm_resource_group.main.location
     config              = each.value.config
@@ -121,9 +122,9 @@ module "storage_account" {
 module "static_web_app" {
     source = "../modules/static-web-app"
 
-    for_each = { for r in local.static_web_app_resources : r.index => r }
+    for_each = local.static_web_app_resources
 
-    name                = "swa-${local.metadata.project_name}-${each.value.name}-${local.metadata.environment}"
+    name                = "swa-${local.metadata.project_name}-${each.key}-${local.metadata.environment}"
     resource_group_name = azurerm_resource_group.main.name
     location            = azurerm_resource_group.main.location
     config              = lookup(each.value, "config", {})
