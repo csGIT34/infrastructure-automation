@@ -88,6 +88,7 @@ Configure these secrets in your GitHub repository:
 | `postgresql` | `terraform/modules/postgresql` | Azure Database for PostgreSQL Flexible Server |
 | `mongodb` | `terraform/modules/mongodb` | Azure Cosmos DB with MongoDB API |
 | `keyvault` | `terraform/modules/keyvault` | Azure Key Vault for secrets management |
+| `static_web_app` | `terraform/modules/static-web-app` | Azure Static Web App for hosting SPAs and static sites |
 
 ## How YAML Becomes Infrastructure
 
@@ -325,6 +326,13 @@ Container options:
 | `rbac_enabled` | bool | `true` | Use RBAC for access control |
 | `default_action` | string | `"Allow"` | Network default action |
 
+#### Static Web App (`static_web_app`)
+
+| Config Key | Type | Default | Description |
+|------------|------|---------|-------------|
+| `sku_tier` | string | `"Free"` | SKU tier (Free, Standard) |
+| `sku_size` | string | `"Free"` | SKU size (Free, Standard) |
+
 ### Automatic Tag Generation
 
 All resources receive these tags automatically:
@@ -476,6 +484,450 @@ To remove a resource, submit a request **without** that resource in the list. Te
 2. **Use version control** - Store your YAML files in Git to track changes over time
 3. **Test in dev first** - Make changes in dev environment before staging/prod
 4. **Review Terraform plans** - Check the workflow logs to see what Terraform plans to change
+
+## GitOps Support
+
+The platform supports a GitOps workflow where developers manage infrastructure directly from their application repositories. This provides a developer-friendly experience with full traceability through Git history.
+
+### How GitOps Works
+
+```
+Developer Repo                    Infrastructure Platform
+----------------                  ----------------------
+
+1. Edit infrastructure.yaml
+        │
+        v
+2. Create Pull Request ──────────> GitHub Action validates YAML
+        │                                    │
+        │                                    v
+        │                          Posts preview comment on PR
+        │                          showing what will be created
+        │
+        v
+3. Merge to main ────────────────> GitHub Action submits to Service Bus
+                                            │
+                                            v
+                                   Queue Consumer processes request
+                                            │
+                                            v
+                                   Terraform provisions resources
+```
+
+### Benefits of GitOps
+
+- **Version Control**: All infrastructure changes tracked in Git
+- **Code Review**: Infrastructure changes go through PR review
+- **Preview Before Apply**: See exactly what will be created before merging
+- **Audit Trail**: Full history of who changed what and when
+- **Self-Service**: Developers manage their own infrastructure
+
+### Setting Up GitOps in Your Repository
+
+#### Step 1: Add the Infrastructure Configuration File
+
+Create `infrastructure.yaml` in your repository root:
+
+```yaml
+# infrastructure.yaml
+metadata:
+  project_name: myapp
+  environment: dev
+  business_unit: engineering
+  cost_center: CC-ENG-001
+  owner_email: team@example.com
+  location: centralus
+  tags:
+    Application: MyApp
+    Team: Engineering
+    ManagedBy: GitOps
+
+resources:
+  # Add your resources here
+  - type: storage_account
+    name: data
+    config:
+      tier: Standard
+      replication: LRS
+      containers:
+        - name: uploads
+          access_type: private
+
+  - type: static_web_app
+    name: frontend
+    config:
+      sku_tier: Free
+      sku_size: Free
+```
+
+#### Step 2: Add the GitHub Actions Workflow
+
+Create `.github/workflows/infrastructure.yaml`:
+
+```yaml
+name: Infrastructure GitOps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure.yaml'
+  pull_request:
+    paths:
+      - 'infrastructure.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-and-plan:
+    runs-on: ubuntu-latest
+    outputs:
+      validation_result: ${{ steps.validate.outputs.result }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate infrastructure YAML
+        id: validate
+        run: |
+          python << 'EOF'
+          import yaml
+          import json
+          import sys
+          import os
+
+          with open("infrastructure.yaml", 'r') as f:
+              config = yaml.safe_load(f)
+
+          errors = []
+
+          # Validate metadata
+          if 'metadata' not in config:
+              errors.append("Missing 'metadata' section")
+          else:
+              required = ['project_name', 'environment', 'business_unit', 'cost_center', 'owner_email']
+              for field in required:
+                  if field not in config['metadata']:
+                      errors.append(f"Missing metadata.{field}")
+
+          # Validate resources
+          if 'resources' not in config:
+              errors.append("Missing 'resources' section")
+          else:
+              valid_types = ['storage_account', 'keyvault', 'postgresql', 'mongodb',
+                            'eventhub', 'function_app', 'linux_vm', 'aks_namespace', 'static_web_app']
+              for i, r in enumerate(config['resources']):
+                  if 'type' not in r:
+                      errors.append(f"Resource {i+1}: missing 'type'")
+                  elif r['type'] not in valid_types:
+                      errors.append(f"Resource {i+1}: invalid type '{r['type']}'")
+                  if 'name' not in r:
+                      errors.append(f"Resource {i+1}: missing 'name'")
+
+          if errors:
+              for err in errors:
+                  print(f"::error::{err}")
+              sys.exit(1)
+
+          print("Validation passed!")
+          EOF
+
+      - name: Generate Plan Preview
+        id: plan
+        run: |
+          python << 'EOF'
+          import yaml
+          import os
+
+          with open("infrastructure.yaml", 'r') as f:
+              config = yaml.safe_load(f)
+
+          m = config['metadata']
+          resources = config['resources']
+
+          preview = f"""## Infrastructure Plan Preview
+
+### Project Information
+| Property | Value |
+|----------|-------|
+| Project Name | `{m.get('project_name')}` |
+| Environment | `{m.get('environment')}` |
+| Business Unit | `{m.get('business_unit')}` |
+| Owner | `{m.get('owner_email')}` |
+| Location | `{m.get('location', 'centralus')}` |
+
+### Resources to be Provisioned
+
+| # | Type | Name | Expected Azure Resource |
+|---|------|------|------------------------|
+"""
+
+          for i, r in enumerate(resources, 1):
+              rtype = r['type']
+              rname = r['name']
+              project = m['project_name']
+              env = m['environment']
+
+              if rtype == 'storage_account':
+                  azure_name = f"{project}{rname}{env}".replace('-', '').replace('_', '')[:24]
+              elif rtype == 'keyvault':
+                  azure_name = f"kv-{project}-{rname}-{env}"[:24]
+              elif rtype == 'static_web_app':
+                  azure_name = f"swa-{project}-{rname}-{env}"
+              else:
+                  azure_name = f"{rtype}-{project}-{rname}-{env}"
+
+              preview += f"| {i} | `{rtype}` | `{rname}` | `{azure_name}` |\n"
+
+          preview += f"""
+### Resource Group
+`rg-{m['project_name']}-{m['environment']}`
+
+---
+**On merge to main**, these resources will be automatically provisioned.
+"""
+
+          with open('plan_preview.md', 'w') as f:
+              f.write(preview)
+          print(preview)
+          EOF
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = fs.readFileSync('plan_preview.md', 'utf8');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Infrastructure Plan')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  provision:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: validate-and-plan
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Submit to Infrastructure Queue
+        env:
+          SAS_KEY: ${{ secrets.INFRA_SERVICE_BUS_SAS_KEY }}
+        run: |
+          python << 'EOF'
+          import yaml
+          import json
+          import hashlib
+          import hmac
+          import base64
+          import time
+          import urllib.parse
+          import urllib.request
+          import os
+
+          with open("infrastructure.yaml", 'r') as f:
+              yaml_content = f.read()
+              config = yaml.safe_load(yaml_content)
+
+          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
+          sha = os.environ.get('GITHUB_SHA', 'unknown')[:8]
+          timestamp = int(time.time())
+          request_id = f"gitops-{repo.replace('/', '-')}-{sha}-{timestamp}"
+
+          namespace = "sb-infra-api-rrkkz6a8"
+          queue_name = f"infrastructure-requests-{config['metadata']['environment']}"
+          sas_key = os.environ['SAS_KEY']
+          sas_key_name = "RootManageSharedAccessKey"
+
+          uri = f"https://{namespace}.servicebus.windows.net/{queue_name}".lower()
+          expiry = int(time.time()) + 3600
+          string_to_sign = f"{urllib.parse.quote_plus(uri)}\n{expiry}"
+          signature = base64.b64encode(
+              hmac.new(sas_key.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).digest()
+          ).decode('utf-8')
+          sas_token = f"SharedAccessSignature sr={urllib.parse.quote_plus(uri)}&sig={urllib.parse.quote_plus(signature)}&se={expiry}&skn={sas_key_name}"
+
+          message = {
+              'request_id': request_id,
+              'yaml_content': yaml_content,
+              'requester_email': config['metadata'].get('owner_email', 'gitops@automation'),
+              'metadata': {
+                  'source': 'gitops',
+                  'repository': repo,
+                  'commit_sha': os.environ.get('GITHUB_SHA'),
+                  'triggered_by': os.environ.get('GITHUB_ACTOR'),
+                  'environment': config['metadata']['environment']
+              }
+          }
+
+          url = f"https://{namespace}.servicebus.windows.net/{queue_name}/messages"
+          data = json.dumps(message).encode('utf-8')
+
+          req = urllib.request.Request(url, data=data, method='POST')
+          req.add_header('Authorization', sas_token)
+          req.add_header('Content-Type', 'application/json')
+
+          response = urllib.request.urlopen(req)
+          print(f"Request submitted: {request_id}")
+          EOF
+```
+
+#### Step 3: Configure the Secret
+
+Add the Service Bus SAS key as a repository secret:
+
+1. Go to your repository's **Settings** > **Secrets and variables** > **Actions**
+2. Click **New repository secret**
+3. Name: `INFRA_SERVICE_BUS_SAS_KEY`
+4. Value: Get the key using:
+
+```bash
+az servicebus namespace authorization-rule keys list \
+  --namespace-name sb-infra-api-rrkkz6a8 \
+  --resource-group rg-infrastructure-api \
+  --name RootManageSharedAccessKey \
+  --query primaryKey -o tsv
+```
+
+### GitOps Workflow in Action
+
+#### Creating a Pull Request
+
+When you edit `infrastructure.yaml` and create a PR, the workflow:
+
+1. Validates the YAML syntax and required fields
+2. Generates a preview of what resources will be created
+3. Posts a comment on the PR with the plan
+
+Example PR comment:
+
+```
+## Infrastructure Plan Preview
+
+### Project Information
+| Property | Value |
+|----------|-------|
+| Project Name | `myapp` |
+| Environment | `dev` |
+| Business Unit | `engineering` |
+| Owner | `team@example.com` |
+
+### Resources to be Provisioned
+| # | Type | Name | Expected Azure Resource |
+|---|------|------|------------------------|
+| 1 | `storage_account` | `data` | `myappdatadev` |
+| 2 | `static_web_app` | `frontend` | `swa-myapp-frontend-dev` |
+
+### Resource Group
+`rg-myapp-dev`
+
+---
+**On merge to main**, these resources will be automatically provisioned.
+```
+
+#### Merging to Main
+
+When the PR is merged to main:
+
+1. The workflow submits the request to the Service Bus queue
+2. The queue consumer picks up the message
+3. Terraform provisions the infrastructure
+4. Track progress at the [Infrastructure Portal](https://wonderful-field-088efae10.1.azurestaticapps.net)
+
+### Tracking GitOps Requests
+
+GitOps requests have IDs in the format:
+```
+gitops-{owner}-{repo}-{commit-sha}-{timestamp}
+```
+
+Example: `gitops-csGIT34-BillTracker-e4a46b8-1704567890`
+
+Look up the request status in the Infrastructure Portal's "Request Lookup" tab.
+
+### Example: BillTracker Repository
+
+See [github.com/csGIT34/BillTracker](https://github.com/csGIT34/BillTracker) for a working example of GitOps infrastructure management.
+
+**infrastructure.yaml:**
+```yaml
+metadata:
+  project_name: billtracker
+  environment: dev
+  business_unit: engineering
+  cost_center: CC-BILL-001
+  owner_email: billtracker-team@example.com
+  location: centralus
+
+resources:
+  - type: storage_account
+    name: docs
+    config:
+      tier: Standard
+      replication: LRS
+      containers:
+        - name: bills
+          access_type: private
+        - name: receipts
+          access_type: private
+
+  - type: keyvault
+    name: secrets
+    config:
+      sku: standard
+      rbac_enabled: true
+
+  - type: static_web_app
+    name: frontend
+    config:
+      sku_tier: Free
+      sku_size: Free
+```
 
 ## How to Test
 
