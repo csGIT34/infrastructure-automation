@@ -1,0 +1,30 @@
+{
+  "name": "infrastructure-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for AI-powered infrastructure generation",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "infrastructure-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "infrastructure",
+    "terraform",
+    "azure"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "yaml": "^2.3.4",
+    "glob": "^10.3.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}
