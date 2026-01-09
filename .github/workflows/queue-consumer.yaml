@@ -19,7 +19,7 @@ env:
 
 jobs:
     check-queues:
-        runs-on: ubuntu-latest
+        runs-on: [self-hosted, linux, local]
         outputs:
             has_prod_messages: ${{ steps.check.outputs.has_prod }}
             has_staging_messages: ${{ steps.check.outputs.has_staging }}
@@ -97,7 +97,6 @@ jobs:
         with:
             queue_name: "infrastructure-requests-dev"
             environment: "dev"
-            # Using GitHub-hosted runner for testing (self-hosted k3s needs Azure CLI installed)
-            runner_labels: '["ubuntu-latest"]'
+            runner_labels: '["self-hosted", "linux", "local"]'
             max_parallel: 5
         secrets: inherit

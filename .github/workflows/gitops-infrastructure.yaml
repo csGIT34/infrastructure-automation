@@ -30,7 +30,7 @@ on:
 
 jobs:
   process:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, local]
     outputs:
       request_id: ${{ steps.submit.outputs.request_id }}
       validation_result: ${{ steps.validate.outputs.result }}
