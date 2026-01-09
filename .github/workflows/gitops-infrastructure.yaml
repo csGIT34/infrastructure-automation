@@ -39,18 +39,13 @@ jobs:
       - name: Checkout calling repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: Install dependencies
-        run: pip install pyyaml
+        run: pip3 install pyyaml
 
       - name: Validate infrastructure YAML
         id: validate
         run: |
-          python << 'EOF'
+          python3 << 'EOF'
           import yaml
           import json
           import sys
@@ -144,7 +139,7 @@ jobs:
         id: plan
         if: inputs.action == 'plan' || inputs.action == 'apply'
         run: |
-          python << 'EOF'
+          python3 << 'EOF'
           import yaml
           import json
           import os
@@ -218,7 +213,7 @@ jobs:
         env:
           SAS_KEY: ${{ secrets.INFRA_SERVICE_BUS_SAS_KEY }}
         run: |
-          python << 'EOF'
+          python3 << 'EOF'
           import yaml
           import json
           import hashlib
