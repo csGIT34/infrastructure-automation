@@ -30,7 +30,7 @@ on:
 
 jobs:
   process:
-    runs-on: [self-hosted, linux, local]
+    runs-on: ubuntu-latest
     outputs:
       request_id: ${{ steps.submit.outputs.request_id }}
       validation_result: ${{ steps.validate.outputs.result }}
@@ -38,6 +38,11 @@ jobs:
     steps:
       - name: Checkout calling repository
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Install dependencies
         run: pip3 install pyyaml

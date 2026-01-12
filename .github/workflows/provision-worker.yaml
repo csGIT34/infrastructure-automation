@@ -44,6 +44,16 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
+            - name: Setup Python
+              uses: actions/setup-python@v5
+              with:
+                python-version: '3.11'
+
+            - name: Setup Terraform
+              uses: hashicorp/setup-terraform@v3
+              with:
+                terraform_version: '1.6.0'
+
             - name: Install Python dependencies
               run: |
                   pip3 install azure-servicebus azure-identity azure-cosmos pyyaml
