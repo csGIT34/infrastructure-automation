@@ -26,7 +26,7 @@ env:
     AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
     SERVICEBUS_NAMESPACE: ${{ secrets.SERVICEBUS_NAMESPACE }}
     COSMOS_ENDPOINT: ${{ secrets.COSMOS_ENDPOINT }}
-    COSMOS_DATABASE: "infrastructure"
+    COSMOS_DATABASE: "infrastructure-db"
     TF_STATE_STORAGE_ACCOUNT: ${{ secrets.TF_STATE_STORAGE_ACCOUNT }}
     TF_STATE_CONTAINER: "tfstate"
 
@@ -109,8 +109,8 @@ jobs:
 
                   # Initialize Cosmos DB client
                   cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
-                  database = cosmos_client.get_database_client("infrastructure")
-                  container = database.get_container_client("infrastructure-requests")
+                  database = cosmos_client.get_database_client("infrastructure-db")
+                  container = database.get_container_client("requests")
 
                   def update_cosmos_status(request_id, status, extra_fields=None):
                       """Update request status in Cosmos DB using upsert"""
