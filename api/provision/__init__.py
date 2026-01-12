@@ -12,7 +12,7 @@ from azure.identity import DefaultAzureCredential
 COSMOS_ENDPOINT = os.environ.get('COSMOS_ENDPOINT', 'https://cosmos-infra-api-rrkkz6a8.documents.azure.com:443/')
 COSMOS_DATABASE = os.environ.get('COSMOS_DATABASE', 'infrastructure-db')
 COSMOS_CONTAINER = os.environ.get('COSMOS_CONTAINER', 'requests')
-SERVICEBUS_NAMESPACE = os.environ.get('SERVICEBUS_NAMESPACE', 'sb-infra-api-rrkkz6a8.servicebus.windows.net')
+SERVICEBUS_NAMESPACE = os.environ.get('SERVICEBUS_NAMESPACE', 'sb-infra-api-rrkkz6a8')
 
 # Cost estimates per resource type (monthly)
 COST_MAP = {
@@ -193,7 +193,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         queue_name = f"infrastructure-requests-{environment}"
         try:
             credential = DefaultAzureCredential()
-            servicebus_client = ServiceBusClient(SERVICEBUS_NAMESPACE, credential=credential)
+            servicebus_client = ServiceBusClient(f"{SERVICEBUS_NAMESPACE}.servicebus.windows.net", credential=credential)
 
             message_body = json.dumps({
                 "request_id": request_id,
