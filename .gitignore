@@ -31,3 +31,17 @@ Thumbs.db
 # Local env files
 .env
 .env.local
+
+# Claude temp files
+*-cwd
+tmpclaude-*
+
+# MCP Server
+mcp-server/node_modules/
+mcp-server/dist/
+.mcp.json
+
+# Node
+node_modules/
+package-lock.json
+*.tgz
