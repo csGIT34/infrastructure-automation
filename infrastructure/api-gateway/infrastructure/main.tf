@@ -146,9 +146,29 @@ resource "azurerm_servicebus_namespace" "api" {
     tags = azurerm_resource_group.api.tags
 }
 
-resource "azurerm_servicebus_queue" "requests" {
-    name         = "infrastructure-requests"
+# Environment-specific queues (API sends to infrastructure-requests-{env})
+resource "azurerm_servicebus_queue" "requests_dev" {
+    name         = "infrastructure-requests-dev"
     namespace_id = azurerm_servicebus_namespace.api.id
+
+    max_delivery_count = 3
+    lock_duration      = "PT5M"
+}
+
+resource "azurerm_servicebus_queue" "requests_staging" {
+    name         = "infrastructure-requests-staging"
+    namespace_id = azurerm_servicebus_namespace.api.id
+
+    max_delivery_count = 3
+    lock_duration      = "PT5M"
+}
+
+resource "azurerm_servicebus_queue" "requests_prod" {
+    name         = "infrastructure-requests-prod"
+    namespace_id = azurerm_servicebus_namespace.api.id
+
+    max_delivery_count = 3
+    lock_duration      = "PT5M"
 }
 
 output "cosmos_db_endpoint" {
