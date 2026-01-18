@@ -16,11 +16,8 @@ spec:
   replicas: 2
   template:
     spec:
-      # For repository-level runners (uncomment and edit):
-      # repository: YOUR_ORG/infrastructure-automation
-
-      # For organization-level runners (uncomment and edit):
-      # organization: YOUR_ORG
+      # Repository-level runners
+      repository: csGIT34/infrastructure-automation
 
       # Runner labels - use these in your workflow's runs-on
       labels:
