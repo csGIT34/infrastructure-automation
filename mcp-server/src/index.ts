@@ -917,6 +917,12 @@ async function main() {
 
     // SSE endpoint for MCP connections (requires auth)
     app.get("/sse", validateApiKey, (req: any, res: any) => {
+      // Set headers to prevent caching
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
+
       // Generate a unique session ID
       const sessionId = crypto.randomUUID();
 
