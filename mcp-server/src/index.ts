@@ -257,6 +257,83 @@ const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
       { pattern: /static|spa|frontend|web.?app/i, weight: 1 },
       { pattern: /index\.html|public\/|dist\//i, weight: 2 }
     ]
+  },
+  aks_namespace: {
+    name: "aks_namespace",
+    description: "Kubernetes namespace in shared AKS cluster with RBAC and resource quotas",
+    use_cases: [
+      "Kubernetes workloads",
+      "Microservices deployment",
+      "Container orchestration",
+      "Team isolation in shared cluster"
+    ],
+    config_options: {
+      cluster_name: { type: "string", default: null, description: "Name of the AKS cluster (required)" },
+      cpu_limit: { type: "string", default: "2", description: "CPU limit for namespace (cores)" },
+      memory_limit: { type: "string", default: "4Gi", description: "Memory limit for namespace" },
+      storage_limit: { type: "string", default: "10Gi", description: "Storage limit for namespace" },
+      pod_limit: { type: "string", default: "20", description: "Maximum number of pods" },
+      cpu_request: { type: "string", default: "100m", description: "Default CPU request per container" },
+      memory_request: { type: "string", default: "128Mi", description: "Default memory request per container" },
+      rbac_groups: { type: "array", default: [], description: "Azure AD groups with edit access" },
+      rbac_users: { type: "array", default: [], description: "Azure AD users with edit access" },
+      enable_network_policy: { type: "boolean", default: true, description: "Enable default deny network policy" },
+      labels: { type: "object", default: {}, description: "Additional labels for namespace" },
+      annotations: { type: "object", default: {}, description: "Additional annotations for namespace" }
+    },
+    detection_patterns: [
+      { pattern: /kubernetes|k8s|kubectl|helm/i, weight: 4 },
+      { pattern: /deployment|pod|service|ingress/i, weight: 3 },
+      { pattern: /KUBECONFIG|KUBERNETES_/i, weight: 5 },
+      { pattern: /\.yaml.*kind:\s*(Deployment|Service)/i, weight: 5 }
+    ]
+  },
+  linux_vm: {
+    name: "linux_vm",
+    description: "Azure Linux Virtual Machine with managed disks and optional public IP",
+    use_cases: [
+      "Custom workloads requiring full VM control",
+      "Legacy application hosting",
+      "Development and testing environments",
+      "Jump boxes and bastion hosts"
+    ],
+    config_options: {
+      size: { type: "string", default: "Standard_B1s", description: "VM size (Standard_B1s, Standard_B2s, Standard_D2s_v3, etc.)" },
+      image_publisher: { type: "string", default: "Canonical", description: "OS image publisher" },
+      image_offer: { type: "string", default: "0001-com-ubuntu-server-jammy", description: "OS image offer" },
+      image_sku: { type: "string", default: "22_04-lts-gen2", description: "OS image SKU" },
+      image_version: { type: "string", default: "latest", description: "OS image version" },
+      os_disk_type: { type: "string", default: "Standard_LRS", description: "OS disk type (Standard_LRS, Premium_LRS, StandardSSD_LRS)" },
+      os_disk_size_gb: { type: "number", default: 30, description: "OS disk size in GB" },
+      data_disks: {
+        type: "array",
+        default: [],
+        description: "Additional data disks",
+        items: {
+          name: { type: "string", required: true },
+          size_gb: { type: "number", default: 100 },
+          type: { type: "string", default: "Standard_LRS" },
+          lun: { type: "number" },
+          caching: { type: "string", default: "ReadWrite" }
+        }
+      },
+      subnet_id: { type: "string", default: null, description: "Subnet ID for the VM NIC (required)" },
+      public_ip: { type: "boolean", default: false, description: "Attach a public IP address" },
+      private_ip_address: { type: "string", default: null, description: "Static private IP (or dynamic if null)" },
+      admin_username: { type: "string", default: "azureuser", description: "Admin username" },
+      ssh_public_key: { type: "string", default: null, description: "SSH public key (auto-generated if null)" },
+      generate_ssh_key: { type: "boolean", default: true, description: "Generate SSH key if not provided" },
+      boot_diagnostics: { type: "boolean", default: true, description: "Enable boot diagnostics" },
+      identity_type: { type: "string", default: "SystemAssigned", description: "Managed identity type (None, SystemAssigned, UserAssigned)" },
+      custom_data: { type: "string", default: null, description: "Cloud-init script (base64 encoded automatically)" },
+      availability_zone: { type: "string", default: null, description: "Availability zone (1, 2, or 3)" }
+    },
+    detection_patterns: [
+      { pattern: /virtual.?machine|vm|server|compute/i, weight: 2 },
+      { pattern: /ssh|linux|ubuntu|debian|centos|rhel/i, weight: 3 },
+      { pattern: /ansible|puppet|chef|terraform.*vm/i, weight: 3 },
+      { pattern: /bastion|jump.?box|gateway/i, weight: 4 }
+    ]
   }
 };
 

@@ -168,6 +168,30 @@ module "eventhub" {
     tags                = local.common_tags
 }
 
+module "aks_namespace" {
+    source = "../modules/aks-namespace"
+
+    for_each = local.aks_namespace_resources
+
+    name                = "${local.metadata.project_name}-${each.key}-${local.metadata.environment}"
+    resource_group_name = azurerm_resource_group.main.name
+    location            = azurerm_resource_group.main.location
+    config              = lookup(each.value, "config", {})
+    tags                = local.common_tags
+}
+
+module "linux_vm" {
+    source = "../modules/linux-vm"
+
+    for_each = local.vm_resources
+
+    name                = "vm-${local.metadata.project_name}-${each.key}-${local.metadata.environment}"
+    resource_group_name = azurerm_resource_group.main.name
+    location            = azurerm_resource_group.main.location
+    config              = lookup(each.value, "config", {})
+    tags                = local.common_tags
+}
+
 output "resource_group" {
     value = {
         name     = azurerm_resource_group.main.name
@@ -223,5 +247,22 @@ output "eventhubs" {
         namespace_name = v.namespace_name
         namespace_id   = v.namespace_id
         hubs           = v.hubs
+    }}
+}
+
+output "aks_namespaces" {
+    value = { for k, v in module.aks_namespace : k => {
+        namespace_name = v.namespace_name
+        resource_quota = v.resource_quota
+    }}
+}
+
+output "linux_vms" {
+    value = { for k, v in module.linux_vm : k => {
+        vm_name            = v.vm_name
+        private_ip_address = v.private_ip_address
+        public_ip_address  = v.public_ip_address
+        admin_username     = v.admin_username
+        principal_id       = v.principal_id
     }}
 }
