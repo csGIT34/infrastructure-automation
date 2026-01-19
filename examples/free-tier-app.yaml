@@ -1,0 +1,48 @@
+# Example: Free Tier Web Application
+# Cost: $0/month (within free tier limits)
+#
+# This configuration uses Azure's free tier offerings:
+# - Azure Functions Consumption Plan (Y1): 1M free executions/month
+# - Azure SQL Free: 100k vCore seconds/month, 32GB storage
+#
+# Perfect for development, prototyping, and learning.
+
+metadata:
+  project_name: myapp
+  environment: dev
+  business_unit: engineering
+  cost_center: CC-1234
+  owner_email: developer@example.com
+  location: centralus
+
+resources:
+  # API backend using Azure Functions (free consumption plan)
+  - type: function_app
+    name: api
+    config:
+      runtime: python
+      runtime_version: "3.11"
+      sku: Y1                      # Consumption plan - FREE
+      os_type: Linux
+      app_settings:
+        ENVIRONMENT: "development"
+
+  # Database using Azure SQL Free tier
+  - type: azure_sql
+    name: db
+    config:
+      sku: Free                    # Free tier - FREE
+      databases:
+        - name: appdb
+          sku: Free
+          max_size_gb: 32          # Free tier max
+
+  # Storage for files (low cost, ~$0.02/GB)
+  - type: storage_account
+    name: files
+    config:
+      tier: Standard
+      replication: LRS             # Cheapest replication
+      containers:
+        - name: uploads
+          access_type: private

@@ -14,7 +14,7 @@ COSMOS_DATABASE = os.environ.get('COSMOS_DATABASE', 'infrastructure-db')
 COSMOS_CONTAINER = os.environ.get('COSMOS_CONTAINER', 'requests')
 SERVICEBUS_NAMESPACE = os.environ.get('SERVICEBUS_NAMESPACE', 'sb-infra-api-rrkkz6a8')
 
-# Cost estimates per resource type (monthly)
+# Cost estimates per resource type (monthly) - base costs
 COST_MAP = {
     'postgresql': 25,
     'mongodb': 25,
@@ -26,6 +26,35 @@ COST_MAP = {
     'static_web_app': 0,
     'aks_namespace': 10,
     'azure_sql': 30
+}
+
+# SKU-specific pricing overrides
+SKU_COSTS = {
+    'azure_sql': {
+        'Free': 0,
+        'Basic': 5,
+        'S0': 15,
+        'S1': 30,
+        'S2': 75,
+        'P1': 465,
+    },
+    'function_app': {
+        'Y1': 0,        # Consumption (free)
+        'B1': 13,       # Basic
+        'S1': 70,       # Standard
+        'P1v2': 140,    # Premium
+    },
+    'postgresql': {
+        'B_Standard_B1ms': 25,
+        'GP_Standard_D2s_v3': 125,
+    }
+}
+
+# Free tier SKUs per resource type
+FREE_TIER_SKUS = {
+    'azure_sql': 'Free',
+    'function_app': 'Y1',
+    'static_web_app': 'Free',
 }
 
 # Cost limits per environment
@@ -48,11 +77,47 @@ def cors_response(body, status_code=200):
     )
 
 def estimate_cost(config):
-    """Calculate estimated monthly cost for resources"""
+    """Calculate estimated monthly cost for resources based on SKU"""
     cost = 0.0
     for resource in config.get('resources', []):
-        cost += COST_MAP.get(resource.get('type'), 10)
+        rtype = resource.get('type')
+        rconfig = resource.get('config', {})
+        sku = rconfig.get('sku')
+
+        # Check for SKU-specific pricing
+        if rtype in SKU_COSTS and sku in SKU_COSTS[rtype]:
+            cost += SKU_COSTS[rtype][sku]
+        else:
+            cost += COST_MAP.get(rtype, 10)
     return cost
+
+def get_free_tier_recommendations(config):
+    """Generate recommendations for using free tiers in dev environments"""
+    recommendations = []
+    metadata = config.get('metadata', {})
+    environment = metadata.get('environment', 'dev')
+
+    # Only recommend free tiers for dev environment
+    if environment != 'dev':
+        return recommendations
+
+    for resource in config.get('resources', []):
+        rtype = resource.get('type')
+        rconfig = resource.get('config', {})
+        sku = rconfig.get('sku')
+
+        if rtype in FREE_TIER_SKUS:
+            free_sku = FREE_TIER_SKUS[rtype]
+            if sku != free_sku:
+                recommendations.append({
+                    "resource": resource.get('name'),
+                    "type": rtype,
+                    "current_sku": sku or "default",
+                    "recommended_sku": free_sku,
+                    "message": f"Consider using '{free_sku}' SKU for {rtype} in dev environment (free tier)"
+                })
+
+    return recommendations
 
 def validate_schema(config):
     """Validate infrastructure YAML schema"""
@@ -153,6 +218,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # Calculate estimated cost
         estimated_cost = estimate_cost(config)
 
+        # Get free tier recommendations for dev environments
+        recommendations = get_free_tier_recommendations(config)
+
         # Generate request ID
         request_id = str(uuid.uuid4())
         metadata = config.get('metadata', {})
@@ -224,13 +292,19 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
         logging.info(f'Request {request_id} queued successfully')
 
-        return cors_response({
+        response_body = {
             'request_id': request_id,
             'status': 'queued',
             'estimated_cost': estimated_cost,
             'queue': queue_name,
             'tracking_url': f'https://wonderful-field-088efae10.1.azurestaticapps.net'
-        }, status_code=202)
+        }
+
+        # Include recommendations if any
+        if recommendations:
+            response_body['recommendations'] = recommendations
+
+        return cors_response(response_body, status_code=202)
 
     except Exception as e:
         logging.error(f'Error processing request: {e}')
