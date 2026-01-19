@@ -923,12 +923,18 @@ async function main() {
       const sessionId = crypto.randomUUID();
 
       // Get the api_key from the request (either header or query)
-      const clientApiKey = req.query.api_key || req.headers.authorization?.replace("Bearer ", "");
+      const clientApiKey = req.query.api_key ||
+        (req.headers.authorization?.startsWith("Bearer ")
+          ? req.headers.authorization.slice(7)
+          : req.headers.authorization);
 
-      // Build the messages endpoint URL with session ID and api_key if present
+      console.log("clientApiKey present:", !!clientApiKey, "apiKey present:", !!apiKey);
+
+      // Build the messages endpoint URL with session ID
+      // Always include api_key in the endpoint URL if provided by client and auth is enabled
       let messagesEndpoint = `/messages?sessionId=${sessionId}`;
-      if (clientApiKey && apiKey) {
-        messagesEndpoint += `&api_key=${clientApiKey}`;
+      if (clientApiKey) {
+        messagesEndpoint += `&api_key=${encodeURIComponent(clientApiKey)}`;
       }
 
       // Create transport with session-specific messages endpoint
