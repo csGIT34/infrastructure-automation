@@ -14,6 +14,80 @@ import YAML from "yaml";
 
 // Module definitions with their config options
 const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
+  function_app: {
+    name: "function_app",
+    description: "Azure Functions for serverless APIs and event processing",
+    use_cases: [
+      "REST APIs and webhooks",
+      "Event-driven processing",
+      "Scheduled jobs and automation",
+      "Backend for SPAs and mobile apps"
+    ],
+    config_options: {
+      runtime: { type: "string", default: "python", description: "Runtime (python, node, dotnet, java)" },
+      runtime_version: { type: "string", default: "3.11", description: "Runtime version" },
+      sku: { type: "string", default: "Y1", description: "SKU (Y1=free, B1=$13/mo, P1V2=$81/mo)" },
+      os_type: { type: "string", default: "Linux", description: "OS type (Linux, Windows)" },
+      app_settings: { type: "object", default: {}, description: "Environment variables" }
+    },
+    detection_patterns: [
+      { pattern: /function|serverless|lambda|azure.*func/i, weight: 3 },
+      { pattern: /fastapi|flask|express|api.*route/i, weight: 2 },
+      { pattern: /FUNCTIONS_|AZURE_FUNCTIONS/i, weight: 5 },
+      { pattern: /@azure\/functions|azure-functions/i, weight: 5 }
+    ]
+  },
+  azure_sql: {
+    name: "azure_sql",
+    description: "Azure SQL Database - managed SQL Server",
+    use_cases: [
+      "Relational data with ACID transactions",
+      "Complex queries and reporting",
+      "Enterprise applications",
+      "Migration from SQL Server"
+    ],
+    config_options: {
+      sku: { type: "string", default: "Free", description: "SKU (Free, Basic=$5/mo, S0=$15/mo, S1=$30/mo)" },
+      databases: {
+        type: "array",
+        default: [],
+        description: "List of databases to create",
+        items: {
+          name: { type: "string", required: true },
+          sku: { type: "string", default: "Free" },
+          max_size_gb: { type: "number", default: 32 }
+        }
+      }
+    },
+    detection_patterns: [
+      { pattern: /sql.?server|mssql|sqlserver|azure.*sql/i, weight: 5 },
+      { pattern: /pyodbc|tedious|mssql-node/i, weight: 4 },
+      { pattern: /SQL_SERVER|MSSQL_|AZURE_SQL/i, weight: 5 },
+      { pattern: /\.query\(|executeQuery|ExecuteNonQuery/i, weight: 2 }
+    ]
+  },
+  eventhub: {
+    name: "eventhub",
+    description: "Azure Event Hubs for event streaming and ingestion",
+    use_cases: [
+      "Real-time event streaming",
+      "IoT data ingestion",
+      "Log aggregation",
+      "Event-driven architectures"
+    ],
+    config_options: {
+      sku: { type: "string", default: "Basic", description: "SKU (Basic=$11/mo, Standard=$22/mo)" },
+      capacity: { type: "number", default: 1, description: "Throughput units (1-20)" },
+      partition_count: { type: "number", default: 2, description: "Partitions (2-32)" },
+      message_retention: { type: "number", default: 1, description: "Retention days (1-7)" }
+    },
+    detection_patterns: [
+      { pattern: /event.?hub|kafka|streaming|event.*driven/i, weight: 3 },
+      { pattern: /@azure\/event-hubs|azure-eventhub/i, weight: 5 },
+      { pattern: /EVENTHUB_|EVENT_HUB/i, weight: 5 },
+      { pattern: /\.sendBatch|EventHubProducerClient/i, weight: 4 }
+    ]
+  },
   storage_account: {
     name: "storage_account",
     description: "Azure Storage Account for blob, file, queue, and table storage",

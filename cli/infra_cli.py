@@ -441,5 +441,138 @@ def init(pattern, env, project, business_unit, cost_center, email, output, runti
     click.echo(f"  2. Submit: infra provision {output} --email {email}")
 
 
+@cli.command()
+@click.argument("request", required=False)
+@click.option("--output", "-o", default="infrastructure.yaml", help="Output file name")
+@click.option("--env", "-e", default="dev", help="Target environment")
+@click.option("--project", "-p", help="Project name")
+@click.option("--chat", "-c", is_flag=True, help="Interactive chat mode")
+def ask(request, output, env, project, chat):
+    """Generate infrastructure using AI.
+
+    Describe what you need in natural language:
+
+    \b
+    Examples:
+      infra ask "I need a Python API with a PostgreSQL database"
+      infra ask "Build me a data pipeline for IoT events"
+      infra ask -c  # Interactive chat mode
+    """
+    try:
+        from anthropic import Anthropic
+        from resource_catalog import SYSTEM_PROMPT
+    except ImportError:
+        click.secho("Error: anthropic package not installed", fg="red")
+        click.echo("Run: pip install anthropic")
+        raise SystemExit(1)
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        click.secho("Error: ANTHROPIC_API_KEY environment variable not set", fg="red")
+        raise SystemExit(1)
+
+    client = Anthropic(api_key=api_key)
+    messages = []
+
+    # Add context about environment and project if provided
+    context_parts = []
+    if env:
+        context_parts.append(f"Target environment: {env}")
+    if project:
+        context_parts.append(f"Project name: {project}")
+
+    click.echo("\n" + "=" * 60)
+    click.secho("Infrastructure AI Assistant", fg="cyan", bold=True)
+    click.echo("=" * 60)
+
+    if chat or not request:
+        # Interactive chat mode
+        click.echo("Describe the infrastructure you need. Type 'done' to generate YAML.")
+        click.echo("Type 'quit' to exit.\n")
+
+        while True:
+            try:
+                user_input = click.prompt(click.style("You", fg="green"), prompt_suffix=": ")
+            except click.Abort:
+                break
+
+            if user_input.lower() == 'quit':
+                click.echo("Goodbye!")
+                return
+            if user_input.lower() == 'done':
+                if not messages:
+                    click.secho("No conversation yet. Describe what you need first.", fg="yellow")
+                    continue
+                # Ask for final YAML generation
+                user_input = f"Generate the final YAML configuration based on our discussion. Environment: {env}. Project: {project or 'my-project'}. Output only the YAML in a code block."
+
+            messages.append({"role": "user", "content": user_input})
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=SYSTEM_PROMPT,
+                messages=messages
+            )
+
+            assistant_message = response.content[0].text
+            messages.append({"role": "assistant", "content": assistant_message})
+
+            click.echo()
+            click.secho("Assistant: ", fg="blue", nl=False)
+            click.echo(assistant_message)
+            click.echo()
+
+            # Check if response contains YAML
+            if "```yaml" in assistant_message and user_input.lower() != 'done':
+                if click.confirm("Save this configuration?"):
+                    _save_yaml_from_response(assistant_message, output)
+                    return
+
+            if user_input.startswith("Generate the final YAML"):
+                _save_yaml_from_response(assistant_message, output)
+                return
+    else:
+        # Single request mode
+        full_request = request
+        if context_parts:
+            full_request = f"{request}\n\nContext:\n" + "\n".join(context_parts)
+
+        click.echo(f"Generating infrastructure for: {request}\n")
+
+        messages = [{"role": "user", "content": full_request}]
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4096,
+            system=SYSTEM_PROMPT,
+            messages=messages
+        )
+
+        assistant_message = response.content[0].text
+        click.echo(assistant_message)
+
+        if "```yaml" in assistant_message:
+            click.echo()
+            if click.confirm("Save this configuration?"):
+                _save_yaml_from_response(assistant_message, output)
+
+
+def _save_yaml_from_response(response_text, output_file):
+    """Extract YAML from response and save to file."""
+    import re
+    yaml_match = re.search(r'```yaml\n(.*?)\n```', response_text, re.DOTALL)
+    if yaml_match:
+        yaml_content = yaml_match.group(1)
+        with open(output_file, 'w') as f:
+            f.write(yaml_content)
+        click.secho(f"\nConfiguration saved to: {output_file}", fg="green")
+        click.echo(f"\nNext steps:")
+        click.echo(f"  1. Review: cat {output_file}")
+        click.echo(f"  2. Submit: infra provision {output_file} --email <your-email>")
+    else:
+        click.secho("Could not extract YAML from response", fg="red")
+
+
 if __name__ == "__main__":
     cli()
