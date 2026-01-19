@@ -47,4 +47,5 @@ mcp-server/dist/
 # Node
 node_modules/
 package-lock.json
+!mcp-server/package-lock.json
 *.tgz
