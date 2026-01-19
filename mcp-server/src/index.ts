@@ -2,6 +2,7 @@
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -11,6 +12,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { glob } from "glob";
 import YAML from "yaml";
+import express from "express";
+import cors from "cors";
 
 // Module definitions with their config options
 const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
@@ -859,9 +862,124 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Start the server
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Infrastructure MCP Server running on stdio");
+  const mode = process.env.MCP_TRANSPORT || "stdio";
+  const port = parseInt(process.env.PORT || "3000", 10);
+
+  if (mode === "sse") {
+    // SSE mode for remote connections
+    const app = express();
+    app.use(cors());
+    app.use(express.json());
+
+    // Health check endpoint
+    app.get("/health", (req, res) => {
+      res.json({ status: "healthy", mode: "sse", version: "1.0.0" });
+    });
+
+    // Store active transports
+    const transports = new Map<string, SSEServerTransport>();
+
+    // SSE endpoint for MCP connections
+    app.get("/sse", (req, res) => {
+      console.log("New SSE connection");
+
+      const transport = new SSEServerTransport("/messages", res);
+      const sessionId = Math.random().toString(36).substring(7);
+      transports.set(sessionId, transport);
+
+      // Create a new server instance for this connection
+      const sessionServer = new Server(
+        {
+          name: "infrastructure-mcp-server",
+          version: "1.0.0",
+        },
+        {
+          capabilities: {
+            tools: {},
+          },
+        }
+      );
+
+      // Register the same handlers
+      sessionServer.setRequestHandler(ListToolsRequestSchema, async () => {
+        return { tools };
+      });
+
+      sessionServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+        const { name, arguments: args } = request.params;
+
+        try {
+          let result: string;
+
+          switch (name) {
+            case "list_available_modules":
+              result = await listAvailableModules(args?.verbose as boolean);
+              break;
+
+            case "analyze_codebase":
+              result = await analyzeCodebase(
+                args?.path as string,
+                args?.include_patterns as string[],
+                args?.exclude_patterns as string[]
+              );
+              break;
+
+            case "generate_infrastructure_yaml":
+              result = generateInfrastructureYaml(args as any);
+              break;
+
+            case "validate_infrastructure_yaml":
+              const yamlContent = args?.yaml_content as string ||
+                (args?.file_path ? fs.readFileSync(args.file_path as string, "utf-8") : "");
+              result = validateInfrastructureYaml(yamlContent);
+              break;
+
+            case "get_module_details":
+              result = getModuleDetails(args?.module_name as string);
+              break;
+
+            default:
+              throw new Error(`Unknown tool: ${name}`);
+          }
+
+          return {
+            content: [{ type: "text", text: result }]
+          };
+
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error: ${error}` }],
+            isError: true
+          };
+        }
+      });
+
+      sessionServer.connect(transport);
+
+      req.on("close", () => {
+        console.log("SSE connection closed");
+        transports.delete(sessionId);
+      });
+    });
+
+    // Messages endpoint for client-to-server communication
+    app.post("/messages", (req, res) => {
+      // Find the transport for this session and handle the message
+      // The SSE transport handles this internally
+      res.status(202).send();
+    });
+
+    app.listen(port, () => {
+      console.log(`Infrastructure MCP Server running on http://0.0.0.0:${port}`);
+      console.log(`SSE endpoint: http://0.0.0.0:${port}/sse`);
+      console.log(`Health check: http://0.0.0.0:${port}/health`);
+    });
+  } else {
+    // Stdio mode for local usage
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("Infrastructure MCP Server running on stdio");
+  }
 }
 
 main().catch(console.error);

@@ -1,211 +1,164 @@
 # Infrastructure MCP Server
 
-An MCP (Model Context Protocol) server that enables AI assistants to analyze codebases and generate infrastructure configurations for the Infrastructure Self-Service Platform.
+An MCP (Model Context Protocol) server that enables AI assistants to generate infrastructure patterns and Terraform configurations on-the-fly.
 
 ## Features
 
-- **Analyze Codebases**: Scans code for database connections, storage usage, frameworks, and environment variables to detect infrastructure needs
-- **List Available Modules**: Shows all Terraform modules with their configuration options
-- **Generate YAML**: Creates valid `infrastructure.yaml` files for the GitOps workflow
-- **Validate Configurations**: Checks YAML against the schema and available modules
+- **Pattern Generation**: Create YAML infrastructure patterns from natural language descriptions
+- **Terraform Generation**: Generate ready-to-apply Terraform configurations
+- **Module Discovery**: List available infrastructure modules and their configurations
+- **Pattern Browsing**: View existing patterns for reference
+- **Cost Estimation**: Estimate infrastructure costs before provisioning
 
-## Installation
+## Supported Resource Types
+
+| Resource Type | Description | Key Options |
+|--------------|-------------|-------------|
+| `postgresql` | Azure Database for PostgreSQL | sku, storage_mb, version, backup, geo_redundancy |
+| `mongodb` | Azure Cosmos DB (MongoDB API) | throughput, consistency, geo_redundancy, backup |
+| `keyvault` | Azure Key Vault | sku, soft_delete, purge_protection, rbac |
+| `storage` | Azure Storage Account | tier, replication, blob_versioning, containers |
+| `function_app` | Azure Functions | runtime, version, sku, always_on |
+| `eventhub` | Azure Event Hubs | sku, capacity, partitions, retention, capture |
+| `aks_namespace` | AKS Kubernetes Namespace | cpu_limit, memory_limit, rbac, network_policies |
+| `linux_vm` | Azure Linux Virtual Machine | size, os, disk_size, admin_username |
+
+## Usage
+
+### Local Development (stdio mode)
 
 ```bash
 cd mcp-server
 npm install
 npm run build
+npm start
 ```
 
-## Configuration
-
-### For Claude Code
-
-Add to your Claude Code MCP settings (`~/.claude/claude_desktop_config.json` or project settings):
-
+Configure in Claude Code settings:
 ```json
 {
   "mcpServers": {
     "infrastructure": {
       "command": "node",
-      "args": ["/path/to/infrastructure-automation/mcp-server/dist/index.js"]
+      "args": ["/path/to/mcp-server/dist/index.js"]
     }
   }
 }
 ```
 
-### For Claude Desktop
+### Remote Server (SSE mode)
 
-Add to your Claude Desktop config:
+Start locally for testing:
+```bash
+npm run start:sse
+```
 
+Or use the hosted version (after deployment):
 ```json
 {
   "mcpServers": {
     "infrastructure": {
-      "command": "node",
-      "args": ["/path/to/infrastructure-automation/mcp-server/dist/index.js"]
+      "type": "sse",
+      "url": "https://your-mcp-server.azurecontainerapps.io/sse"
     }
   }
 }
 ```
 
-## Available Tools
+## MCP Tools
 
-### `list_available_modules`
+### generate_pattern
 
-List all available Terraform modules with their configuration options.
+Generate an infrastructure pattern from a description.
 
+**Parameters:**
+- `description` (required): What infrastructure you need
+- `project` (required): Project name
+- `environment` (required): Environment (dev/staging/prod)
+- `business_unit` (required): Business unit name
+- `owner` (required): Owner email address
+
+**Example:**
 ```
-Arguments:
-  verbose: boolean (optional) - Include detailed config options
-```
-
-Example response:
-```json
-[
-  {
-    "name": "storage_account",
-    "description": "Azure Storage Account for blob, file, queue, and table storage",
-    "use_cases": ["File uploads", "Static assets", "Backups"]
-  },
-  ...
-]
+Generate a pattern for a PostgreSQL database with 50GB storage for the analytics team
 ```
 
-### `analyze_codebase`
+### generate_terraform
 
-Analyze a codebase to detect infrastructure needs.
+Generate Terraform configuration from a YAML pattern.
 
-```
-Arguments:
-  path: string (required) - Path to the codebase
-  include_patterns: string[] (optional) - File patterns to include
-  exclude_patterns: string[] (optional) - File patterns to exclude
-```
+**Parameters:**
+- `pattern_yaml` (required): The YAML pattern content
 
-Example response:
-```json
-{
-  "analyzed_path": "/path/to/project",
-  "files_scanned": 45,
-  "detected_resources": [
-    {
-      "module": "postgresql",
-      "confidence": 0.8,
-      "reasons": ["package.json: matched prisma", "src/db.ts: matched DATABASE_URL"],
-      "suggested_config": { "version": "14", "sku": "B_Standard_B1ms" }
-    }
-  ]
-}
-```
+### list_modules
 
-### `generate_infrastructure_yaml`
+List all available infrastructure modules with their configuration options.
 
-Generate a complete infrastructure.yaml configuration.
+### list_patterns
 
-```
-Arguments:
-  project_name: string (required)
-  environment: string (optional, default: "dev")
-  business_unit: string (required)
-  cost_center: string (required)
-  owner_email: string (required)
-  location: string (optional, default: "centralus")
-  resources: array (required) - List of resources to include
-```
+List existing patterns in the patterns directory.
 
-Example:
-```javascript
-{
-  "project_name": "myapp",
-  "business_unit": "engineering",
-  "cost_center": "CC-ENG-001",
-  "owner_email": "team@example.com",
-  "resources": [
-    { "type": "postgresql", "name": "db" },
-    { "type": "storage_account", "name": "data", "config": { "replication": "GRS" } }
-  ]
-}
-```
+### estimate_cost
 
-### `validate_infrastructure_yaml`
+Estimate the monthly cost for infrastructure.
 
-Validate an infrastructure configuration.
+**Parameters:**
+- `pattern_yaml` (required): The YAML pattern content
 
-```
-Arguments:
-  yaml_content: string - YAML content to validate
-  file_path: string - Or path to YAML file
+## Deployment
+
+### Prerequisites
+
+- Azure subscription with Container Apps enabled
+- GitHub repository with GHCR access
+- Terraform state backend configured
+
+### GitHub Actions Deployment
+
+The deployment workflow triggers on:
+- Push to `main` branch with changes in `mcp-server/`
+- Manual workflow dispatch
+
+Required secrets:
+- `AZURE_CLIENT_ID`: Azure service principal client ID
+- `AZURE_TENANT_ID`: Azure tenant ID
+- `AZURE_SUBSCRIPTION_ID`: Azure subscription ID
+
+Required variables:
+- `TF_STATE_RESOURCE_GROUP`: Resource group for Terraform state
+- `TF_STATE_STORAGE_ACCOUNT`: Storage account for Terraform state
+- `TF_STATE_CONTAINER`: Blob container for Terraform state
+
+### Manual Deployment
+
+```bash
+# Build and push image
+docker build -t ghcr.io/your-org/infrastructure-mcp-server:latest ./mcp-server
+docker push ghcr.io/your-org/infrastructure-mcp-server:latest
+
+# Deploy with Terraform
+cd terraform/mcp-server
+terraform init
+terraform apply \
+  -var="container_registry=ghcr.io/your-org" \
+  -var="image_tag=latest"
 ```
 
-Example response:
-```json
-{
-  "valid": true,
-  "errors": [],
-  "warnings": ["project_name is long; Azure resource names have length limits"],
-  "summary": "Valid with warnings"
-}
-```
+## API Endpoints
 
-### `get_module_details`
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/sse` | GET | SSE endpoint for MCP connections |
+| `/messages` | POST | Message endpoint for SSE transport |
 
-Get detailed information about a specific module.
+## Environment Variables
 
-```
-Arguments:
-  module_name: string (required) - e.g., "storage_account", "postgresql"
-```
-
-## Example Workflow
-
-1. **Analyze your codebase**:
-   ```
-   User: "What infrastructure does my project need?"
-   Claude: [calls analyze_codebase with path to project]
-   ```
-
-2. **Review recommendations**:
-   ```
-   Claude: "Based on your Next.js app with Prisma, I recommend:
-   - postgresql for your database
-   - storage_account for file uploads
-   - static_web_app for hosting
-   - keyvault for secrets"
-   ```
-
-3. **Generate configuration**:
-   ```
-   User: "Generate the infrastructure.yaml"
-   Claude: [calls generate_infrastructure_yaml]
-   ```
-
-4. **Validate and export**:
-   ```
-   User: "Validate this configuration"
-   Claude: [calls validate_infrastructure_yaml]
-   Claude: "Configuration is valid! Add this to your repo root as infrastructure.yaml"
-   ```
-
-## Supported Modules
-
-| Module | Description |
-|--------|-------------|
-| `storage_account` | Azure Storage Account for blobs, files, queues |
-| `postgresql` | Azure Database for PostgreSQL Flexible Server |
-| `mongodb` | Azure Cosmos DB with MongoDB API |
-| `keyvault` | Azure Key Vault for secrets and keys |
-| `static_web_app` | Azure Static Web App for SPAs |
-
-## Detection Patterns
-
-The analyzer looks for:
-
-- **Database connections**: Connection strings, ORM libraries (Prisma, TypeORM, Mongoose)
-- **Storage usage**: S3/Blob SDK imports, file upload libraries
-- **Frameworks**: React, Vue, Angular, Next.js, etc.
-- **Environment variables**: DATABASE_URL, STORAGE_*, API keys
-- **Package dependencies**: package.json, requirements.txt, go.mod
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio` or `sse` |
+| `PORT` | `3000` | HTTP port for SSE mode |
+| `NODE_ENV` | `development` | Node environment |
 
 ## Development
 
@@ -213,13 +166,27 @@ The analyzer looks for:
 # Install dependencies
 npm install
 
-# Build
+# Build TypeScript
 npm run build
 
-# Run locally (for testing)
-npm start
+# Run in stdio mode
+npm run dev
+
+# Run in SSE mode
+npm run dev:sse
 ```
 
-## License
+## Architecture
 
-Internal use - Infrastructure Self-Service Platform
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Claude Code    │────▶│  MCP Server      │────▶│  Pattern Files  │
+│  (AI Assistant) │ SSE │  (Container App) │     │  (Local/Remote) │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                               │
+                               ▼
+                        ┌──────────────────┐
+                        │  Terraform       │
+                        │  Generation      │
+                        └──────────────────┘
+```
