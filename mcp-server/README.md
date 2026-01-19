@@ -1,31 +1,145 @@
 # Infrastructure MCP Server
 
-An MCP (Model Context Protocol) server that enables AI assistants to generate infrastructure patterns and Terraform configurations on-the-fly.
+An MCP (Model Context Protocol) server that enables AI assistants to analyze codebases and generate infrastructure configurations. Deployed on Azure Container Apps with API key authentication.
 
-## Features
+## Quick Start
 
-- **Pattern Generation**: Create YAML infrastructure patterns from natural language descriptions
-- **Terraform Generation**: Generate ready-to-apply Terraform configurations
-- **Module Discovery**: List available infrastructure modules and their configurations
-- **Pattern Browsing**: View existing patterns for reference
-- **Cost Estimation**: Estimate infrastructure costs before provisioning
+### For Developers Using Claude Code
+
+Add this to your project's `.mcp.json` file:
+
+```json
+{
+  "mcpServers": {
+    "infrastructure": {
+      "type": "sse",
+      "url": "https://ca-mcp-prod.mangoflower-3bcf53fc.centralus.azurecontainerapps.io/sse?api_key=YOUR_API_KEY"
+    }
+  }
+}
+```
+
+Contact your platform team to get an API key.
+
+### Getting the API Key (Platform Team)
+
+```bash
+# From Terraform state
+cd terraform/mcp-server
+terraform output -raw api_key
+
+# Or from Azure directly
+az containerapp secret show \
+  --name ca-mcp-prod \
+  --resource-group rg-mcp-prod \
+  --secret-name api-key \
+  --query value -o tsv
+```
+
+## Available Tools
+
+Once connected, Claude Code can use these tools:
+
+### `list_available_modules`
+
+List all available Terraform modules with their configuration options.
+
+```
+Use list_available_modules to see what infrastructure I can provision
+```
+
+### `analyze_codebase`
+
+Analyze a codebase to detect what infrastructure resources it needs. Scans for database connections, storage usage, frameworks, and environment variables.
+
+```
+Analyze my codebase at /path/to/project to determine what infrastructure it needs
+```
+
+### `generate_infrastructure_yaml`
+
+Generate an `infrastructure.yaml` configuration file based on detected or specified resources.
+
+```
+Generate an infrastructure.yaml for my project with a PostgreSQL database and Key Vault
+```
+
+### `validate_infrastructure_yaml`
+
+Validate an infrastructure configuration against the schema and available modules.
+
+```
+Validate this infrastructure.yaml file
+```
+
+### `get_module_details`
+
+Get detailed information about a specific module including all config options and examples.
+
+```
+Show me the details for the postgresql module
+```
 
 ## Supported Resource Types
 
 | Resource Type | Description | Key Options |
 |--------------|-------------|-------------|
-| `postgresql` | Azure Database for PostgreSQL | sku, storage_mb, version, backup, geo_redundancy |
-| `mongodb` | Azure Cosmos DB (MongoDB API) | throughput, consistency, geo_redundancy, backup |
-| `keyvault` | Azure Key Vault | sku, soft_delete, purge_protection, rbac |
-| `storage` | Azure Storage Account | tier, replication, blob_versioning, containers |
-| `function_app` | Azure Functions | runtime, version, sku, always_on |
-| `eventhub` | Azure Event Hubs | sku, capacity, partitions, retention, capture |
-| `aks_namespace` | AKS Kubernetes Namespace | cpu_limit, memory_limit, rbac, network_policies |
-| `linux_vm` | Azure Linux Virtual Machine | size, os, disk_size, admin_username |
+| `postgresql` | Azure Database for PostgreSQL Flexible Server | version, sku, storage_mb, backup_retention_days |
+| `mongodb` | Azure Cosmos DB with MongoDB API | serverless, consistency_level, throughput |
+| `keyvault` | Azure Key Vault for secrets and keys | sku, soft_delete_days, purge_protection, rbac_enabled |
+| `storage_account` | Azure Storage Account | tier, replication, versioning, containers |
+| `function_app` | Azure Functions | runtime, runtime_version, sku, app_settings |
+| `eventhub` | Azure Event Hubs | sku, capacity, partition_count, message_retention |
+| `aks_namespace` | Kubernetes namespace in shared AKS | cpu_limit, memory_limit, rbac_groups |
+| `linux_vm` | Azure Linux Virtual Machine | size, image, os_disk_type, public_ip |
+| `azure_sql` | Azure SQL Database | sku, version, databases, firewall_rules |
+| `static_web_app` | Azure Static Web App | sku_tier |
 
-## Usage
+## Architecture
 
-### Local Development (stdio mode)
+```
+┌─────────────────┐         ┌──────────────────────────┐
+│  Claude Code    │◀──SSE──▶│  MCP Server              │
+│  (Developer)    │         │  (Azure Container Apps)  │
+└─────────────────┘         └──────────────────────────┘
+        │                              │
+        │                              ▼
+        │                   ┌──────────────────────────┐
+        │                   │  Codebase Analysis       │
+        │                   │  Pattern Detection       │
+        │                   │  YAML Generation         │
+        │                   └──────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────┐
+│  GitOps Workflow                                     │
+│  CLI/API → Service Bus → GitHub Actions → Terraform │
+└─────────────────────────────────────────────────────┘
+```
+
+## Authentication
+
+The MCP server uses API key authentication:
+
+- **SSE Endpoint**: Pass API key as query parameter: `/sse?api_key=YOUR_KEY`
+- **Messages Endpoint**: API key is automatically included by the SSE transport
+
+The API key is:
+- Generated by Terraform using `random_password`
+- Stored as a secret in Azure Container Apps
+- Required for all connections (no anonymous access)
+
+## API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/health` | GET | No | Health check (returns server status) |
+| `/sse` | GET | Yes | SSE endpoint for MCP connections |
+| `/messages` | POST | Yes | Message endpoint for MCP protocol |
+
+## Local Development
+
+### Running Locally (stdio mode)
 
 ```bash
 cd mcp-server
@@ -34,7 +148,7 @@ npm run build
 npm start
 ```
 
-Configure in Claude Code settings:
+Configure Claude Code for local testing:
 ```json
 {
   "mcpServers": {
@@ -46,111 +160,73 @@ Configure in Claude Code settings:
 }
 ```
 
-### Remote Server (SSE mode)
+### Running Locally (SSE mode)
 
-Start locally for testing:
 ```bash
+# Without authentication
 npm run start:sse
+
+# With authentication
+API_KEY=test-key npm run start:sse
 ```
 
-Or use the hosted version (after deployment):
-```json
-{
-  "mcpServers": {
-    "infrastructure": {
-      "type": "sse",
-      "url": "https://your-mcp-server.azurecontainerapps.io/sse"
-    }
-  }
-}
+Test the connection:
+```bash
+# Health check
+curl http://localhost:3000/health
+
+# SSE connection (without auth)
+curl -N http://localhost:3000/sse
+
+# SSE connection (with auth)
+curl -N "http://localhost:3000/sse?api_key=test-key"
 ```
-
-## MCP Tools
-
-### generate_pattern
-
-Generate an infrastructure pattern from a description.
-
-**Parameters:**
-- `description` (required): What infrastructure you need
-- `project` (required): Project name
-- `environment` (required): Environment (dev/staging/prod)
-- `business_unit` (required): Business unit name
-- `owner` (required): Owner email address
-
-**Example:**
-```
-Generate a pattern for a PostgreSQL database with 50GB storage for the analytics team
-```
-
-### generate_terraform
-
-Generate Terraform configuration from a YAML pattern.
-
-**Parameters:**
-- `pattern_yaml` (required): The YAML pattern content
-
-### list_modules
-
-List all available infrastructure modules with their configuration options.
-
-### list_patterns
-
-List existing patterns in the patterns directory.
-
-### estimate_cost
-
-Estimate the monthly cost for infrastructure.
-
-**Parameters:**
-- `pattern_yaml` (required): The YAML pattern content
 
 ## Deployment
 
-### Prerequisites
+### Automatic Deployment (GitHub Actions)
 
-- Azure subscription with Container Apps enabled
-- GitHub repository with GHCR access
-- Terraform state backend configured
+The MCP server deploys automatically when:
+- Changes are pushed to `main` branch in the `mcp-server/` directory
+- Manual workflow dispatch via GitHub Actions
 
-### GitHub Actions Deployment
+### Required GitHub Secrets
 
-The deployment workflow triggers on:
-- Push to `main` branch with changes in `mcp-server/`
-- Manual workflow dispatch
+| Secret | Description |
+|--------|-------------|
+| `AZURE_CLIENT_ID` | Azure AD app registration client ID |
+| `AZURE_TENANT_ID` | Azure AD tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
 
-Required secrets:
-- `AZURE_CLIENT_ID`: Azure service principal client ID
-- `AZURE_TENANT_ID`: Azure tenant ID
-- `AZURE_SUBSCRIPTION_ID`: Azure subscription ID
+### Required GitHub Variables
 
-Required variables:
-- `TF_STATE_RESOURCE_GROUP`: Resource group for Terraform state
-- `TF_STATE_STORAGE_ACCOUNT`: Storage account for Terraform state
-- `TF_STATE_CONTAINER`: Blob container for Terraform state
+| Variable | Description |
+|----------|-------------|
+| `TF_STATE_RESOURCE_GROUP` | Resource group containing Terraform state storage |
+| `TF_STATE_STORAGE_ACCOUNT` | Storage account for Terraform state |
+| `TF_STATE_CONTAINER` | Blob container for state files |
 
 ### Manual Deployment
 
 ```bash
-# Build and push image
-docker build -t ghcr.io/your-org/infrastructure-mcp-server:latest ./mcp-server
+# Build and push Docker image
+cd mcp-server
+docker build -t ghcr.io/your-org/infrastructure-mcp-server:latest .
 docker push ghcr.io/your-org/infrastructure-mcp-server:latest
 
 # Deploy with Terraform
-cd terraform/mcp-server
-terraform init
-terraform apply \
-  -var="container_registry=ghcr.io/your-org" \
-  -var="image_tag=latest"
+cd ../terraform/mcp-server
+terraform init \
+  -backend-config="resource_group_name=your-rg" \
+  -backend-config="storage_account_name=yourstorageaccount" \
+  -backend-config="container_name=tfstate" \
+  -backend-config="key=mcp/prod/terraform.tfstate"
+
+terraform apply -var="container_registry=ghcr.io/your-org"
+
+# Get the API key
+terraform output -raw api_key
 ```
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/sse` | GET | SSE endpoint for MCP connections |
-| `/messages` | POST | Message endpoint for SSE transport |
 
 ## Environment Variables
 
@@ -159,34 +235,46 @@ terraform apply \
 | `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio` or `sse` |
 | `PORT` | `3000` | HTTP port for SSE mode |
 | `NODE_ENV` | `development` | Node environment |
+| `API_KEY` | (none) | API key for authentication (SSE mode only) |
 
-## Development
+## Troubleshooting
+
+### "Session not found" error
+
+This was fixed in the current version. If you see this error, ensure you're running the latest image:
 
 ```bash
-# Install dependencies
-npm install
-
-# Build TypeScript
-npm run build
-
-# Run in stdio mode
-npm run dev
-
-# Run in SSE mode
-npm run dev:sse
+az containerapp update --name ca-mcp-prod --resource-group rg-mcp-prod \
+  --image "ghcr.io/your-org/infrastructure-mcp-server:latest" \
+  --revision-suffix "v$(date +%s)"
 ```
 
-## Architecture
+### Connection closes immediately
 
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Claude Code    │────▶│  MCP Server      │────▶│  Pattern Files  │
-│  (AI Assistant) │ SSE │  (Container App) │     │  (Local/Remote) │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-                               │
-                               ▼
-                        ┌──────────────────┐
-                        │  Terraform       │
-                        │  Generation      │
-                        └──────────────────┘
-```
+Check that:
+1. The API key is correct
+2. The URL includes the `?api_key=` parameter
+3. The container is healthy: `curl https://your-server/health`
+
+### Tools not appearing in Claude Code
+
+1. Restart Claude Code after adding `.mcp.json`
+2. Check the MCP server status in Claude Code settings
+3. Verify the SSE connection with curl:
+   ```bash
+   curl -N "https://your-server/sse?api_key=YOUR_KEY"
+   ```
+
+## Cost
+
+Azure Container Apps with scale-to-zero:
+- **Idle**: ~$0/month (scales to 0 when not in use)
+- **Active**: ~$0.000024/vCPU-second + $0.000003/GiB-second
+- **Typical usage**: $1-5/month for light usage
+
+## Security Notes
+
+- API keys should be rotated periodically
+- Use project-specific `.mcp.json` files (not global)
+- The `.mcp.json` file may contain secrets - add to `.gitignore` if needed
+- Consider using Azure Key Vault for API key management in production
