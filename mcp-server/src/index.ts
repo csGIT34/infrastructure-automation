@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import * as crypto from "crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -911,15 +912,27 @@ async function main() {
       res.json({ status: "healthy", mode: "sse", version: "1.0.0", auth: apiKey ? "enabled" : "disabled" });
     });
 
-    // Store active transports
+    // Store active transports by session ID
     const transports = new Map<string, SSEServerTransport>();
 
     // SSE endpoint for MCP connections (requires auth)
-    app.get("/sse", validateApiKey, (req: any, res: any) => {
-      console.log("New SSE connection");
+    app.get("/sse", validateApiKey, async (req: any, res: any) => {
+      console.log("SSE connection");
 
-      const transport = new SSEServerTransport("/messages", res);
-      const sessionId = Math.random().toString(36).substring(7);
+      // Generate a unique session ID
+      const sessionId = crypto.randomUUID();
+
+      // Get the api_key from the request (either header or query)
+      const clientApiKey = req.query.api_key || req.headers.authorization?.replace("Bearer ", "");
+
+      // Build the messages endpoint URL with session ID and api_key if present
+      let messagesEndpoint = `/messages?sessionId=${sessionId}`;
+      if (clientApiKey && apiKey) {
+        messagesEndpoint += `&api_key=${clientApiKey}`;
+      }
+
+      // Create transport with session-specific messages endpoint
+      const transport = new SSEServerTransport(messagesEndpoint, res);
       transports.set(sessionId, transport);
 
       // Create a new server instance for this connection
@@ -998,10 +1011,25 @@ async function main() {
     });
 
     // Messages endpoint for client-to-server communication (requires auth)
-    app.post("/messages", validateApiKey, (req: any, res: any) => {
-      // Find the transport for this session and handle the message
-      // The SSE transport handles this internally
-      res.status(202).send();
+    app.post("/messages", validateApiKey, async (req: any, res: any) => {
+      const sessionId = req.query.sessionId as string;
+
+      if (!sessionId) {
+        return res.status(400).json({ error: "Missing sessionId query parameter" });
+      }
+
+      const transport = transports.get(sessionId);
+      if (!transport) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      try {
+        // Handle the incoming message through the transport
+        await transport.handlePostMessage(req, res);
+      } catch (error) {
+        console.error("Error handling message:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
     });
 
     app.listen(port, () => {

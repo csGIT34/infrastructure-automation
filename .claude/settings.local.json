@@ -95,11 +95,21 @@
       "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run list --workflow=queue-consumer.yaml --limit 3 --repo csGIT34/infrastructure-automation)",
       "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20766160890 --repo csGIT34/BillTracker)",
       "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run list --repo csGIT34/infrastructure-automation --workflow=deploy-api.yaml --limit 3)",
-      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20768948044 --repo csGIT34/infrastructure-automation)"
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" run view 20768948044 --repo csGIT34/infrastructure-automation)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl create:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh api:*)",
+      "Bash(grep:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(gh run view:*)",
+      "Bash(terraform fmt:*)",
+      "Bash(terraform validate:*)"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "infrastructure"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
