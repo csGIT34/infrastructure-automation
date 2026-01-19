@@ -916,7 +916,8 @@ async function main() {
     const transports = new Map<string, SSEServerTransport>();
 
     // SSE endpoint for MCP connections (requires auth)
-    app.get("/sse", validateApiKey, async (req: any, res: any) => {
+    // Note: NOT async - we don't want the handler to complete, SSE needs response to stay open
+    app.get("/sse", validateApiKey, (req: any, res: any) => {
       console.log("SSE connection");
 
       // Generate a unique session ID
@@ -1008,19 +1009,20 @@ async function main() {
         }
       });
 
-      // Connect the server to the transport
-      try {
-        await sessionServer.connect(transport);
+      // Connect the server to the transport (don't await - let it run)
+      sessionServer.connect(transport).then(() => {
         console.log("Server connected to transport for session:", sessionId);
-      } catch (error) {
+      }).catch((error) => {
         console.error("Error connecting server to transport:", error);
-      }
+      });
 
       req.on("close", () => {
         console.log("SSE connection closed for session:", sessionId);
         transports.delete(sessionId);
-        sessionServer.close();
+        sessionServer.close().catch(console.error);
       });
+
+      // Don't call res.end() - SSE connection must stay open
     });
 
     // Messages endpoint for client-to-server communication (requires auth)
