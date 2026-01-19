@@ -145,7 +145,7 @@ resource "azurerm_container_app" "mcp_server" {
   ingress {
     external_enabled = true
     target_port      = 3000
-    transport        = "http2" # Better for SSE/streaming
+    transport        = "http"
 
     traffic_weight {
       percentage      = 100
