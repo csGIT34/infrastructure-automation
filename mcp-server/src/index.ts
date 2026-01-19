@@ -871,16 +871,43 @@ async function main() {
     app.use(cors());
     app.use(express.json());
 
-    // Health check endpoint
+    // API key from environment
+    const apiKey = process.env.API_KEY;
+
+    // API key validation middleware
+    const validateApiKey = (req: any, res: any, next: any) => {
+      // Skip auth if no API_KEY is configured (local development)
+      if (!apiKey) {
+        return next();
+      }
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ error: "Missing Authorization header" });
+      }
+
+      // Support both "Bearer <key>" and just "<key>"
+      const token = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : authHeader;
+
+      if (token !== apiKey) {
+        return res.status(403).json({ error: "Invalid API key" });
+      }
+
+      next();
+    };
+
+    // Health check endpoint (no auth required)
     app.get("/health", (req, res) => {
-      res.json({ status: "healthy", mode: "sse", version: "1.0.0" });
+      res.json({ status: "healthy", mode: "sse", version: "1.0.0", auth: apiKey ? "enabled" : "disabled" });
     });
 
     // Store active transports
     const transports = new Map<string, SSEServerTransport>();
 
-    // SSE endpoint for MCP connections
-    app.get("/sse", (req, res) => {
+    // SSE endpoint for MCP connections (requires auth)
+    app.get("/sse", validateApiKey, (req: any, res: any) => {
       console.log("New SSE connection");
 
       const transport = new SSEServerTransport("/messages", res);
@@ -962,8 +989,8 @@ async function main() {
       });
     });
 
-    // Messages endpoint for client-to-server communication
-    app.post("/messages", (req, res) => {
+    // Messages endpoint for client-to-server communication (requires auth)
+    app.post("/messages", validateApiKey, (req: any, res: any) => {
       // Find the transport for this session and handle the message
       // The SSE transport handles this internally
       res.status(202).send();
@@ -973,6 +1000,7 @@ async function main() {
       console.log(`Infrastructure MCP Server running on http://0.0.0.0:${port}`);
       console.log(`SSE endpoint: http://0.0.0.0:${port}/sse`);
       console.log(`Health check: http://0.0.0.0:${port}/health`);
+      console.log(`Authentication: ${apiKey ? "enabled" : "disabled (set API_KEY to enable)"}`);
     });
   } else {
     // Stdio mode for local usage

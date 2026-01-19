@@ -5,11 +5,21 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 
   backend "azurerm" {
     use_oidc = true
   }
+}
+
+# Generate a secure API key
+resource "random_password" "api_key" {
+  length  = 32
+  special = false
 }
 
 provider "azurerm" {
@@ -83,6 +93,11 @@ resource "azurerm_container_app" "mcp_server" {
   revision_mode                = "Single"
   tags                         = local.common_tags
 
+  secret {
+    name  = "api-key"
+    value = random_password.api_key.result
+  }
+
   template {
     min_replicas = 0
     max_replicas = 3
@@ -106,6 +121,11 @@ resource "azurerm_container_app" "mcp_server" {
       env {
         name  = "NODE_ENV"
         value = "production"
+      }
+
+      env {
+        name        = "API_KEY"
+        secret_name = "api-key"
       }
 
       liveness_probe {
@@ -150,13 +170,24 @@ output "health_endpoint" {
   value       = "https://${azurerm_container_app.mcp_server.ingress[0].fqdn}/health"
 }
 
+output "api_key" {
+  description = "API key for MCP server authentication"
+  value       = random_password.api_key.result
+  sensitive   = true
+}
+
 output "claude_code_config" {
-  description = "Claude Code MCP configuration"
+  description = "Claude Code MCP configuration (use 'terraform output -raw api_key' to get the key)"
   value = jsonencode({
     mcpServers = {
       infrastructure = {
         type = "sse"
         url  = "https://${azurerm_container_app.mcp_server.ingress[0].fqdn}/sse"
+        requestInit = {
+          headers = {
+            Authorization = "Bearer <API_KEY>"
+          }
+        }
       }
     }
   })
