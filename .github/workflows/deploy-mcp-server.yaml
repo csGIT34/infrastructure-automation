@@ -115,9 +115,10 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_USE_OIDC: true
         run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           terraform plan \
             -var="environment=${{ inputs.environment || 'prod' }}" \
-            -var="container_registry=${{ env.REGISTRY }}/${{ github.repository }}" \
+            -var="container_registry=${{ env.REGISTRY }}/${REPO_LOWER}" \
             -var="image_tag=${{ needs.build.outputs.image_tag }}" \
             -out=tfplan
 
