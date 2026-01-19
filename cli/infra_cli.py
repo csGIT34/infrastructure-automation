@@ -304,10 +304,10 @@ def patterns_show(pattern_name):
 @cli.command()
 @click.option("--pattern", "-p", help="Pattern to use (run 'infra patterns list' to see options)")
 @click.option("--env", "-e", default="dev", help="Environment (dev, staging, prod)")
-@click.option("--project", required=True, help="Project name")
-@click.option("--business-unit", "-b", required=True, help="Business unit")
-@click.option("--cost-center", "-c", required=True, help="Cost center")
-@click.option("--email", required=True, help="Owner email")
+@click.option("--project", default=None, help="Project name")
+@click.option("--business-unit", "-b", default=None, help="Business unit")
+@click.option("--cost-center", "-c", default=None, help="Cost center")
+@click.option("--email", default=None, help="Owner email")
 @click.option("--output", "-o", default="infrastructure.yaml", help="Output file name")
 @click.option("--runtime", default="python", help="Runtime for function apps")
 @click.option("--runtime-version", default="3.11", help="Runtime version")
@@ -320,7 +320,7 @@ def init(pattern, env, project, business_unit, cost_center, email, output, runti
     """
     available = get_available_patterns()
 
-    # Interactive mode
+    # Interactive mode - prompt for missing values
     if interactive or not pattern:
         if not available:
             click.secho("No patterns available", fg="red")
@@ -332,7 +332,7 @@ def init(pattern, env, project, business_unit, cost_center, email, output, runti
 
         # Select pattern
         click.echo("\nAvailable patterns:")
-        pattern_list = list(available.keys())
+        pattern_list = sorted(available.keys())
         for i, name in enumerate(pattern_list, 1):
             desc = available[name].get('description', '')
             cost = available[name].get('estimated_costs', {}).get('dev', '?')
@@ -356,14 +356,36 @@ def init(pattern, env, project, business_unit, cost_center, email, output, runti
         env = ['dev', 'staging', 'prod'][env_choice - 1] if 1 <= env_choice <= 3 else 'dev'
 
         # Collect other info if not provided
-        if not project or project == 'my-project':
+        if not project:
             project = click.prompt("Project name")
-        if not business_unit or business_unit == 'engineering':
+        if not business_unit:
             business_unit = click.prompt("Business unit")
-        if not cost_center or cost_center == 'CC-1234':
+        if not cost_center:
             cost_center = click.prompt("Cost center")
-        if not email or email == 'owner@example.com':
+        if not email:
             email = click.prompt("Owner email")
+
+    # Validate required fields for non-interactive mode
+    if not interactive and not pattern:
+        # If no pattern specified and not interactive, show help
+        click.secho("Error: Please specify --pattern or use --interactive mode", fg="red")
+        click.echo("\nAvailable patterns: " + ", ".join(available.keys()))
+        click.echo("Run 'infra patterns list' for details")
+        raise SystemExit(1)
+
+    missing = []
+    if not project:
+        missing.append('--project')
+    if not business_unit:
+        missing.append('--business-unit')
+    if not cost_center:
+        missing.append('--cost-center')
+    if not email:
+        missing.append('--email')
+    if missing:
+        click.secho(f"Error: Missing required options: {', '.join(missing)}", fg="red")
+        click.echo("Use --interactive mode or provide all required options")
+        raise SystemExit(1)
 
     # Validate pattern
     if pattern not in available:
