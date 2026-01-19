@@ -52,7 +52,7 @@ jobs:
 
             - name: Install Python dependencies
               run: |
-                  pip3 install azure-servicebus azure-identity azure-cosmos pyyaml
+                  pip3 install --break-system-packages azure-servicebus azure-identity azure-cosmos pyyaml
 
             - name: Azure Login
               uses: azure/login@v1
