@@ -881,15 +881,23 @@ async function main() {
         return next();
       }
 
+      // Check Authorization header first
       const authHeader = req.headers.authorization;
-      if (!authHeader) {
-        return res.status(401).json({ error: "Missing Authorization header" });
+      let token: string | undefined;
+
+      if (authHeader) {
+        // Support both "Bearer <key>" and just "<key>"
+        token = authHeader.startsWith("Bearer ")
+          ? authHeader.slice(7)
+          : authHeader;
+      } else if (req.query.api_key) {
+        // Fallback to query parameter (needed for SSE which doesn't support headers)
+        token = req.query.api_key;
       }
 
-      // Support both "Bearer <key>" and just "<key>"
-      const token = authHeader.startsWith("Bearer ")
-        ? authHeader.slice(7)
-        : authHeader;
+      if (!token) {
+        return res.status(401).json({ error: "Missing API key. Use Authorization header or ?api_key= query parameter" });
+      }
 
       if (token !== apiKey) {
         return res.status(403).json({ error: "Invalid API key" });
