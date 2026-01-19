@@ -14,6 +14,9 @@ __pycache__/
 .Python
 venv/
 .venv/
+*.egg-info/
+dist/
+build/
 
 # IDE
 .idea/

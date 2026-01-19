@@ -1,12 +1,30 @@
 # Infrastructure Self-Service CLI
 
-A command-line tool for requesting and managing Azure infrastructure resources.
+Command-line tool for requesting and managing Azure infrastructure resources.
 
 ## Installation
 
+### Using uv (recommended)
+
+```bash
+# Install as a tool (globally available)
+uv tool install git+https://github.com/csGIT34/infrastructure-automation.git#subdirectory=cli
+
+# Or add to a project
+uv add git+https://github.com/csGIT34/infrastructure-automation.git#subdirectory=cli
+```
+
+### Using pip
+
+```bash
+pip install git+https://github.com/csGIT34/infrastructure-automation.git#subdirectory=cli
+```
+
+### Development install
+
 ```bash
 cd cli
-pip install -e .
+uv pip install -e .
 ```
 
 ## Configuration
@@ -14,22 +32,55 @@ pip install -e .
 Set environment variables:
 
 ```bash
-export INFRA_API_URL="https://your-function-app.azurewebsites.net"
+export INFRA_API_URL="https://func-infra-api.azurewebsites.net"
 export INFRA_API_KEY="your-api-key"
+```
+
+## Quick Start
+
+```bash
+# Browse available patterns
+infra patterns list
+
+# Create config interactively
+infra init -i
+
+# Submit request
+infra provision infrastructure.yaml --email your@email.com
 ```
 
 ## Usage
 
-### Initialize a new configuration
+### Browse patterns
 
 ```bash
-infra init web-app-stack -o my-app.yaml
+infra patterns list
+infra patterns show web-app
+```
+
+### Create infrastructure config (interactive wizard)
+
+```bash
+infra init -i
+```
+
+### Create infrastructure config (command line)
+
+```bash
+infra init --pattern web-app --env dev \
+  --project my-app \
+  --business-unit engineering \
+  --cost-center CC-1234 \
+  --email team@example.com
 ```
 
 ### Submit a provisioning request
 
 ```bash
 infra provision my-app.yaml --email your@email.com
+
+# Dry run first (validate without submitting)
+infra provision my-app.yaml --email your@email.com --dry-run
 ```
 
 ### Check request status
@@ -38,17 +89,27 @@ infra provision my-app.yaml --email your@email.com
 infra status <request-id>
 ```
 
-### List available templates
+## Available Patterns
 
-```bash
-infra templates
-```
+| Pattern | Description | Dev Cost |
+|---------|-------------|----------|
+| `web-app` | Full-stack with Function App + SQL + Storage | $0/month |
+| `api-backend` | Serverless API with Function App + Key Vault | $0/month |
+| `data-pipeline` | Event Hub + Functions + Storage | ~$25/month |
+| `static-site` | Static Web App hosting | $0/month |
 
-### Dry run (validate without submitting)
+## Available Resource Types
 
-```bash
-infra provision my-app.yaml --email your@email.com --dry-run
-```
+- `azure_sql` - Azure SQL Database
+- `function_app` - Azure Functions
+- `storage_account` - Azure Storage Account
+- `keyvault` - Azure Key Vault
+- `eventhub` - Azure Event Hubs
+- `static_web_app` - Azure Static Web Apps
+- `postgresql` - Azure Database for PostgreSQL
+- `mongodb` - Azure Cosmos DB with MongoDB API
+- `linux_vm` - Azure Linux Virtual Machine
+- `aks_namespace` - AKS Namespace with RBAC
 
 ## YAML Configuration Format
 
@@ -61,28 +122,18 @@ metadata:
   owner_email: owner@company.com
 
 resources:
-  - type: postgresql
-    name: main-db
+  - type: function_app
+    name: api
     config:
-      sku: B_Standard_B1ms
-      storage_mb: 32768
+      runtime: python
+      runtime_version: "3.11"
+      sku: Y1              # Y1 = free consumption plan
 
-  - type: storage_account
-    name: data
+  - type: azure_sql
+    name: db
     config:
-      tier: Standard
-      replication: LRS
-      containers:
-        - name: uploads
+      sku: Free            # Free tier available
+      databases:
+        - name: appdb
+          sku: Free
 ```
-
-## Available Resource Types
-
-- `postgresql` - Azure Database for PostgreSQL Flexible Server
-- `mongodb` - Azure Cosmos DB with MongoDB API
-- `keyvault` - Azure Key Vault
-- `storage_account` - Azure Storage Account
-- `eventhub` - Azure Event Hubs
-- `function_app` - Azure Functions
-- `linux_vm` - Azure Linux Virtual Machine
-- `aks_namespace` - AKS Namespace with RBAC
