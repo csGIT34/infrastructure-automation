@@ -1,0 +1,26 @@
+name: static-site
+description: Static website with optional serverless API
+use_cases:
+  - Marketing websites
+  - Documentation sites
+  - Single-page applications (React, Vue, Angular)
+  - JAMstack applications
+
+components:
+  - name: Static Web App
+    type: static_web_app
+    description: Globally distributed static hosting
+  - name: API Functions (optional)
+    type: function_app
+    description: Serverless API for dynamic features
+
+estimated_costs:
+  dev: 0
+  staging: 0
+  prod: 9
+
+tags:
+  - static
+  - web
+  - spa
+  - jamstack

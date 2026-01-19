@@ -1,0 +1,49 @@
+# Web App Pattern - Staging Environment
+# Estimated Cost: ~$30/month
+#
+# Components:
+# - Azure Functions (Basic Plan) - Consistent performance
+# - Azure SQL (Standard S0) - Better performance
+# - Storage Account (LRS) - File storage
+
+metadata:
+  project_name: ${PROJECT_NAME}
+  environment: staging
+  business_unit: ${BUSINESS_UNIT}
+  cost_center: ${COST_CENTER}
+  owner_email: ${OWNER_EMAIL}
+  location: ${LOCATION:centralus}
+
+resources:
+  - type: function_app
+    name: api
+    config:
+      runtime: ${RUNTIME:python}
+      runtime_version: ${RUNTIME_VERSION:3.11}
+      sku: B1
+      os_type: Linux
+      app_settings:
+        ENVIRONMENT: staging
+        DATABASE_HOST: ${PROJECT_NAME}-db.database.windows.net
+
+  - type: azure_sql
+    name: db
+    config:
+      sku: S0
+      databases:
+        - name: ${PROJECT_NAME}db
+          sku: S0
+          max_size_gb: 50
+
+  - type: storage_account
+    name: files
+    config:
+      tier: Standard
+      replication: LRS
+      versioning: true
+      soft_delete_days: 7
+      containers:
+        - name: uploads
+          access_type: private
+        - name: assets
+          access_type: blob

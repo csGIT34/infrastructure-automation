@@ -1,0 +1,29 @@
+name: data-pipeline
+description: Event-driven data processing pipeline
+use_cases:
+  - Real-time data ingestion
+  - ETL pipelines
+  - Event streaming
+  - IoT data processing
+
+components:
+  - name: Event Ingestion
+    type: eventhub
+    description: High-throughput event streaming
+  - name: Processing Functions
+    type: function_app
+    description: Event processors and transformers
+  - name: Data Lake
+    type: storage_account
+    description: Raw and processed data storage
+
+estimated_costs:
+  dev: 25
+  staging: 50
+  prod: 200
+
+tags:
+  - data
+  - streaming
+  - events
+  - etl

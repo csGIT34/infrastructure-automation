@@ -1,0 +1,28 @@
+name: web-app
+description: Full-stack web application with serverless API and SQL database
+use_cases:
+  - Web applications with backend API
+  - CRUD applications
+  - SaaS products
+
+components:
+  - name: API Backend
+    type: function_app
+    description: Serverless API using Azure Functions
+  - name: Database
+    type: azure_sql
+    description: SQL database for application data
+  - name: File Storage
+    type: storage_account
+    description: Blob storage for user uploads and static assets
+
+estimated_costs:
+  dev: 0
+  staging: 30
+  prod: 150
+
+tags:
+  - web
+  - api
+  - database
+  - serverless

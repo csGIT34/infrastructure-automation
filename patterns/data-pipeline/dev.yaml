@@ -1,0 +1,42 @@
+# Data Pipeline Pattern - Development Environment
+# Estimated Cost: ~$25/month
+
+metadata:
+  project_name: ${PROJECT_NAME}
+  environment: dev
+  business_unit: ${BUSINESS_UNIT}
+  cost_center: ${COST_CENTER}
+  owner_email: ${OWNER_EMAIL}
+  location: ${LOCATION:centralus}
+
+resources:
+  - type: eventhub
+    name: ingest
+    config:
+      sku: Basic
+      capacity: 1
+      partition_count: 2
+      message_retention: 1
+
+  - type: function_app
+    name: processor
+    config:
+      runtime: ${RUNTIME:python}
+      runtime_version: ${RUNTIME_VERSION:3.11}
+      sku: Y1
+      os_type: Linux
+      app_settings:
+        ENVIRONMENT: development
+
+  - type: storage_account
+    name: datalake
+    config:
+      tier: Standard
+      replication: LRS
+      containers:
+        - name: raw
+          access_type: private
+        - name: processed
+          access_type: private
+        - name: archive
+          access_type: private
