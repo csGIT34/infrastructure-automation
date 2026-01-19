@@ -41,7 +41,7 @@ variable "container_registry" {
 }
 
 locals {
-  name_prefix = "infra-mcp-${var.environment}"
+  name_prefix = "mcp-server-${var.environment}"
   common_tags = {
     Environment = var.environment
     Service     = "infrastructure-mcp-server"
