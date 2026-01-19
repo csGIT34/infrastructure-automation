@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import * as crypto from "crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -917,35 +916,29 @@ async function main() {
 
     // SSE endpoint for MCP connections (requires auth)
     app.get("/sse", validateApiKey, (req: any, res: any) => {
-      // Set headers to prevent caching
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-      res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
-
-      // Generate a unique session ID
-      const sessionId = crypto.randomUUID();
-
       // Get the api_key from the request
       const clientApiKey = req.query.api_key ||
         (req.headers.authorization?.startsWith("Bearer ")
           ? req.headers.authorization.slice(7)
           : req.headers.authorization);
 
-      // Build the messages endpoint URL
-      let messagesEndpoint = `/messages?sessionId=${sessionId}`;
+      // Build the messages endpoint URL - just include api_key, NOT sessionId
+      // SSEServerTransport generates its own sessionId and appends it to the endpoint
+      let messagesEndpoint = "/messages";
       if (clientApiKey) {
-        messagesEndpoint += `&api_key=${encodeURIComponent(clientApiKey)}`;
+        messagesEndpoint += `?api_key=${encodeURIComponent(clientApiKey)}`;
       }
 
-      console.log(`[${sessionId.slice(0,8)}] New SSE connection, endpoint: ${messagesEndpoint}`);
-
-      // Create transport - this immediately sends the endpoint URL to the client
+      // Create transport - it will generate its own sessionId and send endpoint to client
       const transport = new SSEServerTransport(messagesEndpoint, res);
 
-      // Store transport in map
+      // IMPORTANT: Use the transport's internal sessionId as the map key
+      // The transport generates its own UUID and sends it to the client
+      const sessionId = (transport as any)._sessionId;
+
+      // Store transport in map using the transport's session ID
       transports.set(sessionId, transport);
-      console.log(`[${sessionId.slice(0,8)}] Stored in map, total sessions: ${transports.size}`);
+      console.log(`[${sessionId.slice(0,8)}] New SSE connection, stored in map, total: ${transports.size}`);
 
       // Create a new server instance for this connection
       const sessionServer = new Server(
