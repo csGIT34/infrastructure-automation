@@ -89,7 +89,7 @@ jobs:
           elif len(config.get('resources', [])) == 0:
               errors.append("'resources' list is empty")
           else:
-              valid_types = ['storage_account', 'keyvault', 'postgresql', 'mongodb', 'eventhub', 'function_app', 'linux_vm', 'aks_namespace']
+              valid_types = ['storage_account', 'keyvault', 'postgresql', 'mongodb', 'eventhub', 'function_app', 'linux_vm', 'aks_namespace', 'static_web_app', 'azure_sql']
               for i, resource in enumerate(config['resources']):
                   if 'type' not in resource:
                       errors.append(f"Resource {i+1}: missing 'type'")

@@ -24,7 +24,8 @@ COST_MAP = {
     'linux_vm': 40,
     'storage_account': 5,
     'static_web_app': 0,
-    'aks_namespace': 10
+    'aks_namespace': 10,
+    'azure_sql': 30
 }
 
 # Cost limits per environment
@@ -74,7 +75,7 @@ def validate_schema(config):
         errors.append("'resources' list is empty")
     else:
         valid_types = ['storage_account', 'keyvault', 'postgresql', 'mongodb',
-                       'eventhub', 'function_app', 'linux_vm', 'aks_namespace', 'static_web_app']
+                       'eventhub', 'function_app', 'linux_vm', 'aks_namespace', 'static_web_app', 'azure_sql']
         for i, resource in enumerate(config['resources']):
             if 'type' not in resource:
                 errors.append(f"Resource {i+1}: missing 'type'")
