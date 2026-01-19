@@ -26,8 +26,8 @@ spec:
         - local
         - infrastructure
 
-      # Use custom image with infrastructure tools (optional)
-      # image: your-registry/custom-runner:latest
+      # Custom image with Azure CLI, Terraform, Python pre-installed
+      image: ghcr.io/csgit34/infrastructure-automation/actions-runner:latest
 
       # Environment variables
       env:
