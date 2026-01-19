@@ -916,31 +916,30 @@ async function main() {
     const transports = new Map<string, SSEServerTransport>();
 
     // SSE endpoint for MCP connections (requires auth)
-    // Note: NOT async - we don't want the handler to complete, SSE needs response to stay open
     app.get("/sse", validateApiKey, (req: any, res: any) => {
-      console.log("SSE connection");
-
       // Generate a unique session ID
       const sessionId = crypto.randomUUID();
 
-      // Get the api_key from the request (either header or query)
+      // Get the api_key from the request
       const clientApiKey = req.query.api_key ||
         (req.headers.authorization?.startsWith("Bearer ")
           ? req.headers.authorization.slice(7)
           : req.headers.authorization);
 
-      console.log("clientApiKey present:", !!clientApiKey, "apiKey present:", !!apiKey);
-
-      // Build the messages endpoint URL with session ID
-      // Always include api_key in the endpoint URL if provided by client and auth is enabled
+      // Build the messages endpoint URL
       let messagesEndpoint = `/messages?sessionId=${sessionId}`;
       if (clientApiKey) {
         messagesEndpoint += `&api_key=${encodeURIComponent(clientApiKey)}`;
       }
 
-      // Create transport with session-specific messages endpoint
+      console.log(`[${sessionId.slice(0,8)}] New SSE connection, endpoint: ${messagesEndpoint}`);
+
+      // Create transport - this immediately sends the endpoint URL to the client
       const transport = new SSEServerTransport(messagesEndpoint, res);
+
+      // Store transport in map
       transports.set(sessionId, transport);
+      console.log(`[${sessionId.slice(0,8)}] Stored in map, total sessions: ${transports.size}`);
 
       // Create a new server instance for this connection
       const sessionServer = new Server(
@@ -1009,26 +1008,25 @@ async function main() {
         }
       });
 
-      // Connect the server to the transport (don't await - let it run)
+      // Connect the server to the transport
       sessionServer.connect(transport).then(() => {
-        console.log("Server connected to transport for session:", sessionId);
+        console.log(`[${sessionId.slice(0,8)}] Server connected to transport`);
       }).catch((error) => {
-        console.error("Error connecting server to transport:", error);
+        console.error(`[${sessionId.slice(0,8)}] Error connecting:`, error);
       });
 
       req.on("close", () => {
-        console.log("SSE connection closed for session:", sessionId);
+        console.log(`[${sessionId.slice(0,8)}] SSE connection closed`);
         transports.delete(sessionId);
         sessionServer.close().catch(console.error);
       });
-
-      // Don't call res.end() - SSE connection must stay open
     });
 
     // Messages endpoint for client-to-server communication (requires auth)
     app.post("/messages", validateApiKey, async (req: any, res: any) => {
       const sessionId = req.query.sessionId as string;
-      console.log("POST /messages - sessionId:", sessionId, "active sessions:", transports.size);
+      const shortId = sessionId?.slice(0,8) || "unknown";
+      console.log(`[${shortId}] POST /messages, active sessions: ${transports.size}, keys: [${Array.from(transports.keys()).map(k => k.slice(0,8)).join(", ")}]`);
 
       if (!sessionId) {
         return res.status(400).json({ error: "Missing sessionId query parameter" });
@@ -1036,16 +1034,16 @@ async function main() {
 
       const transport = transports.get(sessionId);
       if (!transport) {
-        console.log("Session not found. Active sessions:", Array.from(transports.keys()));
+        console.log(`[${shortId}] Session NOT FOUND`);
         return res.status(404).json({ error: "Session not found" });
       }
 
       try {
-        console.log("Handling message for session:", sessionId);
+        console.log(`[${shortId}] Handling message...`);
         await transport.handlePostMessage(req, res);
-        console.log("Message handled successfully for session:", sessionId);
+        console.log(`[${shortId}] Message handled OK`);
       } catch (error) {
-        console.error("Error handling message:", error);
+        console.error(`[${shortId}] Error:`, error);
         res.status(500).json({ error: "Internal server error" });
       }
     });
