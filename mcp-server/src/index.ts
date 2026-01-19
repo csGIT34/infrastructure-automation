@@ -1039,11 +1039,14 @@ async function main() {
 
       try {
         console.log(`[${shortId}] Handling message...`);
-        await transport.handlePostMessage(req, res);
+        // Pass req.body as parsedBody since express.json() already consumed the stream
+        await transport.handlePostMessage(req, res, req.body);
         console.log(`[${shortId}] Message handled OK`);
       } catch (error) {
         console.error(`[${shortId}] Error:`, error);
-        res.status(500).json({ error: "Internal server error" });
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Internal server error" });
+        }
       }
     });
 
