@@ -24,11 +24,12 @@ const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
       "Backend for SPAs and mobile apps"
     ],
     config_options: {
-      runtime: { type: "string", default: "python", description: "Runtime (python, node, dotnet, java)" },
-      runtime_version: { type: "string", default: "3.11", description: "Runtime version" },
-      sku: { type: "string", default: "Y1", description: "SKU (Y1=free, B1=$13/mo, P1V2=$81/mo)" },
+      runtime: { type: "string", default: "python", description: "Runtime (python, node, dotnet, java, powershell)" },
+      runtime_version: { type: "string", default: "3.11", description: "Runtime version (e.g., 3.11 for Python, 18 for Node)" },
+      sku: { type: "string", default: "Y1", description: "SKU (Y1=free consumption, B1=$13/mo, P1V2=$81/mo)" },
       os_type: { type: "string", default: "Linux", description: "OS type (Linux, Windows)" },
-      app_settings: { type: "object", default: {}, description: "Environment variables" }
+      app_settings: { type: "object", default: {}, description: "Environment variables as key-value pairs" },
+      cors_origins: { type: "array", default: ["*"], description: "Allowed CORS origins" }
     },
     detection_patterns: [
       { pattern: /function|serverless|lambda|azure.*func/i, weight: 3 },
@@ -47,17 +48,36 @@ const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
       "Migration from SQL Server"
     ],
     config_options: {
-      sku: { type: "string", default: "Free", description: "SKU (Free, Basic=$5/mo, S0=$15/mo, S1=$30/mo)" },
+      sku: { type: "string", default: "Basic", description: "Server SKU (Free, Basic=$5/mo, S0=$15/mo, S1=$30/mo)" },
+      version: { type: "string", default: "12.0", description: "SQL Server version" },
+      max_size_gb: { type: "number", default: 2, description: "Default max database size in GB" },
+      collation: { type: "string", default: "SQL_Latin1_General_CP1_CI_AS", description: "Database collation" },
+      admin_login: { type: "string", default: "sqladmin", description: "Administrator login name" },
       databases: {
         type: "array",
         default: [],
         description: "List of databases to create",
         items: {
           name: { type: "string", required: true },
-          sku: { type: "string", default: "Free" },
-          max_size_gb: { type: "number", default: 32 }
+          sku: { type: "string", default: "Basic" },
+          max_size_gb: { type: "number", default: 2 },
+          collation: { type: "string", default: "SQL_Latin1_General_CP1_CI_AS" },
+          zone_redundant: { type: "boolean", default: false },
+          backup_retention_days: { type: "number", default: 7 }
         }
-      }
+      },
+      firewall_rules: {
+        type: "array",
+        default: [],
+        description: "Firewall rules (default allows Azure services)",
+        items: {
+          name: { type: "string", required: true },
+          start_ip_address: { type: "string", required: true },
+          end_ip_address: { type: "string", required: true }
+        }
+      },
+      aad_admin_login: { type: "string", default: null, description: "Azure AD admin login (optional)" },
+      aad_admin_object_id: { type: "string", default: null, description: "Azure AD admin object ID (optional)" }
     },
     detection_patterns: [
       { pattern: /sql.?server|mssql|sqlserver|azure.*sql/i, weight: 5 },
@@ -76,10 +96,43 @@ const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
       "Event-driven architectures"
     ],
     config_options: {
-      sku: { type: "string", default: "Basic", description: "SKU (Basic=$11/mo, Standard=$22/mo)" },
+      sku: { type: "string", default: "Basic", description: "SKU (Basic=$11/mo, Standard=$22/mo, Premium)" },
       capacity: { type: "number", default: 1, description: "Throughput units (1-20)" },
-      partition_count: { type: "number", default: 2, description: "Partitions (2-32)" },
-      message_retention: { type: "number", default: 1, description: "Retention days (1-7)" }
+      partition_count: { type: "number", default: 2, description: "Default partitions per hub (2-32)" },
+      message_retention: { type: "number", default: 1, description: "Default retention days (1-7, up to 90 for Premium)" },
+      auto_inflate_enabled: { type: "boolean", default: false, description: "Enable auto-inflate for throughput units" },
+      max_throughput_units: { type: "number", default: null, description: "Max throughput units when auto-inflate enabled" },
+      hubs: {
+        type: "array",
+        default: [],
+        description: "Event hubs to create in the namespace",
+        items: {
+          name: { type: "string", required: true },
+          partition_count: { type: "number", default: 2 },
+          message_retention: { type: "number", default: 1 }
+        }
+      },
+      consumer_groups: {
+        type: "array",
+        default: [],
+        description: "Consumer groups to create",
+        items: {
+          hub_name: { type: "string", required: true },
+          name: { type: "string", required: true },
+          user_metadata: { type: "string", default: null }
+        }
+      },
+      authorization_rules: {
+        type: "array",
+        default: [],
+        description: "Namespace authorization rules",
+        items: {
+          name: { type: "string", required: true },
+          listen: { type: "boolean", default: false },
+          send: { type: "boolean", default: false },
+          manage: { type: "boolean", default: false }
+        }
+      }
     },
     detection_patterns: [
       { pattern: /event.?hub|kafka|streaming|event.*driven/i, weight: 3 },

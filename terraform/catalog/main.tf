@@ -156,6 +156,18 @@ module "azure_sql" {
     tags                = local.common_tags
 }
 
+module "eventhub" {
+    source = "../modules/eventhub"
+
+    for_each = local.eventhub_resources
+
+    name                = "evhns-${local.metadata.project_name}-${each.key}-${local.metadata.environment}"
+    resource_group_name = azurerm_resource_group.main.name
+    location            = azurerm_resource_group.main.location
+    config              = lookup(each.value, "config", {})
+    tags                = local.common_tags
+}
+
 output "resource_group" {
     value = {
         name     = azurerm_resource_group.main.name
@@ -203,5 +215,13 @@ output "azure_sql_servers" {
         server_fqdn  = v.server_fqdn
         databases    = v.databases
         principal_id = v.principal_id
+    }}
+}
+
+output "eventhubs" {
+    value = { for k, v in module.eventhub : k => {
+        namespace_name = v.namespace_name
+        namespace_id   = v.namespace_id
+        hubs           = v.hubs
     }}
 }
