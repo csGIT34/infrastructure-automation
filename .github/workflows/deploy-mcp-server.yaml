@@ -105,7 +105,7 @@ jobs:
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
-            -backend-config="key=mcp-server/${{ inputs.environment || 'prod' }}/terraform.tfstate"
+            -backend-config="key=mcp-server-v2/${{ inputs.environment || 'prod' }}/terraform.tfstate"
 
       - name: Terraform Plan
         working-directory: terraform/mcp-server
