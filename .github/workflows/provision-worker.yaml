@@ -44,16 +44,6 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            - name: Install Azure CLI
-              run: |
-                  if ! command -v az &> /dev/null; then
-                      curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-                  fi
-
-            - name: Install Python dependencies
-              run: |
-                  pip3 install --break-system-packages azure-servicebus azure-identity azure-cosmos pyyaml
-
             - name: Azure Login
               uses: azure/login@v1
               with:

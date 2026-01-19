@@ -47,9 +47,15 @@ spec:
       volumeMounts:
         - name: work
           mountPath: /runner/_work
+        - name: terraform-cache
+          mountPath: /home/runner/.terraform.d/plugin-cache
       volumes:
         - name: work
           emptyDir: {}
+        - name: terraform-cache
+          hostPath:
+            path: /var/cache/terraform
+            type: DirectoryOrCreate
 
       # Optional: Docker-in-Docker for container builds
       # dockerdWithinRunnerContainer: true
@@ -76,8 +82,8 @@ spec:
     name: infrastructure-runners
 
   # Scaling bounds
-  minReplicas: 1
-  maxReplicas: 5
+  minReplicas: 2
+  maxReplicas: 10
 
   # Scaling metrics
   metrics:
