@@ -1008,17 +1008,25 @@ async function main() {
         }
       });
 
-      sessionServer.connect(transport);
+      // Connect the server to the transport
+      try {
+        await sessionServer.connect(transport);
+        console.log("Server connected to transport for session:", sessionId);
+      } catch (error) {
+        console.error("Error connecting server to transport:", error);
+      }
 
       req.on("close", () => {
-        console.log("SSE connection closed");
+        console.log("SSE connection closed for session:", sessionId);
         transports.delete(sessionId);
+        sessionServer.close();
       });
     });
 
     // Messages endpoint for client-to-server communication (requires auth)
     app.post("/messages", validateApiKey, async (req: any, res: any) => {
       const sessionId = req.query.sessionId as string;
+      console.log("POST /messages - sessionId:", sessionId, "active sessions:", transports.size);
 
       if (!sessionId) {
         return res.status(400).json({ error: "Missing sessionId query parameter" });
@@ -1026,12 +1034,14 @@ async function main() {
 
       const transport = transports.get(sessionId);
       if (!transport) {
+        console.log("Session not found. Active sessions:", Array.from(transports.keys()));
         return res.status(404).json({ error: "Session not found" });
       }
 
       try {
-        // Handle the incoming message through the transport
+        console.log("Handling message for session:", sessionId);
         await transport.handlePostMessage(req, res);
+        console.log("Message handled successfully for session:", sessionId);
       } catch (error) {
         console.error("Error handling message:", error);
         res.status(500).json({ error: "Internal server error" });
