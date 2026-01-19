@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/actions-runner
+  IMAGE_NAME: csgit34/infrastructure-automation/actions-runner
 
 jobs:
   build:
