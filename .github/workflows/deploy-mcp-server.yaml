@@ -117,7 +117,7 @@ jobs:
         run: |
           terraform plan \
             -var="environment=${{ inputs.environment || 'prod' }}" \
-            -var="container_registry=${{ env.REGISTRY }}" \
+            -var="container_registry=${{ env.REGISTRY }}/${{ github.repository }}" \
             -var="image_tag=${{ needs.build.outputs.image_tag }}" \
             -out=tfplan
 
