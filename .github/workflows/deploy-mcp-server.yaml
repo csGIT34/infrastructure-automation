@@ -70,6 +70,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+          build-args: |
+            CACHE_BUST=${{ github.sha }}
 
   deploy:
     name: Deploy to Azure

@@ -9,6 +9,9 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci
 
+# Cache bust arg - changes with each commit to invalidate source cache
+ARG CACHE_BUST=unknown
+
 # Copy source code
 COPY tsconfig.json ./
 COPY src/ ./src/
