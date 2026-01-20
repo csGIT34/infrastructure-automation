@@ -89,10 +89,10 @@ const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     },
     detection_patterns: [
       { pattern: /sql.?server|sqlserver|azure.*sql/i, weight: 5 },
-      { pattern: /["']mssql["']/i, weight: 6 },  // mssql package in package.json
-      { pattern: /import.*from\s+["']mssql["']/i, weight: 6 },  // mssql import
-      { pattern: /require\s*\(\s*["']mssql["']\s*\)/i, weight: 6 },  // mssql require
-      { pattern: /pyodbc|tedious|mssql-node/i, weight: 4 },
+      { pattern: /["']mssql["']/i, weight: 8 },  // mssql package in package.json
+      { pattern: /import.*from\s+["']mssql["']/i, weight: 8 },  // mssql import
+      { pattern: /require\s*\(\s*["']mssql["']\s*\)/i, weight: 8 },  // mssql require
+      { pattern: /pyodbc|tedious|mssql-node/i, weight: 6 },
       { pattern: /SQL_SERVER|MSSQL_|AZURE_SQL/i, weight: 5 },
       { pattern: /sql\.config|sql\.connect/i, weight: 5 },  // mssql connection
       { pattern: /\.query\(|executeQuery|ExecuteNonQuery/i, weight: 2 },
@@ -717,12 +717,45 @@ function analyzeFiles(params: {
   // Track detections per module
   const moduleDetections: Record<string, { matches: string[]; totalWeight: number }> = {};
 
+  // Track detected runtime for function_app
+  let detectedRuntime: { runtime: string; version: string } | null = null;
+
   // Analyze each file
   for (const file of files) {
     const { path: filePath, content } = file;
     if (!content) continue;
 
     const fileName = filePath.split('/').pop() || filePath;
+
+    // Detect runtime from file contents
+    if (!detectedRuntime) {
+      if (fileName === 'package.json') {
+        try {
+          const pkg = JSON.parse(content);
+          // Check engines.node first
+          if (pkg.engines?.node) {
+            const nodeVersion = pkg.engines.node.replace(/[^0-9.]/g, '').split('.')[0] || '18';
+            detectedRuntime = { runtime: 'node', version: nodeVersion };
+          }
+          // Or if it has @azure/functions dependency, it's Node
+          else if (pkg.dependencies?.['@azure/functions'] || pkg.devDependencies?.['@azure/functions']) {
+            detectedRuntime = { runtime: 'node', version: '18' };
+          }
+          // Or just has typical node project structure
+          else if (pkg.main || pkg.scripts) {
+            detectedRuntime = { runtime: 'node', version: '18' };
+          }
+        } catch (e) {
+          // Invalid JSON, skip
+        }
+      } else if (fileName === 'requirements.txt' || filePath.endsWith('.py')) {
+        detectedRuntime = { runtime: 'python', version: '3.11' };
+      } else if (filePath.endsWith('.csproj') || filePath.endsWith('.cs')) {
+        detectedRuntime = { runtime: 'dotnet', version: '8.0' };
+      } else if (fileName === 'go.mod' || filePath.endsWith('.go')) {
+        detectedRuntime = { runtime: 'custom', version: '' }; // Go uses custom handler
+      }
+    }
 
     // Check each module's detection patterns
     for (const [moduleName, moduleDef] of Object.entries(MODULE_DEFINITIONS)) {
@@ -752,6 +785,14 @@ function analyzeFiles(params: {
       for (const [key, opt] of Object.entries(moduleDef.config_options)) {
         if (opt.default !== null) {
           suggestedConfig[key] = opt.default;
+        }
+      }
+
+      // Apply detected runtime for function_app
+      if (moduleName === 'function_app' && detectedRuntime) {
+        suggestedConfig.runtime = detectedRuntime.runtime;
+        if (detectedRuntime.version) {
+          suggestedConfig.runtime_version = detectedRuntime.version;
         }
       }
 
