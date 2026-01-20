@@ -407,7 +407,7 @@ const tools: Tool[] = [
   },
   {
     name: "analyze_codebase",
-    description: "Analyze a codebase to detect what infrastructure resources it needs. NOTE: This tool only works in LOCAL mode (stdio). When using the remote SSE server, the path must be accessible from the server. For remote usage, describe your tech stack instead and use generate_infrastructure_yaml directly.",
+    description: "Analyze a codebase to detect what infrastructure resources it needs. NOTE: This tool only works in LOCAL mode (stdio). When using the remote SSE server, use analyze_files instead.",
     inputSchema: {
       type: "object",
       properties: {
@@ -429,6 +429,38 @@ const tools: Tool[] = [
         }
       },
       required: ["path"]
+    }
+  },
+  {
+    name: "analyze_files",
+    description: "Analyze file contents to detect infrastructure needs. Use this when connecting to the remote MCP server - Claude Code reads your local files and passes contents here for analysis. Useful files: package.json, requirements.txt, host.json, staticwebapp.config.json, source files with imports.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        files: {
+          type: "array",
+          description: "Array of files with their contents",
+          items: {
+            type: "object",
+            properties: {
+              path: {
+                type: "string",
+                description: "Relative file path (e.g., 'package.json', 'src/database.ts')"
+              },
+              content: {
+                type: "string",
+                description: "File content (text only, skip binary files)"
+              }
+            },
+            required: ["path", "content"]
+          }
+        },
+        project_name: {
+          type: "string",
+          description: "Optional project name for context"
+        }
+      },
+      required: ["files"]
     }
   },
   {
@@ -659,6 +691,103 @@ async function analyzeCodebase(
       analyzed_path: targetPath
     }, null, 2);
   }
+}
+
+// Analyze file contents passed directly (works with remote SSE server)
+function analyzeFiles(params: {
+  files: Array<{ path: string; content: string }>;
+  project_name?: string;
+}): string {
+  const { files, project_name } = params;
+
+  if (!files || files.length === 0) {
+    return JSON.stringify({
+      error: "No files provided. Pass an array of {path, content} objects.",
+      files_analyzed: 0
+    }, null, 2);
+  }
+
+  const results: Array<{
+    module: string;
+    confidence: number;
+    reasons: string[];
+    suggested_config: Record<string, any>;
+  }> = [];
+
+  // Track detections per module
+  const moduleDetections: Record<string, { matches: string[]; totalWeight: number }> = {};
+
+  // Analyze each file
+  for (const file of files) {
+    const { path: filePath, content } = file;
+    if (!content) continue;
+
+    const fileName = filePath.split('/').pop() || filePath;
+
+    // Check each module's detection patterns
+    for (const [moduleName, moduleDef] of Object.entries(MODULE_DEFINITIONS)) {
+      for (const { pattern, weight } of moduleDef.detection_patterns) {
+        if (pattern.test(content) || pattern.test(fileName) || pattern.test(filePath)) {
+          if (!moduleDetections[moduleName]) {
+            moduleDetections[moduleName] = { matches: [], totalWeight: 0 };
+          }
+          const matchDescription = `${filePath}: matches ${pattern.source}`;
+          if (!moduleDetections[moduleName].matches.includes(matchDescription)) {
+            moduleDetections[moduleName].matches.push(matchDescription);
+            moduleDetections[moduleName].totalWeight += weight;
+          }
+        }
+      }
+    }
+  }
+
+  // Convert detections to results with confidence scores
+  for (const [moduleName, detection] of Object.entries(moduleDetections)) {
+    const moduleDef = MODULE_DEFINITIONS[moduleName];
+    // Normalize confidence: higher weight = higher confidence, cap at 1.0
+    const confidence = Math.min(detection.totalWeight / 15, 1.0);
+
+    if (confidence >= 0.2) { // Threshold for including in results
+      const suggestedConfig: Record<string, any> = {};
+      for (const [key, opt] of Object.entries(moduleDef.config_options)) {
+        if (opt.default !== null) {
+          suggestedConfig[key] = opt.default;
+        }
+      }
+
+      results.push({
+        module: moduleName,
+        confidence,
+        reasons: detection.matches.slice(0, 5), // Top 5 matches
+        suggested_config: suggestedConfig
+      });
+    }
+  }
+
+  // Sort by confidence
+  results.sort((a, b) => b.confidence - a.confidence);
+
+  // Recommend keyvault if other resources detected
+  if (results.length > 0 && !results.find(r => r.module === "keyvault")) {
+    results.push({
+      module: "keyvault",
+      confidence: 0.5,
+      reasons: ["Recommended for secure secret management with other resources"],
+      suggested_config: { sku: "standard", rbac_enabled: true }
+    });
+  }
+
+  return JSON.stringify({
+    project_name: project_name || "unknown",
+    files_analyzed: files.length,
+    detected_resources: results,
+    summary: results.length > 0
+      ? `Detected ${results.length} potential infrastructure needs`
+      : "No specific infrastructure patterns detected",
+    hint: results.length > 0
+      ? "Use generate_infrastructure_yaml with these detected resources"
+      : "Try including more files: package.json, requirements.txt, host.json, source files with imports"
+  }, null, 2);
 }
 
 function generateInfrastructureYaml(params: {
@@ -1015,6 +1144,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
         break;
 
+      case "analyze_files":
+        result = analyzeFiles(args as {
+          files: Array<{ path: string; content: string }>;
+          project_name?: string;
+        });
+        break;
+
       case "generate_infrastructure_yaml":
         result = generateInfrastructureYaml(args as any);
         break;
@@ -1164,6 +1300,13 @@ async function main() {
                 args?.include_patterns as string[],
                 args?.exclude_patterns as string[]
               );
+              break;
+
+            case "analyze_files":
+              result = analyzeFiles(args as {
+                files: Array<{ path: string; content: string }>;
+                project_name?: string;
+              });
               break;
 
             case "generate_infrastructure_yaml":

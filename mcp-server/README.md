@@ -52,10 +52,24 @@ Use list_available_modules to see what infrastructure I can provision
 
 Analyze a codebase to detect what infrastructure resources it needs. Scans for database connections, storage usage, frameworks, and environment variables.
 
-> **⚠️ Important**: This tool only works in **local mode** (stdio). When using the hosted SSE server, the server cannot access your local filesystem. Instead, describe your tech stack to the AI and use `generate_infrastructure_yaml` directly.
+> **⚠️ Important**: This tool only works in **local mode** (stdio). When using the hosted SSE server, the server cannot access your local filesystem. Use `analyze_files` instead.
 
 ```
 Analyze my codebase at /path/to/project to determine what infrastructure it needs
+```
+
+### `analyze_files`
+
+Analyze file contents to detect infrastructure needs. **Works with the remote SSE server** - Claude Code reads your local files and passes the contents to this tool for pattern analysis.
+
+**Recommended files to include:**
+- `package.json` or `requirements.txt` (dependencies)
+- `host.json` (Azure Functions)
+- `staticwebapp.config.json` (Static Web Apps)
+- Source files with imports (database connections, SDK usage)
+
+```
+Read my package.json, host.json, and database.ts files, then use analyze_files to detect what infrastructure I need
 ```
 
 ### `generate_infrastructure_yaml`
