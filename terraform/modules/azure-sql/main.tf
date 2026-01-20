@@ -75,12 +75,19 @@ resource "azurerm_mssql_database" "databases" {
     name           = each.value.name
     server_id      = azurerm_mssql_server.main.id
     collation      = lookup(each.value, "collation", local.collation)
-    max_size_gb    = lookup(each.value, "max_size_gb", local.max_size_gb)
     sku_name       = lookup(each.value, "sku", local.sku_name)
     zone_redundant = lookup(each.value, "zone_redundant", false)
 
-    short_term_retention_policy {
-        retention_days = lookup(each.value, "backup_retention_days", 7)
+    # Don't set max_size_gb for Free tier - it uses fixed 32MB
+    # For other tiers, use specified size or default to 2GB
+    max_size_gb = lookup(each.value, "sku", local.sku_name) == "Free" ? null : lookup(each.value, "max_size_gb", local.max_size_gb)
+
+    # short_term_retention not supported on Free tier
+    dynamic "short_term_retention_policy" {
+        for_each = lookup(each.value, "sku", local.sku_name) != "Free" ? [1] : []
+        content {
+            retention_days = lookup(each.value, "backup_retention_days", 7)
+        }
     }
 
     tags = var.tags
