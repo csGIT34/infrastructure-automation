@@ -153,6 +153,8 @@ module "project_rbac" {
     tags              = local.common_tags
 
     # Enable flags - computed from YAML-derived locals (known at plan time)
+    # Secrets group always enabled since project keyvault is always created
+    enable_secrets_group = true
     enable_deployers_group = (
         length(local.function_resources) > 0 ||
         length(local.static_web_app_resources) > 0

@@ -116,6 +116,12 @@ variable "tags" {
 }
 
 # Enable flags - computed in catalog from YAML (known at plan time)
+variable "enable_secrets_group" {
+    description = "Whether to create the secrets security group"
+    type        = bool
+    default     = true
+}
+
 variable "enable_deployers_group" {
     description = "Whether to create the deployers security group"
     type        = bool
@@ -152,7 +158,7 @@ locals {
 
     # Determine which groups are needed based on resources
     # Use boolean flags passed from catalog (computed from YAML, known at plan time)
-    has_keyvault             = var.keyvault_id != null
+    has_keyvault             = var.enable_secrets_group
     has_deployable_resources = var.enable_deployers_group
     has_data_resources       = var.enable_data_group
     has_compute_resources    = var.enable_compute_group
