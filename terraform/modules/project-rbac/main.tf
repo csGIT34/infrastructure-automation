@@ -15,6 +15,7 @@ terraform {
 # Project RBAC Module
 # -----------------------------------------------------------------------------
 # Creates Entra ID security groups with delegated ownership model.
+# Groups are only created if there are resources that need them.
 #
 # Required Graph API Permissions (least privilege):
 #   - Group.Create          : Create security groups
@@ -52,20 +53,59 @@ variable "keyvault_id" {
     default     = null
 }
 
+# Deployable resources (deployers group)
 variable "function_app_ids" {
     description = "Map of Function App IDs for deployer RBAC"
     type        = map(string)
     default     = {}
 }
 
+variable "static_web_app_ids" {
+    description = "Map of Static Web App IDs for deployer RBAC"
+    type        = map(string)
+    default     = {}
+}
+
+variable "aks_namespace_ids" {
+    description = "Map of AKS namespace identifiers for deployer RBAC"
+    type        = map(string)
+    default     = {}
+}
+
+# Data resources (data group)
 variable "sql_server_ids" {
-    description = "Map of SQL Server IDs for data access RBAC"
+    description = "Map of Azure SQL Server IDs for data access RBAC"
+    type        = map(string)
+    default     = {}
+}
+
+variable "postgresql_server_ids" {
+    description = "Map of PostgreSQL Server IDs for data access RBAC"
+    type        = map(string)
+    default     = {}
+}
+
+variable "cosmosdb_account_ids" {
+    description = "Map of Cosmos DB (MongoDB) Account IDs for data access RBAC"
     type        = map(string)
     default     = {}
 }
 
 variable "storage_account_ids" {
     description = "Map of Storage Account IDs for data access RBAC"
+    type        = map(string)
+    default     = {}
+}
+
+variable "eventhub_namespace_ids" {
+    description = "Map of Event Hub Namespace IDs for data access RBAC"
+    type        = map(string)
+    default     = {}
+}
+
+# Compute resources (compute group)
+variable "linux_vm_ids" {
+    description = "Map of Linux VM IDs for compute access RBAC"
     type        = map(string)
     default     = {}
 }
@@ -91,31 +131,69 @@ locals {
     prefix    = "sg-${var.project_name}-${var.environment}"
     owner_ids = [for user in data.azuread_user.owners : user.object_id]
 
-    # Security group definitions
-    groups = {
-        readers = {
-            display_name = "${local.prefix}-readers"
-            description  = "Read access to ${var.project_name} ${var.environment} resources"
-        }
-        secrets = {
-            display_name = "${local.prefix}-secrets"
-            description  = "Key Vault secrets access for ${var.project_name} ${var.environment}"
-        }
-        deployers = {
-            display_name = "${local.prefix}-deployers"
-            description  = "Deployment access for ${var.project_name} ${var.environment}"
-        }
-        data = {
-            display_name = "${local.prefix}-data"
-            description  = "Data store access for ${var.project_name} ${var.environment}"
-        }
-    }
+    # Determine which groups are needed based on resources
+    has_keyvault = var.keyvault_id != null
+
+    has_deployable_resources = (
+        length(var.function_app_ids) > 0 ||
+        length(var.static_web_app_ids) > 0 ||
+        length(var.aks_namespace_ids) > 0
+    )
+
+    has_data_resources = (
+        length(var.sql_server_ids) > 0 ||
+        length(var.postgresql_server_ids) > 0 ||
+        length(var.cosmosdb_account_ids) > 0 ||
+        length(var.storage_account_ids) > 0 ||
+        length(var.eventhub_namespace_ids) > 0
+    )
+
+    has_compute_resources = length(var.linux_vm_ids) > 0
+
+    # Build groups map conditionally
+    groups = merge(
+        # Readers group - always created (Reader on RG is always useful)
+        {
+            readers = {
+                display_name = "${local.prefix}-readers"
+                description  = "Read access to ${var.project_name} ${var.environment} resources"
+            }
+        },
+        # Secrets group - only if Key Vault exists
+        local.has_keyvault ? {
+            secrets = {
+                display_name = "${local.prefix}-secrets"
+                description  = "Key Vault secrets access for ${var.project_name} ${var.environment}"
+            }
+        } : {},
+        # Deployers group - only if there are deployable resources
+        local.has_deployable_resources ? {
+            deployers = {
+                display_name = "${local.prefix}-deployers"
+                description  = "Deployment access for ${var.project_name} ${var.environment}"
+            }
+        } : {},
+        # Data group - only if there are data resources
+        local.has_data_resources ? {
+            data = {
+                display_name = "${local.prefix}-data"
+                description  = "Data store access for ${var.project_name} ${var.environment}"
+            }
+        } : {},
+        # Compute group - only if there are VMs
+        local.has_compute_resources ? {
+            compute = {
+                display_name = "${local.prefix}-compute"
+                description  = "VM access for ${var.project_name} ${var.environment}"
+            }
+        } : {}
+    )
 }
 
 # -----------------------------------------------------------------------------
 # Security Groups
 # -----------------------------------------------------------------------------
-# Groups are created with owners set to the specified users.
+# Groups are created conditionally based on resource presence.
 # Owners can manage group membership - Terraform doesn't need GroupMember perms.
 
 resource "azuread_group" "groups" {
@@ -136,9 +214,8 @@ resource "azuread_group" "groups" {
 }
 
 # -----------------------------------------------------------------------------
-# RBAC Role Assignments - Readers Group
+# RBAC Role Assignments - Readers Group (always created)
 # -----------------------------------------------------------------------------
-# Reader role on resource group - view all resources, logs, metrics
 
 resource "azurerm_role_assignment" "readers_rg" {
     scope                = var.resource_group_id
@@ -147,12 +224,11 @@ resource "azurerm_role_assignment" "readers_rg" {
 }
 
 # -----------------------------------------------------------------------------
-# RBAC Role Assignments - Secrets Group
+# RBAC Role Assignments - Secrets Group (if Key Vault exists)
 # -----------------------------------------------------------------------------
-# Key Vault Secrets User - read secrets for local development
 
 resource "azurerm_role_assignment" "secrets_keyvault" {
-    count = var.keyvault_id != null ? 1 : 0
+    count = local.has_keyvault ? 1 : 0
 
     scope                = var.keyvault_id
     role_definition_name = "Key Vault Secrets User"
@@ -160,39 +236,113 @@ resource "azurerm_role_assignment" "secrets_keyvault" {
 }
 
 # -----------------------------------------------------------------------------
-# RBAC Role Assignments - Deployers Group
+# RBAC Role Assignments - Deployers Group (if deployable resources exist)
 # -----------------------------------------------------------------------------
-# Website Contributor on Function Apps - deploy code
 
+# Website Contributor on Function Apps
 resource "azurerm_role_assignment" "deployers_function_apps" {
-    for_each = var.function_app_ids
+    for_each = local.has_deployable_resources ? var.function_app_ids : {}
 
     scope                = each.value
     role_definition_name = "Website Contributor"
     principal_id         = azuread_group.groups["deployers"].object_id
 }
 
-# -----------------------------------------------------------------------------
-# RBAC Role Assignments - Data Group
-# -----------------------------------------------------------------------------
-# SQL DB Contributor on SQL Servers
+# Contributor on Static Web Apps (for deployment)
+resource "azurerm_role_assignment" "deployers_static_web_apps" {
+    for_each = local.has_deployable_resources ? var.static_web_app_ids : {}
 
+    scope                = each.value
+    role_definition_name = "Contributor"
+    principal_id         = azuread_group.groups["deployers"].object_id
+}
+
+# Azure Kubernetes Service Cluster User Role for AKS namespaces
+resource "azurerm_role_assignment" "deployers_aks" {
+    for_each = local.has_deployable_resources ? var.aks_namespace_ids : {}
+
+    scope                = each.value
+    role_definition_name = "Azure Kubernetes Service Cluster User Role"
+    principal_id         = azuread_group.groups["deployers"].object_id
+}
+
+# -----------------------------------------------------------------------------
+# RBAC Role Assignments - Data Group (if data resources exist)
+# -----------------------------------------------------------------------------
+
+# SQL DB Contributor on Azure SQL Servers
 resource "azurerm_role_assignment" "data_sql" {
-    for_each = var.sql_server_ids
+    for_each = local.has_data_resources ? var.sql_server_ids : {}
 
     scope                = each.value
     role_definition_name = "SQL DB Contributor"
     principal_id         = azuread_group.groups["data"].object_id
 }
 
-# Storage Blob Data Contributor on Storage Accounts
+# Contributor on PostgreSQL Servers
+resource "azurerm_role_assignment" "data_postgresql" {
+    for_each = local.has_data_resources ? var.postgresql_server_ids : {}
 
+    scope                = each.value
+    role_definition_name = "Contributor"
+    principal_id         = azuread_group.groups["data"].object_id
+}
+
+# Cosmos DB Account Reader Role + Data Contributor
+resource "azurerm_role_assignment" "data_cosmosdb" {
+    for_each = local.has_data_resources ? var.cosmosdb_account_ids : {}
+
+    scope                = each.value
+    role_definition_name = "Cosmos DB Account Reader Role"
+    principal_id         = azuread_group.groups["data"].object_id
+}
+
+resource "azurerm_role_assignment" "data_cosmosdb_data" {
+    for_each = local.has_data_resources ? var.cosmosdb_account_ids : {}
+
+    scope                = each.value
+    role_definition_name = "Cosmos DB Built-in Data Contributor"
+    principal_id         = azuread_group.groups["data"].object_id
+}
+
+# Storage Blob Data Contributor on Storage Accounts
 resource "azurerm_role_assignment" "data_storage" {
-    for_each = var.storage_account_ids
+    for_each = local.has_data_resources ? var.storage_account_ids : {}
 
     scope                = each.value
     role_definition_name = "Storage Blob Data Contributor"
     principal_id         = azuread_group.groups["data"].object_id
+}
+
+# Azure Event Hubs Data Owner on Event Hub Namespaces
+resource "azurerm_role_assignment" "data_eventhub" {
+    for_each = local.has_data_resources ? var.eventhub_namespace_ids : {}
+
+    scope                = each.value
+    role_definition_name = "Azure Event Hubs Data Owner"
+    principal_id         = azuread_group.groups["data"].object_id
+}
+
+# -----------------------------------------------------------------------------
+# RBAC Role Assignments - Compute Group (if VMs exist)
+# -----------------------------------------------------------------------------
+
+# Virtual Machine Contributor on Linux VMs
+resource "azurerm_role_assignment" "compute_vm" {
+    for_each = local.has_compute_resources ? var.linux_vm_ids : {}
+
+    scope                = each.value
+    role_definition_name = "Virtual Machine Contributor"
+    principal_id         = azuread_group.groups["compute"].object_id
+}
+
+# Virtual Machine User Login for SSH access
+resource "azurerm_role_assignment" "compute_vm_login" {
+    for_each = local.has_compute_resources ? var.linux_vm_ids : {}
+
+    scope                = each.value
+    role_definition_name = "Virtual Machine User Login"
+    principal_id         = azuread_group.groups["compute"].object_id
 }
 
 # -----------------------------------------------------------------------------
@@ -200,21 +350,16 @@ resource "azurerm_role_assignment" "data_storage" {
 # -----------------------------------------------------------------------------
 
 output "group_ids" {
-    description = "Map of security group object IDs"
-    value = {
-        readers   = azuread_group.groups["readers"].object_id
-        secrets   = azuread_group.groups["secrets"].object_id
-        deployers = azuread_group.groups["deployers"].object_id
-        data      = azuread_group.groups["data"].object_id
-    }
+    description = "Map of security group object IDs (only includes created groups)"
+    value = { for k, v in azuread_group.groups : k => v.object_id }
 }
 
 output "group_names" {
-    description = "Map of security group display names"
-    value = {
-        readers   = azuread_group.groups["readers"].display_name
-        secrets   = azuread_group.groups["secrets"].display_name
-        deployers = azuread_group.groups["deployers"].display_name
-        data      = azuread_group.groups["data"].display_name
-    }
+    description = "Map of security group display names (only includes created groups)"
+    value = { for k, v in azuread_group.groups : k => v.display_name }
+}
+
+output "groups_created" {
+    description = "List of which groups were created"
+    value       = keys(local.groups)
 }

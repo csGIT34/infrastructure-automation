@@ -152,12 +152,25 @@ module "project_rbac" {
     tags              = local.common_tags
 
     # Pass resource IDs for RBAC assignments
-    function_app_ids = { for k, v in module.function_app : k => v.id }
-    sql_server_ids   = { for k, v in module.azure_sql : k => v.server_id }
-    storage_account_ids = merge(
+    # Deployable resources (deployers group)
+    function_app_ids   = { for k, v in module.function_app : k => v.id }
+    static_web_app_ids = { for k, v in module.static_web_app : k => v.id }
+    # Note: AKS namespaces are Kubernetes resources, not Azure ARM resources
+    # RBAC for AKS is typically at cluster level, not namespace level
+    aks_namespace_ids = {}
+
+    # Data resources (data group)
+    sql_server_ids         = { for k, v in module.azure_sql : k => v.server_id }
+    postgresql_server_ids  = { for k, v in module.postgresql : k => v.server_id }
+    cosmosdb_account_ids   = { for k, v in module.mongodb : k => v.account_id }
+    eventhub_namespace_ids = { for k, v in module.eventhub : k => v.namespace_id }
+    storage_account_ids    = merge(
         { for k, v in module.storage_account : k => v.id },
         { for k, v in module.function_app : "${k}-storage" => v.storage_account_id }
     )
+
+    # Compute resources (compute group)
+    linux_vm_ids = { for k, v in module.linux_vm : k => v.vm_id }
 
     depends_on = [module.project_keyvault]
 }
@@ -372,13 +385,8 @@ output "project_keyvault" {
 }
 
 output "security_groups" {
-    description = "Entra ID security groups for RBAC"
-    value = local.enable_rbac ? {
-        readers   = module.project_rbac[0].group_names.readers
-        secrets   = module.project_rbac[0].group_names.secrets
-        deployers = module.project_rbac[0].group_names.deployers
-        data      = module.project_rbac[0].group_names.data
-    } : {}
+    description = "Entra ID security groups for RBAC (only includes created groups)"
+    value = local.enable_rbac ? module.project_rbac[0].group_names : {}
 }
 
 output "developer_access_info" {
@@ -404,11 +412,17 @@ output "developer_access_info" {
             Available secrets: ${join(", ", keys(local.all_secrets))}
         EOT
 
+        # Security groups (only shows groups that were created)
         security_groups = local.enable_rbac ? {
-            "Resource Group Reader" = module.project_rbac[0].group_names.readers
-            "Key Vault Secrets"     = module.project_rbac[0].group_names.secrets
-            "Deployers"             = module.project_rbac[0].group_names.deployers
-            "Data Access"           = module.project_rbac[0].group_names.data
+            for k, v in module.project_rbac[0].group_names : {
+                "readers"   = "Resource Group Reader"
+                "secrets"   = "Key Vault Secrets"
+                "deployers" = "Deployers"
+                "data"      = "Data Access"
+                "compute"   = "Compute Access"
+            }[k] => v
         } : {}
+
+        groups_created = local.enable_rbac ? module.project_rbac[0].groups_created : []
     }
 }
