@@ -680,15 +680,8 @@ async function analyzeCodebase(
     // Sort by confidence
     results.sort((a, b) => b.confidence - a.confidence);
 
-    // Always recommend keyvault if other resources detected
-    if (results.length > 0 && !results.find(r => r.module === "keyvault")) {
-      results.push({
-        module: "keyvault",
-        confidence: 0.5,
-        reasons: ["Recommended for secure secret management with other resources"],
-        suggested_config: { sku: "standard", rbac_enabled: true }
-      });
-    }
+    // Note: We no longer auto-recommend keyvault because the platform auto-creates
+    // a Project Key Vault (kv-{project}-{env}) for every deployment.
 
     return JSON.stringify({
       analyzed_path: targetPath,
@@ -696,7 +689,8 @@ async function analyzeCodebase(
       detected_resources: results,
       summary: results.length > 0
         ? `Detected ${results.length} potential infrastructure needs`
-        : "No specific infrastructure patterns detected"
+        : "No specific infrastructure patterns detected",
+      note: "A Project Key Vault is automatically created for secrets management."
     }, null, 2);
 
   } catch (error) {
@@ -822,15 +816,10 @@ function analyzeFiles(params: {
   // Sort by confidence
   results.sort((a, b) => b.confidence - a.confidence);
 
-  // Recommend keyvault if other resources detected
-  if (results.length > 0 && !results.find(r => r.module === "keyvault")) {
-    results.push({
-      module: "keyvault",
-      confidence: 0.5,
-      reasons: ["Recommended for secure secret management with other resources"],
-      suggested_config: { sku: "standard", rbac_enabled: true }
-    });
-  }
+  // Note: We no longer auto-recommend keyvault because the platform auto-creates
+  // a Project Key Vault (kv-{project}-{env}) for every deployment. Developers
+  // should only add an explicit keyvault resource if they need a separate one
+  // with custom settings.
 
   return JSON.stringify({
     project_name: project_name || "unknown",
@@ -840,7 +829,7 @@ function analyzeFiles(params: {
       ? `Detected ${results.length} potential infrastructure needs`
       : "No specific infrastructure patterns detected",
     hint: results.length > 0
-      ? "Use generate_infrastructure_yaml with these detected resources"
+      ? "Use generate_infrastructure_yaml with these detected resources. Note: A Project Key Vault is auto-created for secrets."
       : "Try including more files: package.json, requirements.txt, host.json, source files with imports"
   }, null, 2);
 }
