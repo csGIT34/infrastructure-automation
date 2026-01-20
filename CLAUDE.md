@@ -214,6 +214,57 @@ for q in infrastructure-requests-dev infrastructure-requests-staging infrastruct
 done
 ```
 
+### Managing Self-Hosted Runners (ArgoCD)
+
+The GitHub Actions self-hosted runners are managed via ArgoCD. **Do not directly delete pods or modify k8s resources** - always use ArgoCD.
+
+**Key files:**
+- `infrastructure/local-runners/runner-deployment.yaml` - Runner configuration
+- `infrastructure/local-runners/docker/Dockerfile` - Runner image definition
+
+**To update the runner image:**
+
+1. Make changes to `infrastructure/local-runners/docker/Dockerfile`
+2. Push to main - the `build-runner-image.yaml` workflow builds and pushes to Docker Hub
+3. Trigger ArgoCD sync to pull the new image:
+   ```bash
+   # Trigger hard refresh via kubectl
+   kubectl patch application github-runners -n argocd \
+     --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
+
+   # Or trigger a sync
+   kubectl patch application github-runners -n argocd \
+     --type merge -p '{"operation":{"initiatedBy":{"username":"claude"},"sync":{"revision":"HEAD"}}}'
+   ```
+
+4. Verify pods are updated:
+   ```bash
+   kubectl get pods -n github-runners
+   kubectl get application github-runners -n argocd
+   ```
+
+**To update runner configuration:**
+
+1. Edit `infrastructure/local-runners/runner-deployment.yaml`
+2. Commit and push to main
+3. ArgoCD auto-syncs (or trigger manually as above)
+
+**Verify runner packages:**
+```bash
+kubectl exec -n github-runners <pod-name> -c runner -- pip3 list | grep -E "yaml|azure"
+```
+
+**ArgoCD application details:**
+- Application name: `github-runners`
+- Namespace: `argocd`
+- Target namespace: `github-runners`
+- Source: `infrastructure/local-runners/` in this repo
+
+**Image configuration:**
+- Registry: `docker.io/csdock34/actions-runner:latest`
+- `imagePullPolicy: Always` ensures new images are pulled on pod creation
+- Packages included: pyyaml, azure-servicebus, azure-identity, azure-cosmos, terraform, azure-cli
+
 ### Reprocessing Failed Requests
 
 To resubmit a failed request:
