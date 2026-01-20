@@ -32,12 +32,16 @@ jobs:
     name: Build and Push Image
     runs-on: ubuntu-latest
     outputs:
-      image_tag: ${{ steps.meta.outputs.version }}
+      image_tag: ${{ steps.short_sha.outputs.sha }}
       image_digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Get short SHA
+        id: short_sha
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
