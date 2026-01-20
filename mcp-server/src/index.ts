@@ -1274,7 +1274,13 @@ async function main() {
 
     // Health check endpoint (no auth required)
     app.get("/health", (req, res) => {
-      res.json({ status: "healthy", mode: "sse", version: "1.0.0", auth: apiKey ? "enabled" : "disabled" });
+      res.json({
+        status: "healthy",
+        mode: "sse",
+        version: "1.1.0",
+        tools_count: tools.length,
+        auth: apiKey ? "enabled" : "disabled"
+      });
     });
 
     // Store active transports by session ID
