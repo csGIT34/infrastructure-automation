@@ -33,9 +33,9 @@ variable "secrets" {
 
 # Principal IDs (managed identities) to grant Secrets User access
 variable "secrets_user_principal_ids" {
-    description = "List of principal IDs to grant Key Vault Secrets User role"
-    type        = list(string)
-    default     = []
+    description = "Map of resource names to principal IDs for Key Vault Secrets User role"
+    type        = map(string)
+    default     = {}
 }
 
 data "azurerm_client_config" "current" {}
@@ -88,7 +88,8 @@ resource "azurerm_role_assignment" "terraform_secrets_officer" {
 # -----------------------------------------------------------------------------
 
 resource "azurerm_role_assignment" "secrets_user" {
-    for_each = toset(var.secrets_user_principal_ids)
+    # Use map keys (static resource names) for for_each, values are principal IDs
+    for_each = var.secrets_user_principal_ids
 
     scope                = azurerm_key_vault.main.id
     role_definition_name = "Key Vault Secrets User"

@@ -86,10 +86,11 @@ locals {
     azure_sql_resources      = { for r in local.resources : r.name => r if r.type == "azure_sql" }
 
     # Collect all managed identity principal IDs (for Key Vault access)
-    all_principal_ids = concat(
-        [for k, v in module.function_app : v.principal_id],
-        [for k, v in module.azure_sql : v.principal_id],
-        [for k, v in module.linux_vm : v.principal_id]
+    # Use a map with static keys (resource names) so for_each works at plan time
+    all_principal_ids = merge(
+        { for k, v in module.function_app : "function-${k}" => v.principal_id },
+        { for k, v in module.azure_sql : "sql-${k}" => v.principal_id },
+        { for k, v in module.linux_vm : "vm-${k}" => v.principal_id }
     )
 
     # Collect all secrets from modules for Key Vault storage
@@ -376,6 +377,7 @@ output "linux_vms" {
 
 output "project_keyvault" {
     description = "Project Key Vault for secrets access"
+    sensitive   = true
     value = {
         name      = module.project_keyvault.vault_name
         uri       = module.project_keyvault.vault_uri
