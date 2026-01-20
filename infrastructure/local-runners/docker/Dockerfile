@@ -70,3 +70,4 @@ USER runner
 # Labels
 LABEL org.opencontainers.image.description="GitHub Actions Runner with Infrastructure Tools"
 LABEL org.opencontainers.image.source="https://github.com/infrastructure-automation"
+LABEL org.opencontainers.image.version="1.1.0"
