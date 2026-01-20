@@ -109,6 +109,68 @@ resources:
     sku: B_Standard_B1ms
 ```
 
+## Adding New Infrastructure Modules
+
+When asked to add a new infrastructure module/resource type, follow these steps in order:
+
+### Required Steps
+
+1. **Add MODULE_DEFINITIONS entry** in `mcp-server/src/index.ts`:
+   ```typescript
+   const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
+     // Add new module here with all required fields:
+     new_module: {
+       name: "new_module",
+       description: "Description of the resource",
+       required_fields: ["name"],
+       config_options: {
+         // Define all configuration options
+       },
+       azure_resource: "Microsoft.ResourceType/resources",
+       example: {
+         type: "new_module",
+         name: "example-name",
+         config: {}
+       }
+     }
+   };
+   ```
+
+2. **Create Terraform module** in `terraform/modules/new_module/`:
+   - `main.tf` - Resource definitions
+   - `variables.tf` - Input variables matching config_options
+   - `outputs.tf` - Resource outputs
+
+3. **Update Terraform catalog** in `terraform/catalog/main.tf`:
+   - Add module block that references the new module
+   - Use for_each pattern to iterate over resources of this type
+
+4. **Sync the workflow template** (IMPORTANT - do not skip):
+   ```bash
+   ./scripts/sync-workflow-template.sh
+   ```
+   This updates `templates/infrastructure-workflow.yaml` with the new valid_types list.
+
+5. **Commit all changes together** - The CI workflow `validate-module-sync.yaml` will fail if MODULE_DEFINITIONS and the workflow template are out of sync.
+
+### Files to Update (Checklist)
+
+- [ ] `mcp-server/src/index.ts` - MODULE_DEFINITIONS
+- [ ] `terraform/modules/<new_module>/main.tf`
+- [ ] `terraform/modules/<new_module>/variables.tf`
+- [ ] `terraform/modules/<new_module>/outputs.tf`
+- [ ] `terraform/catalog/main.tf` - Module reference
+- [ ] `templates/infrastructure-workflow.yaml` - Run sync script
+
+### Single Source of Truth
+
+`MODULE_DEFINITIONS` in `mcp-server/src/index.ts` is the single source of truth for:
+- MCP server tools (list_available_modules, analyze_files, generate_workflow)
+- The `/schema/modules` API endpoint
+- The workflow template valid_types list (via sync script)
+
+The CI workflow `.github/workflows/validate-module-sync.yaml` validates that these stay in sync.
+
 ## Error Handling Patterns
 
 - Failed Service Bus messages go to DLQ for retry
