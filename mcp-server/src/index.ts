@@ -745,7 +745,7 @@ function analyzeFiles(params: {
   for (const [moduleName, detection] of Object.entries(moduleDetections)) {
     const moduleDef = MODULE_DEFINITIONS[moduleName];
     // Normalize confidence: higher weight = higher confidence, cap at 1.0
-    const confidence = Math.min(detection.totalWeight / 15, 1.0);
+    const confidence = Math.min(detection.totalWeight / 10, 1.0);
 
     if (confidence >= 0.2) { // Threshold for including in results
       const suggestedConfig: Record<string, any> = {};
@@ -1321,6 +1321,10 @@ async function main() {
 
             case "get_module_details":
               result = getModuleDetails(args?.module_name as string);
+              break;
+
+            case "generate_workflow":
+              result = generateWorkflow(args as any);
               break;
 
             default:
