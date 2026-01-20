@@ -59,12 +59,6 @@ RUN mkdir -p /home/runner/.terraform.d/plugin-cache && \
 # Set Terraform plugin cache environment variable
 ENV TF_PLUGIN_CACHE_DIR=/home/runner/.terraform.d/plugin-cache
 
-# Pre-download common Azure Terraform providers
-RUN mkdir -p /tmp/tf-init && cd /tmp/tf-init && \
-    echo 'terraform { required_providers { azurerm = { source = "hashicorp/azurerm" version = "~> 3.0" } random = { source = "hashicorp/random" version = "~> 3.0" } } }' > main.tf && \
-    terraform init -backend=false && \
-    rm -rf /tmp/tf-init
-
 USER runner
 
 # Labels
