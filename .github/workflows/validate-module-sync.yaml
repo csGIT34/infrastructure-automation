@@ -1,0 +1,110 @@
+name: Validate Module Sync
+
+on:
+  pull_request:
+    paths:
+      - 'mcp-server/src/index.ts'
+      - 'templates/infrastructure-workflow.yaml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'mcp-server/src/index.ts'
+      - 'templates/infrastructure-workflow.yaml'
+
+jobs:
+  validate-sync:
+    name: Validate MODULE_DEFINITIONS sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Extract valid_types from MODULE_DEFINITIONS
+        id: extract
+        run: |
+          cd mcp-server
+
+          # Extract module names from MODULE_DEFINITIONS in index.ts
+          # Look for lines like "  module_name: {" at the start of module definitions
+          MODULES=$(grep -E "^  [a-z_]+: \{$" src/index.ts | sed 's/: {$//' | sed 's/  //' | sort | tr '\n' ',' | sed 's/,$//')
+
+          # Convert to JSON array format
+          MODULES_JSON=$(echo "$MODULES" | sed 's/,/","/g' | sed 's/^/["/' | sed 's/$/"]/')
+
+          echo "Modules from code: $MODULES_JSON"
+          echo "modules=$MODULES_JSON" >> $GITHUB_OUTPUT
+
+      - name: Extract valid_types from workflow template
+        id: template
+        run: |
+          # Extract the valid_types list from the template
+          TEMPLATE_TYPES=$(grep -o "valid_types = \[.*\]" templates/infrastructure-workflow.yaml | head -1 | sed "s/valid_types = //" | sed "s/'/\"/g")
+
+          echo "Types from template: $TEMPLATE_TYPES"
+          echo "types=$TEMPLATE_TYPES" >> $GITHUB_OUTPUT
+
+      - name: Compare and validate
+        run: |
+          CODE_MODULES='${{ steps.extract.outputs.modules }}'
+          TEMPLATE_TYPES='${{ steps.template.outputs.types }}'
+
+          echo "MODULE_DEFINITIONS: $CODE_MODULES"
+          echo "Workflow Template:  $TEMPLATE_TYPES"
+
+          # Sort both for comparison
+          CODE_SORTED=$(echo "$CODE_MODULES" | jq -c 'sort')
+          TEMPLATE_SORTED=$(echo "$TEMPLATE_TYPES" | jq -c 'sort')
+
+          echo ""
+          echo "Sorted MODULE_DEFINITIONS: $CODE_SORTED"
+          echo "Sorted Workflow Template:  $TEMPLATE_SORTED"
+
+          if [ "$CODE_SORTED" != "$TEMPLATE_SORTED" ]; then
+            echo ""
+            echo "::error::MODULE_DEFINITIONS and workflow template are out of sync!"
+            echo ""
+            echo "Modules in code but not in template:"
+            echo "$CODE_MODULES" | jq -r '.[]' | while read m; do
+              if ! echo "$TEMPLATE_TYPES" | grep -q "\"$m\""; then
+                echo "  - $m"
+              fi
+            done
+
+            echo ""
+            echo "Modules in template but not in code:"
+            echo "$TEMPLATE_TYPES" | jq -r '.[]' | while read m; do
+              if ! echo "$CODE_MODULES" | grep -q "\"$m\""; then
+                echo "  - $m"
+              fi
+            done
+
+            echo ""
+            echo "To fix, run: ./scripts/sync-workflow-template.sh"
+            echo "Or manually update templates/infrastructure-workflow.yaml with: valid_types = $CODE_MODULES"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ MODULE_DEFINITIONS and workflow template are in sync!"
+
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## Module Sync Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### MODULE_DEFINITIONS (source of truth)" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo '${{ steps.extract.outputs.modules }}' | jq '.' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Workflow Template valid_types" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo '${{ steps.template.outputs.types }}' | jq '.' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
