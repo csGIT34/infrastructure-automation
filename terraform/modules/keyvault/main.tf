@@ -7,6 +7,13 @@ terraform {
     }
 }
 
+# -----------------------------------------------------------------------------
+# Key Vault Module
+# -----------------------------------------------------------------------------
+# Creates a Key Vault with RBAC authorization and optional secret storage.
+# Supports granting Secrets User access to managed identities.
+# -----------------------------------------------------------------------------
+
 variable "name" { type = string }
 variable "resource_group_name" { type = string }
 variable "location" { type = string }
@@ -14,6 +21,21 @@ variable "config" { type = any }
 variable "tags" {
     type    = map(string)
     default = {}
+}
+
+# Secrets to store in the vault (name => value)
+variable "secrets" {
+    description = "Map of secret names to values to store in the vault"
+    type        = map(string)
+    default     = {}
+    sensitive   = true
+}
+
+# Principal IDs (managed identities) to grant Secrets User access
+variable "secrets_user_principal_ids" {
+    description = "List of principal IDs to grant Key Vault Secrets User role"
+    type        = list(string)
+    default     = []
 }
 
 data "azurerm_client_config" "current" {}
@@ -37,6 +59,52 @@ resource "azurerm_key_vault" "main" {
     tags = var.tags
 }
 
+# -----------------------------------------------------------------------------
+# Store secrets in the vault
+# -----------------------------------------------------------------------------
+
+resource "azurerm_key_vault_secret" "secrets" {
+    for_each = var.secrets
+
+    name         = each.key
+    value        = each.value
+    key_vault_id = azurerm_key_vault.main.id
+
+    # Ensure Terraform has access before creating secrets
+    depends_on = [azurerm_role_assignment.terraform_secrets_officer]
+}
+
+# Grant Terraform service principal Secrets Officer to manage secrets
+resource "azurerm_role_assignment" "terraform_secrets_officer" {
+    scope                = azurerm_key_vault.main.id
+    role_definition_name = "Key Vault Secrets Officer"
+    principal_id         = data.azurerm_client_config.current.object_id
+}
+
+# -----------------------------------------------------------------------------
+# Grant Secrets User access to managed identities
+# -----------------------------------------------------------------------------
+
+resource "azurerm_role_assignment" "secrets_user" {
+    for_each = toset(var.secrets_user_principal_ids)
+
+    scope                = azurerm_key_vault.main.id
+    role_definition_name = "Key Vault Secrets User"
+    principal_id         = each.value
+}
+
+# -----------------------------------------------------------------------------
+# Outputs
+# -----------------------------------------------------------------------------
+
 output "vault_uri" { value = azurerm_key_vault.main.vault_uri }
 output "vault_id" { value = azurerm_key_vault.main.id }
 output "vault_name" { value = azurerm_key_vault.main.name }
+
+output "secret_uris" {
+    description = "Map of secret names to their Key Vault URIs"
+    value = {
+        for name, secret in azurerm_key_vault_secret.secrets :
+        name => secret.id
+    }
+}

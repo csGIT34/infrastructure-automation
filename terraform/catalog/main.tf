@@ -5,6 +5,10 @@ terraform {
             source  = "hashicorp/azurerm"
             version = "~> 3.0"
         }
+        azuread = {
+            source  = "hashicorp/azuread"
+            version = "~> 2.0"
+        }
         random = {
             source  = "hashicorp/random"
             version = "~> 3.0"
@@ -28,15 +32,28 @@ provider "azurerm" {
     use_oidc = true
 }
 
+provider "azuread" {
+    use_oidc = true
+}
+
 variable "config_file" {
     description = "Path to YAML configuration file"
     type        = string
 }
 
 locals {
-    config   = yamldecode(file(var.config_file))
-    metadata = local.config.metadata
+    config    = yamldecode(file(var.config_file))
+    metadata  = local.config.metadata
     resources = local.config.resources
+
+    # Owner emails for RBAC - supports both single owner_email and owners array
+    owner_emails = distinct(concat(
+        lookup(local.metadata, "owners", []),
+        lookup(local.metadata, "owner_email", "") != "" ? [local.metadata.owner_email] : []
+    ))
+
+    # Check if RBAC should be enabled (requires at least one owner)
+    enable_rbac = length(local.owner_emails) > 0
 
     common_tags = merge(
         {
@@ -44,7 +61,7 @@ locals {
             Environment   = local.metadata.environment
             BusinessUnit  = local.metadata.business_unit
             CostCenter    = local.metadata.cost_center
-            Owner         = local.metadata.owner_email
+            Owner         = join(",", local.owner_emails)
             ManagedBy     = "Terraform-SelfService"
         },
         lookup(local.metadata, "tags", {})
@@ -52,6 +69,9 @@ locals {
 
     resource_group_name = "rg-${local.metadata.project_name}-${local.metadata.environment}"
     location            = lookup(local.metadata, "location", "eastus")
+
+    # Project Key Vault name (auto-created for secrets)
+    project_keyvault_name = "kv-${local.metadata.project_name}-${local.metadata.environment}"
 
     # Use resource name as key (stable) instead of index (shifts when resources removed)
     postgresql_resources    = { for r in local.resources : r.name => r if r.type == "postgresql" }
@@ -64,12 +84,82 @@ locals {
     storage_resources        = { for r in local.resources : r.name => r if r.type == "storage_account" }
     static_web_app_resources = { for r in local.resources : r.name => r if r.type == "static_web_app" }
     azure_sql_resources      = { for r in local.resources : r.name => r if r.type == "azure_sql" }
+
+    # Collect all managed identity principal IDs (for Key Vault access)
+    all_principal_ids = concat(
+        [for k, v in module.function_app : v.principal_id],
+        [for k, v in module.azure_sql : v.principal_id],
+        [for k, v in module.linux_vm : v.principal_id]
+    )
+
+    # Collect all secrets from modules for Key Vault storage
+    all_secrets = merge(
+        # SQL secrets
+        merge([for k, v in module.azure_sql : v.secrets_for_keyvault]...),
+        # Function App secrets
+        merge([for k, v in module.function_app : v.secrets_for_keyvault]...)
+    )
 }
 
 resource "azurerm_resource_group" "main" {
     name     = local.resource_group_name
     location = local.location
     tags     = local.common_tags
+}
+
+# -----------------------------------------------------------------------------
+# Project Key Vault (auto-created for secrets storage)
+# -----------------------------------------------------------------------------
+# Every project gets a Key Vault to store generated secrets (SQL passwords,
+# connection strings, etc.). Managed identities get Secrets User access.
+
+module "project_keyvault" {
+    source = "../modules/keyvault"
+
+    name                = local.project_keyvault_name
+    resource_group_name = azurerm_resource_group.main.name
+    location            = azurerm_resource_group.main.location
+    config              = {
+        sku              = "standard"
+        soft_delete_days = 7
+        purge_protection = false
+        rbac_enabled     = true
+    }
+    tags = local.common_tags
+
+    # Store all collected secrets from resource modules
+    secrets = local.all_secrets
+
+    # Grant Secrets User to all managed identities
+    secrets_user_principal_ids = local.all_principal_ids
+}
+
+# -----------------------------------------------------------------------------
+# Project RBAC (Entra ID Security Groups)
+# -----------------------------------------------------------------------------
+# Creates security groups for owners with delegated administration.
+# Owners can manage group membership after creation.
+
+module "project_rbac" {
+    source = "../modules/project-rbac"
+    count  = local.enable_rbac ? 1 : 0
+
+    project_name      = local.metadata.project_name
+    environment       = local.metadata.environment
+    owner_emails      = local.owner_emails
+    resource_group_id = azurerm_resource_group.main.id
+    keyvault_id       = module.project_keyvault.vault_id
+    tags              = local.common_tags
+
+    # Pass resource IDs for RBAC assignments
+    function_app_ids = { for k, v in module.function_app : k => v.id }
+    sql_server_ids   = { for k, v in module.azure_sql : k => v.server_id }
+    storage_account_ids = merge(
+        { for k, v in module.storage_account : k => v.id },
+        { for k, v in module.function_app : "${k}-storage" => v.storage_account_id }
+    )
+
+    depends_on = [module.project_keyvault]
 }
 
 module "postgresql" {
@@ -265,4 +355,60 @@ output "linux_vms" {
         admin_username     = v.admin_username
         principal_id       = v.principal_id
     }}
+}
+
+# -----------------------------------------------------------------------------
+# Project Key Vault and RBAC Outputs
+# -----------------------------------------------------------------------------
+
+output "project_keyvault" {
+    description = "Project Key Vault for secrets access"
+    value = {
+        name      = module.project_keyvault.vault_name
+        uri       = module.project_keyvault.vault_uri
+        id        = module.project_keyvault.vault_id
+        secrets   = keys(local.all_secrets)
+    }
+}
+
+output "security_groups" {
+    description = "Entra ID security groups for RBAC"
+    value = local.enable_rbac ? {
+        readers   = module.project_rbac[0].group_names.readers
+        secrets   = module.project_rbac[0].group_names.secrets
+        deployers = module.project_rbac[0].group_names.deployers
+        data      = module.project_rbac[0].group_names.data
+    } : {}
+}
+
+output "developer_access_info" {
+    description = "Information for developers to access their resources"
+    value = {
+        keyvault_name = module.project_keyvault.vault_name
+        keyvault_uri  = module.project_keyvault.vault_uri
+
+        # Instructions for accessing secrets
+        access_instructions = <<-EOT
+            To retrieve secrets, use one of the following methods:
+
+            1. Azure CLI:
+               az keyvault secret show --vault-name ${module.project_keyvault.vault_name} --name <secret-name>
+
+            2. Azure Portal:
+               Navigate to Key Vault '${module.project_keyvault.vault_name}' > Secrets
+
+            3. Application (Managed Identity):
+               Your app's managed identity has been granted access automatically.
+               Use Azure SDK to retrieve secrets at runtime.
+
+            Available secrets: ${join(", ", keys(local.all_secrets))}
+        EOT
+
+        security_groups = local.enable_rbac ? {
+            "Resource Group Reader" = module.project_rbac[0].group_names.readers
+            "Key Vault Secrets"     = module.project_rbac[0].group_names.secrets
+            "Deployers"             = module.project_rbac[0].group_names.deployers
+            "Data Access"           = module.project_rbac[0].group_names.data
+        } : {}
+    }
 }

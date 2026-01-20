@@ -272,6 +272,77 @@ To resubmit a failed request:
 2. Update status back to "pending"
 3. Resubmit to Service Bus queue (or use CLI to submit fresh)
 
+## Project RBAC and Secrets Management
+
+### Overview
+
+Every provisioned project automatically gets:
+1. **Project Key Vault** (`kv-{project}-{env}`) - Stores all generated secrets
+2. **Entra ID Security Groups** - Least-privilege access for owners
+3. **Managed Identity Access** - Apps can read secrets at runtime
+
+### Defining Owners in infrastructure.yaml
+
+```yaml
+metadata:
+  project_name: myapp
+  environment: dev
+  business_unit: engineering
+  cost_center: eng-123
+  owners:                           # NEW: Array of owner emails
+    - alice@company.com
+    - bob@company.com
+  location: centralus
+```
+
+### Security Groups Created
+
+| Group | RBAC Role | Scope |
+|-------|-----------|-------|
+| `sg-{project}-{env}-readers` | Reader | Resource Group |
+| `sg-{project}-{env}-secrets` | Key Vault Secrets User | Key Vault |
+| `sg-{project}-{env}-deployers` | Website Contributor | Function Apps |
+| `sg-{project}-{env}-data` | SQL DB Contributor, Storage Blob Data Contributor | Data stores |
+
+Owners are set as **group owners** in Entra ID, allowing them to manage membership without platform intervention.
+
+### Accessing Secrets
+
+Developers can access their secrets via:
+
+```bash
+# Azure CLI
+az keyvault secret show --vault-name kv-myapp-dev --name sql-connection-string-mydb
+
+# Azure Portal
+# Navigate to Key Vault > Secrets
+
+# Application (Managed Identity - automatic)
+# Apps provisioned by the platform have Secrets User access
+```
+
+### Graph API Permissions (Terraform Service Principal)
+
+The Terraform service principal requires these **least-privilege** Graph API permissions:
+
+| Permission | Type | Purpose |
+|------------|------|---------|
+| `Group.Create` | Application | Create security groups |
+| `Group.Read.All` | Application | Read group properties |
+| `User.Read.All` | Application | Look up users by email |
+| `Application.Read.All` | Application | Read application info |
+
+**Note:** `Group.ReadWrite.All` and `GroupMember.ReadWrite.All` are NOT required because:
+- Terraform creates groups with owners set
+- Owners can manage membership via delegated administration
+
+### Azure RBAC Permissions (Terraform Service Principal)
+
+On the subscription or target resource group scope:
+- `Contributor` - Create and manage resources
+- `User Access Administrator` - Create RBAC role assignments
+- `Key Vault Secrets Officer` - Store secrets in Key Vault
+
 ## Error Handling Patterns
 
 - Failed Service Bus messages go to DLQ for retry

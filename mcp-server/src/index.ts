@@ -488,7 +488,12 @@ const tools: Tool[] = [
         },
         owner_email: {
           type: "string",
-          description: "Owner email for notifications"
+          description: "Owner email for notifications (deprecated - use 'owners' array instead)"
+        },
+        owners: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of owner email addresses. Owners get Entra ID security group access to resources (Reader on RG, Key Vault Secrets User, deployer access)"
         },
         location: {
           type: "string",
@@ -508,7 +513,7 @@ const tools: Tool[] = [
           }
         }
       },
-      required: ["project_name", "business_unit", "cost_center", "owner_email", "resources"]
+      required: ["project_name", "business_unit", "cost_center", "resources"]
     }
   },
   {
@@ -845,19 +850,29 @@ function generateInfrastructureYaml(params: {
   environment?: string;
   business_unit: string;
   cost_center: string;
-  owner_email: string;
+  owner_email?: string;
+  owners?: string[];
   location?: string;
   resources: Array<{ type: string; name: string; config?: Record<string, any> }>;
 }): string {
+  // Build metadata with owners array (preferred) or owner_email (legacy)
+  const metadata: Record<string, any> = {
+    project_name: params.project_name,
+    environment: params.environment || "dev",
+    business_unit: params.business_unit,
+    cost_center: params.cost_center,
+    location: params.location || "centralus"
+  };
+
+  // Prefer owners array, fall back to owner_email
+  if (params.owners && params.owners.length > 0) {
+    metadata.owners = params.owners;
+  } else if (params.owner_email) {
+    metadata.owners = [params.owner_email];
+  }
+
   const config = {
-    metadata: {
-      project_name: params.project_name,
-      environment: params.environment || "dev",
-      business_unit: params.business_unit,
-      cost_center: params.cost_center,
-      owner_email: params.owner_email,
-      location: params.location || "centralus"
-    },
+    metadata,
     resources: params.resources.map(r => {
       const moduleDef = MODULE_DEFINITIONS[r.type];
       const resourceConfig: Record<string, any> = {
@@ -911,11 +926,18 @@ function validateInfrastructureYaml(yamlContent: string): string {
     if (!config.metadata) {
       errors.push("Missing 'metadata' section");
     } else {
-      const requiredMeta = ["project_name", "environment", "business_unit", "cost_center", "owner_email"];
+      const requiredMeta = ["project_name", "environment", "business_unit", "cost_center"];
       for (const field of requiredMeta) {
         if (!config.metadata[field]) {
           errors.push(`Missing metadata.${field}`);
         }
+      }
+
+      // Require either owners array or owner_email
+      const hasOwners = config.metadata.owners && Array.isArray(config.metadata.owners) && config.metadata.owners.length > 0;
+      const hasOwnerEmail = config.metadata.owner_email;
+      if (!hasOwners && !hasOwnerEmail) {
+        errors.push("Missing metadata.owners (array of owner emails) - required for RBAC access to provisioned resources");
       }
 
       if (config.metadata.environment && !["dev", "staging", "prod"].includes(config.metadata.environment)) {
