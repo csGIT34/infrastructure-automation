@@ -152,6 +152,20 @@ module "project_rbac" {
     keyvault_id       = module.project_keyvault.vault_id
     tags              = local.common_tags
 
+    # Enable flags - computed from YAML-derived locals (known at plan time)
+    enable_deployers_group = (
+        length(local.function_app_resources) > 0 ||
+        length(local.static_web_app_resources) > 0
+    )
+    enable_data_group = (
+        length(local.azure_sql_resources) > 0 ||
+        length(local.postgresql_resources) > 0 ||
+        length(local.mongodb_resources) > 0 ||
+        length(local.storage_resources) > 0 ||
+        length(local.eventhub_resources) > 0
+    )
+    enable_compute_group = length(local.vm_resources) > 0
+
     # Pass resource IDs for RBAC assignments
     # Deployable resources (deployers group)
     function_app_ids   = { for k, v in module.function_app : k => v.id }

@@ -115,6 +115,25 @@ variable "tags" {
     default = {}
 }
 
+# Enable flags - computed in catalog from YAML (known at plan time)
+variable "enable_deployers_group" {
+    description = "Whether to create the deployers security group"
+    type        = bool
+    default     = false
+}
+
+variable "enable_data_group" {
+    description = "Whether to create the data security group"
+    type        = bool
+    default     = false
+}
+
+variable "enable_compute_group" {
+    description = "Whether to create the compute security group"
+    type        = bool
+    default     = false
+}
+
 # -----------------------------------------------------------------------------
 # Data Sources
 # -----------------------------------------------------------------------------
@@ -132,24 +151,11 @@ locals {
     owner_ids = [for user in data.azuread_user.owners : user.object_id]
 
     # Determine which groups are needed based on resources
-    has_keyvault = var.keyvault_id != null
-
-    # Use keys() to check map presence - keys are known at plan time even if values aren't
-    has_deployable_resources = (
-        length(keys(var.function_app_ids)) > 0 ||
-        length(keys(var.static_web_app_ids)) > 0 ||
-        length(keys(var.aks_namespace_ids)) > 0
-    )
-
-    has_data_resources = (
-        length(keys(var.sql_server_ids)) > 0 ||
-        length(keys(var.postgresql_server_ids)) > 0 ||
-        length(keys(var.cosmosdb_account_ids)) > 0 ||
-        length(keys(var.storage_account_ids)) > 0 ||
-        length(keys(var.eventhub_namespace_ids)) > 0
-    )
-
-    has_compute_resources = length(keys(var.linux_vm_ids)) > 0
+    # Use boolean flags passed from catalog (computed from YAML, known at plan time)
+    has_keyvault             = var.keyvault_id != null
+    has_deployable_resources = var.enable_deployers_group
+    has_data_resources       = var.enable_data_group
+    has_compute_resources    = var.enable_compute_group
 
     # Build groups map conditionally
     groups = merge(
