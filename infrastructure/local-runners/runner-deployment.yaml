@@ -28,6 +28,7 @@ spec:
 
       # Custom image with Azure CLI, Terraform, Python pre-installed
       image: csdock34/actions-runner:latest
+      imagePullPolicy: Always
 
       # Environment variables
       env:
