@@ -154,7 +154,7 @@ module "project_rbac" {
 
     # Enable flags - computed from YAML-derived locals (known at plan time)
     enable_deployers_group = (
-        length(local.function_app_resources) > 0 ||
+        length(local.function_resources) > 0 ||
         length(local.static_web_app_resources) > 0
     )
     enable_data_group = (
