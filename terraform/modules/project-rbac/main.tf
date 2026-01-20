@@ -134,21 +134,22 @@ locals {
     # Determine which groups are needed based on resources
     has_keyvault = var.keyvault_id != null
 
+    # Use keys() to check map presence - keys are known at plan time even if values aren't
     has_deployable_resources = (
-        length(var.function_app_ids) > 0 ||
-        length(var.static_web_app_ids) > 0 ||
-        length(var.aks_namespace_ids) > 0
+        length(keys(var.function_app_ids)) > 0 ||
+        length(keys(var.static_web_app_ids)) > 0 ||
+        length(keys(var.aks_namespace_ids)) > 0
     )
 
     has_data_resources = (
-        length(var.sql_server_ids) > 0 ||
-        length(var.postgresql_server_ids) > 0 ||
-        length(var.cosmosdb_account_ids) > 0 ||
-        length(var.storage_account_ids) > 0 ||
-        length(var.eventhub_namespace_ids) > 0
+        length(keys(var.sql_server_ids)) > 0 ||
+        length(keys(var.postgresql_server_ids)) > 0 ||
+        length(keys(var.cosmosdb_account_ids)) > 0 ||
+        length(keys(var.storage_account_ids)) > 0 ||
+        length(keys(var.eventhub_namespace_ids)) > 0
     )
 
-    has_compute_resources = length(var.linux_vm_ids) > 0
+    has_compute_resources = length(keys(var.linux_vm_ids)) > 0
 
     # Build groups map conditionally
     groups = merge(
