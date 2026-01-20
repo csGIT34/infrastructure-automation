@@ -44,9 +44,13 @@ resource "azurerm_mssql_server" "main" {
 
     minimum_tls_version = "1.2"
 
-    azuread_administrator {
-        login_username = lookup(var.config, "aad_admin_login", null)
-        object_id      = lookup(var.config, "aad_admin_object_id", null)
+    # Only configure AAD administrator if both login and object_id are provided
+    dynamic "azuread_administrator" {
+        for_each = lookup(var.config, "aad_admin_login", null) != null && lookup(var.config, "aad_admin_object_id", null) != null ? [1] : []
+        content {
+            login_username = lookup(var.config, "aad_admin_login", null)
+            object_id      = lookup(var.config, "aad_admin_object_id", null)
+        }
     }
 
     identity {
@@ -54,12 +58,6 @@ resource "azurerm_mssql_server" "main" {
     }
 
     tags = var.tags
-
-    lifecycle {
-        ignore_changes = [
-            azuread_administrator
-        ]
-    }
 }
 
 resource "azurerm_mssql_firewall_rule" "rules" {
