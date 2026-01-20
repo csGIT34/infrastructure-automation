@@ -27,13 +27,16 @@ spec:
         - infrastructure
 
       # Custom image with Azure CLI, Terraform, Python pre-installed
-      image: csdock34/actions-runner:latest
+      image: ghcr.io/csgit34/actions-runner-tools:latest
       imagePullPolicy: Always
 
       # Environment variables
       env:
         - name: RUNNER_FEATURE_FLAG_EPHEMERAL
           value: "false"
+        # Terraform plugin cache in /tmp to avoid permission issues
+        - name: TF_PLUGIN_CACHE_DIR
+          value: "/tmp/terraform-plugin-cache"
 
       # Resource limits
       resources:
@@ -49,14 +52,12 @@ spec:
         - name: work
           mountPath: /runner/_work
         - name: terraform-cache
-          mountPath: /home/runner/.terraform.d/plugin-cache
+          mountPath: /tmp/terraform-plugin-cache
       volumes:
         - name: work
           emptyDir: {}
         - name: terraform-cache
-          hostPath:
-            path: /var/cache/terraform
-            type: DirectoryOrCreate
+          emptyDir: {}
 
       # Optional: Docker-in-Docker for container builds
       # dockerdWithinRunnerContainer: true
