@@ -119,6 +119,127 @@ Generate a workflow file for my infrastructure provisioning
 | `azure_sql` | Azure SQL Database | sku, version, databases, firewall_rules |
 | `static_web_app` | Azure Static Web App | sku_tier |
 
+## Module Management (Single Source of Truth)
+
+The `MODULE_DEFINITIONS` object in `src/index.ts` serves as the **single source of truth** for all supported resource types. This ensures consistency between:
+
+- The MCP server tools (`list_available_modules`, `analyze_files`, etc.)
+- The `generate_workflow` tool output
+- The GitOps workflow template (`templates/infrastructure-workflow.yaml`)
+
+### How It Works
+
+```
+┌─────────────────────────────────────────┐
+│  MODULE_DEFINITIONS (src/index.ts)      │  ◀── Single Source of Truth
+└─────────────────────────────────────────┘
+              │
+              ▼
+    ┌─────────────────────┐
+    │ getValidResourceTypes() │
+    └─────────────────────┘
+              │
+    ┌─────────┴─────────┐
+    │                   │
+    ▼                   ▼
+┌─────────────┐   ┌─────────────────────────┐
+│ MCP Tools   │   │ /schema/modules API     │
+│ (runtime)   │   │ (for external sync)     │
+└─────────────┘   └─────────────────────────┘
+                            │
+                            ▼
+                  ┌─────────────────────────┐
+                  │ sync-workflow-template.sh│
+                  │ (updates template YAML) │
+                  └─────────────────────────┘
+```
+
+### Adding a New Module
+
+1. **Add the module definition** to `MODULE_DEFINITIONS` in `src/index.ts`:
+
+```typescript
+const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
+  // ... existing modules ...
+
+  new_resource: {
+    name: "new_resource",
+    description: "Description of the new resource",
+    required_fields: ["field1", "field2"],
+    config_options: {
+      option1: {
+        type: "string",
+        required: false,
+        default: "default_value",
+        description: "Description of option1"
+      }
+    },
+    azure_resource: "Microsoft.ResourceType/resources",
+    example: {
+      type: "new_resource",
+      name: "my-resource",
+      config: {
+        option1: "value"
+      }
+    }
+  }
+};
+```
+
+2. **Deploy the MCP server** - The CI/CD pipeline will build and deploy automatically on push to main.
+
+3. **Sync the workflow template**:
+
+```bash
+# Automatically updates templates/infrastructure-workflow.yaml
+./scripts/sync-workflow-template.sh
+
+# Or specify a different MCP server URL
+./scripts/sync-workflow-template.sh https://your-mcp-server.com
+```
+
+4. **Commit both changes** together to keep everything in sync.
+
+### Schema API Endpoint
+
+The MCP server exposes a public endpoint for fetching the current module schema:
+
+```bash
+curl https://ca-mcp-prod.mangoflower-3bcf53fc.centralus.azurecontainerapps.io/schema/modules
+```
+
+Response:
+```json
+{
+  "valid_types": ["aks_namespace", "azure_sql", "eventhub", ...],
+  "modules": {
+    "postgresql": {
+      "name": "postgresql",
+      "description": "Azure Database for PostgreSQL Flexible Server",
+      "config_options": ["version", "sku", "storage_mb", ...]
+    }
+  },
+  "generated_at": "2026-01-19T12:00:00.000Z"
+}
+```
+
+### CI Validation
+
+The `.github/workflows/validate-module-sync.yaml` workflow automatically validates that `MODULE_DEFINITIONS` and the workflow template stay in sync:
+
+- **Triggers**: On PRs or pushes that modify `mcp-server/src/index.ts` or `templates/infrastructure-workflow.yaml`
+- **Action**: Extracts module names from both sources and compares them
+- **On failure**: Shows which modules are missing and provides fix instructions
+
+If the CI check fails:
+```bash
+# Option 1: Run the sync script
+./scripts/sync-workflow-template.sh
+
+# Option 2: Manually update the template
+# Edit templates/infrastructure-workflow.yaml and update the valid_types list
+```
+
 ## Architecture
 
 ```
