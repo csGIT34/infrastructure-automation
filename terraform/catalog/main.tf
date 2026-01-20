@@ -409,6 +409,7 @@ output "security_groups" {
 
 output "developer_access_info" {
     description = "Information for developers to access their resources"
+    sensitive   = true
     value = {
         keyvault_name = module.project_keyvault.vault_name
         keyvault_uri  = module.project_keyvault.vault_uri
