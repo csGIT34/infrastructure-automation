@@ -216,11 +216,11 @@ resource "azuread_group" "groups" {
     description      = each.value.description
     security_enabled = true
 
-    # Set the specified users as group owners
-    # Owners can add/remove members without Terraform intervention
-    owners = local.owner_ids
+    # Set the specified users AND the Terraform SP as group owners
+    # This allows the SP to add members, and users can manage membership too
+    owners = concat(local.owner_ids, [data.azuread_client_config.current.object_id])
 
-    # Also add owners as initial members so they have access immediately
+    # Add owners as initial members so they have access immediately
     members = local.owner_ids
 
     prevent_duplicate_names = true
