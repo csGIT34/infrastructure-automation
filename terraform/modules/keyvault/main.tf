@@ -64,10 +64,12 @@ resource "azurerm_key_vault" "main" {
 # -----------------------------------------------------------------------------
 
 resource "azurerm_key_vault_secret" "secrets" {
-    for_each = var.secrets
+    # Use nonsensitive() on keys only - values remain sensitive
+    # This is required because for_each can't use sensitive values directly
+    for_each = nonsensitive(toset(keys(var.secrets)))
 
     name         = each.key
-    value        = each.value
+    value        = var.secrets[each.key]
     key_vault_id = azurerm_key_vault.main.id
 
     # Ensure Terraform has access before creating secrets
