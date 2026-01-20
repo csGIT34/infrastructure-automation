@@ -1150,10 +1150,15 @@ jobs:
               errors.append("Missing 'metadata' section")
           else:
               metadata = config['metadata']
-              required_meta = ['project_name', 'environment', 'business_unit', 'cost_center', 'owner_email']
+              required_meta = ['project_name', 'environment', 'business_unit', 'cost_center']
               for field in required_meta:
                   if field not in metadata:
                       errors.append(f"Missing metadata.{field}")
+              # Require either owners array or owner_email
+              has_owners = isinstance(metadata.get('owners'), list) and len(metadata.get('owners', [])) > 0
+              has_owner_email = bool(metadata.get('owner_email'))
+              if not has_owners and not has_owner_email:
+                  errors.append("Missing metadata.owners (array of owner emails) - required for RBAC")
 
           if 'resources' not in config:
               errors.append("Missing 'resources' section")
@@ -1239,7 +1244,8 @@ jobs:
           preview += f"| Environment | \`{metadata.get('environment')}\` |\\n"
           preview += f"| Business Unit | \`{metadata.get('business_unit')}\` |\\n"
           preview += f"| Cost Center | \`{metadata.get('cost_center')}\` |\\n"
-          preview += f"| Owner | \`{metadata.get('owner_email')}\` |\\n"
+          owners_list = metadata.get('owners', [metadata.get('owner_email')] if metadata.get('owner_email') else [])
+          preview += f"| Owners | \`{', '.join(owners_list)}\` |\\n"
           preview += f"| Location | \`{metadata.get('location', 'centralus')}\` |\\n\\n"
 
           preview += "### Changes Summary\\n"
@@ -1365,10 +1371,12 @@ jobs:
           ).decode('utf-8')
           sas_token = f"SharedAccessSignature sr={urllib.parse.quote_plus(uri)}&sig={urllib.parse.quote_plus(signature)}&se={expiry}&skn={sas_key_name}"
 
+          owners = config['metadata'].get('owners', [])
+          primary_owner = owners[0] if owners else config['metadata'].get('owner_email', 'gitops@automation')
           message = {
               'request_id': request_id,
               'yaml_content': yaml_content,
-              'requester_email': config['metadata'].get('owner_email', 'gitops@automation'),
+              'requester_email': primary_owner,
               'metadata': {
                   'source': 'gitops',
                   'repository': repo,
