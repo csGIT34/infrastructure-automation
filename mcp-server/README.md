@@ -52,6 +52,8 @@ Use list_available_modules to see what infrastructure I can provision
 
 Analyze a codebase to detect what infrastructure resources it needs. Scans for database connections, storage usage, frameworks, and environment variables.
 
+> **⚠️ Important**: This tool only works in **local mode** (stdio). When using the hosted SSE server, the server cannot access your local filesystem. Instead, describe your tech stack to the AI and use `generate_infrastructure_yaml` directly.
+
 ```
 Analyze my codebase at /path/to/project to determine what infrastructure it needs
 ```
@@ -78,6 +80,14 @@ Get detailed information about a specific module including all config options an
 
 ```
 Show me the details for the postgresql module
+```
+
+### `generate_workflow`
+
+Generate a GitHub Actions workflow file that processes `infrastructure.yaml` and triggers the provisioning pipeline. Save this in your repo as `.github/workflows/infrastructure.yaml`.
+
+```
+Generate a workflow file for my infrastructure provisioning
 ```
 
 ## Supported Resource Types
