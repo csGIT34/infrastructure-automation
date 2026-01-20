@@ -52,12 +52,13 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     requests \
     click
 
-# Setup Terraform plugin cache directory
-RUN mkdir -p /home/runner/.terraform.d/plugin-cache && \
-    chown -R runner:runner /home/runner/.terraform.d
+# Setup Terraform plugin cache directory in /tmp (writable by runner)
+# Using /tmp because the base image's init script overwrites /home/runner/.terraform.d
+RUN mkdir -p /tmp/terraform-plugin-cache && \
+    chmod 777 /tmp/terraform-plugin-cache
 
 # Set Terraform plugin cache environment variable
-ENV TF_PLUGIN_CACHE_DIR=/home/runner/.terraform.d/plugin-cache
+ENV TF_PLUGIN_CACHE_DIR=/tmp/terraform-plugin-cache
 
 USER runner
 
