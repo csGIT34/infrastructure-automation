@@ -171,6 +171,56 @@ When asked to add a new infrastructure module/resource type, follow these steps 
 
 The CI workflow `.github/workflows/validate-module-sync.yaml` validates that these stay in sync.
 
+## Operations & Maintenance
+
+### Cleaning Up Stuck Requests
+
+When infrastructure requests get stuck in "pending", "processing", or "queued" state, use the cleanup script:
+
+```bash
+# Preview what would be cleaned up (dry run)
+./scripts/cleanup-stuck-requests.sh --dry-run
+
+# Actually clean up stuck requests
+./scripts/cleanup-stuck-requests.sh
+```
+
+The script will:
+1. Query Cosmos DB for records with status: pending, processing, or queued
+2. Update those records to status: failed with cleanup message
+3. Remove corresponding messages from all Service Bus queues (dev, staging, prod)
+
+**Prerequisites:**
+- Azure CLI installed and logged in (`az login`)
+- Python 3 with `azure-servicebus` package (`pip install azure-servicebus`)
+
+**When to use:**
+- Requests stuck for extended periods (workflow failures, runner issues)
+- After infrastructure incidents that left orphaned requests
+- Before maintenance windows to clear the queue
+
+### Monitoring Queue Health
+
+Check Service Bus queue status:
+```bash
+# Check all queues
+for q in infrastructure-requests-dev infrastructure-requests-staging infrastructure-requests-prod; do
+  az servicebus queue show \
+    --namespace-name sb-infra-api-rrkkz6a8 \
+    --resource-group rg-infrastructure-api \
+    --name $q \
+    --query "{queue: name, active: countDetails.activeMessageCount, dlq: countDetails.deadLetterMessageCount}" \
+    -o json
+done
+```
+
+### Reprocessing Failed Requests
+
+To resubmit a failed request:
+1. Find the request in Cosmos DB by requestId
+2. Update status back to "pending"
+3. Resubmit to Service Bus queue (or use CLI to submit fresh)
+
 ## Error Handling Patterns
 
 - Failed Service Bus messages go to DLQ for retry
