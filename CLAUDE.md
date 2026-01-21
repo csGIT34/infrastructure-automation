@@ -350,8 +350,99 @@ On the subscription or target resource group scope:
 - Policy violations return 403 with specific violation message
 - Schema validation errors return 400 with field-level details
 
+## Home Lab Networking
+
+The k3s cluster runs on Hyper-V with dual-NIC VMs for home network access.
+
+### Network Architecture
+
+```
+Home Network (10.1.1.0/24)
+├── k3s-master: 10.1.1.60 (eth1)
+├── k3s-worker-1: 10.1.1.61 (eth1)
+├── k3s-worker-2: 10.1.1.62 (eth1)
+├── Traefik Ingress: 10.1.1.230 (MetalLB)
+└── dnsmasq DNS: 10.1.1.231 (MetalLB)
+
+Internal Cluster Network (10.10.10.0/24)
+├── k3s-master: 10.10.10.10 (eth0)
+├── k3s-worker-1: 10.10.10.11 (eth0)
+└── k3s-worker-2: 10.10.10.12 (eth0)
+```
+
+### DNS Resolution
+
+Network-wide DNS via dnsmasq at `10.1.1.231`. Configure router DHCP to use this as primary DNS.
+
+**Current DNS records** (edit `infrastructure/local-runners/dnsmasq/configmap.yaml`):
+- `argocd.lab` → 10.1.1.230 (Traefik)
+- `workout.lab` → 10.1.1.230 (Traefik)
+- `k3s-master.lab` → 10.1.1.60
+
+**Adding DNS records:**
+```yaml
+# In dnsmasq configmap.yaml
+address=/myapp.lab/10.1.1.230
+```
+Then: `kubectl rollout restart deployment dnsmasq -n dns`
+
+### Creating Ingress for Apps
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: myapp-route
+  namespace: myapp
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`myapp.lab`)
+    kind: Rule
+    services:
+    - name: myapp-service
+      port: 80
+```
+
+### ArgoCD Applications
+
+| App | Namespace | Description |
+|-----|-----------|-------------|
+| `cluster-networking` | metallb-system | MetalLB L2 load balancer |
+| `dnsmasq` | dns | Network DNS server |
+| `github-runners` | github-runners | Self-hosted Actions runners |
+
+### Key Files
+
+- `infrastructure/local-runners/networking/` - MetalLB, CoreDNS config
+- `infrastructure/local-runners/dnsmasq/` - dnsmasq DNS server
+- `infrastructure/local-runners/runner-deployment.yaml` - GitHub runners
+
+### Useful Commands
+
+```bash
+# Check ArgoCD apps
+kubectl get applications -n argocd
+
+# Sync an app
+kubectl patch application <app-name> -n argocd \
+  --type merge -p '{"operation":{"sync":{"revision":"HEAD"}}}'
+
+# Check LoadBalancer IPs
+kubectl get svc -A | grep LoadBalancer
+
+# Test DNS
+nslookup argocd.lab 10.1.1.231
+
+# Restart dnsmasq after config changes
+kubectl rollout restart deployment dnsmasq -n dns
+```
+
 ## Key Documentation
 
 - `infrastructure-platform-guide.md` - Comprehensive platform guide
 - `docs/ARCHITECTURE.md` - System design diagrams
 - `docs/LOCAL-K8S-SETUP.md` - Local k3s cluster setup for self-hosted runners
+- `infrastructure/local-runners/networking/README.md` - Network architecture details
+- `infrastructure/local-runners/dnsmasq/README.md` - DNS server configuration
