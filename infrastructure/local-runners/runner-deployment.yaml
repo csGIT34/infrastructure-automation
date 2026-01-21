@@ -27,7 +27,7 @@ spec:
         - infrastructure
 
       # Custom image with Azure CLI, Terraform, Python pre-installed
-      image: ghcr.io/csgit34/actions-runner-tools:latest
+      image: docker.io/csdock34/actions-runner:latest
       imagePullPolicy: Always
 
       # Environment variables
