@@ -5,18 +5,18 @@ metadata:
   namespace: kube-system
 data:
   lab.server: |
-    lab.local:53 {
+    lab:53 {
       errors
       log
       hosts {
         # Cluster nodes (external IPs on home network)
-        10.1.1.60  k3s-master.lab.local master.lab.local
-        10.1.1.61  k3s-worker-1.lab.local worker-1.lab.local
-        10.1.1.62  k3s-worker-2.lab.local worker-2.lab.local
+        10.1.1.60  k3s-master.lab master.lab
+        10.1.1.61  k3s-worker-1.lab worker-1.lab
+        10.1.1.62  k3s-worker-2.lab worker-2.lab
         # Traefik ingress (all apps route through here)
-        10.1.1.230 traefik.lab.local
-        10.1.1.230 argocd.lab.local
-        10.1.1.230 workout.lab.local
+        10.1.1.230 traefik.lab
+        10.1.1.230 argocd.lab
+        10.1.1.230 workout.lab
         fallthrough
       }
       cache 30
