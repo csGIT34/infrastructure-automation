@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  lab.server: |
+    lab.local:53 {
+      errors
+      log
+      hosts {
+        # Cluster nodes
+        10.10.10.10  k3s-master.lab.local master.lab.local
+        10.10.10.11  k3s-worker-1.lab.local worker-1.lab.local
+        10.10.10.12  k3s-worker-2.lab.local worker-2.lab.local
+        # MetalLB service IPs - add as you deploy services
+        10.10.10.200 apps.lab.local
+        10.10.10.201 api.lab.local
+        10.10.10.202 argocd.lab.local
+        fallthrough
+      }
+      cache 30
+    }
+  forward.override: |
+    forward . 1.1.1.1 1.0.0.1

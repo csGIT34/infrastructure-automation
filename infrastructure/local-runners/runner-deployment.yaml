@@ -72,6 +72,15 @@ spec:
       #     operator: "Equal"
       #     value: "runner"
       #     effect: "NoSchedule"
+
+      # Spread pods across worker nodes for high availability
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              actions-runner-controller/inject-registration-token: "true"
 ---
 apiVersion: actions.summerwind.dev/v1alpha1
 kind: HorizontalRunnerAutoscaler
