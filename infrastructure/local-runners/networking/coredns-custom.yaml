@@ -9,14 +9,14 @@ data:
       errors
       log
       hosts {
-        # Cluster nodes
-        10.10.10.10  k3s-master.lab.local master.lab.local
-        10.10.10.11  k3s-worker-1.lab.local worker-1.lab.local
-        10.10.10.12  k3s-worker-2.lab.local worker-2.lab.local
-        # MetalLB service IPs - add as you deploy services
-        10.10.10.200 apps.lab.local
-        10.10.10.201 api.lab.local
-        10.10.10.202 argocd.lab.local
+        # Cluster nodes (external IPs on home network)
+        10.1.1.60  k3s-master.lab.local master.lab.local
+        10.1.1.61  k3s-worker-1.lab.local worker-1.lab.local
+        10.1.1.62  k3s-worker-2.lab.local worker-2.lab.local
+        # MetalLB service IPs on home network
+        10.1.1.200 apps.lab.local
+        10.1.1.201 api.lab.local
+        10.1.1.202 argocd.lab.local
         fallthrough
       }
       cache 30

@@ -5,7 +5,8 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-    - 10.10.10.200-10.10.10.250
+    # Home network range - ensure these IPs are outside your DHCP range
+    - 10.1.1.200-10.1.1.220
 ---
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
@@ -16,4 +17,4 @@ spec:
   ipAddressPools:
     - lab-pool
   interfaces:
-    - eth0  # Adjust to your worker node interface
+    - eth1  # External interface on home network
