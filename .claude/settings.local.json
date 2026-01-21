@@ -105,7 +105,8 @@
       "Bash(kubectl describe:*)",
       "Bash(gh run view:*)",
       "Bash(terraform fmt:*)",
-      "Bash(terraform validate:*)"
+      "Bash(terraform validate:*)",
+      "Bash(npm run build:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
