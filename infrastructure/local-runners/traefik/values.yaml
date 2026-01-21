@@ -1,0 +1,50 @@
+# Traefik Helm values for k3s home lab
+# https://github.com/traefik/traefik-helm-chart
+
+# Dashboard configuration
+ingressRoute:
+  dashboard:
+    enabled: true
+    matchRule: Host(`traefik.lab.local`)
+    entryPoints:
+      - web
+
+# Service configuration - LoadBalancer on home network
+service:
+  type: LoadBalancer
+  spec:
+    loadBalancerIP: 10.1.1.200  # First IP in MetalLB pool
+
+# Entry points
+ports:
+  web:
+    port: 8000
+    exposedPort: 80
+    expose:
+      default: true
+  websecure:
+    port: 8443
+    exposedPort: 443
+    expose:
+      default: true
+
+# Enable Traefik dashboard
+additionalArguments:
+  - "--api.dashboard=true"
+  - "--api.insecure=true"
+
+# Logs
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true
+
+# Resource limits
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
