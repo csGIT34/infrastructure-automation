@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dnsmasq-config
+  namespace: dns
+data:
+  dnsmasq.conf: |
+    # Don't read /etc/resolv.conf
+    no-resolv
+    # Upstream DNS (Cloudflare)
+    server=1.1.1.1
+    server=1.0.0.1
+    # Local domain
+    local=/lab.local/
+    # Host entries - Traefik ingress
+    address=/traefik.lab.local/10.1.1.230
+    address=/argocd.lab.local/10.1.1.230
+    address=/workout.lab.local/10.1.1.230
+    # Host entries - Cluster nodes
+    address=/k3s-master.lab.local/10.1.1.60
+    address=/k3s-worker-1.lab.local/10.1.1.61
+    address=/k3s-worker-2.lab.local/10.1.1.62
+    # Logging
+    log-queries
