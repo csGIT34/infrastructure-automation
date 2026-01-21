@@ -14,9 +14,9 @@ data:
         10.1.1.61  k3s-worker-1.lab.local worker-1.lab.local
         10.1.1.62  k3s-worker-2.lab.local worker-2.lab.local
         # Traefik ingress (all apps route through here)
-        10.1.1.230 traefik.lab.local apps.lab.local
-        10.1.1.230 hello.lab.local
+        10.1.1.230 traefik.lab.local
         10.1.1.230 argocd.lab.local
+        10.1.1.230 workout.lab.local
         fallthrough
       }
       cache 30
