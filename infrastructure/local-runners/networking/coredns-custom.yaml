@@ -13,10 +13,10 @@ data:
         10.1.1.60  k3s-master.lab.local master.lab.local
         10.1.1.61  k3s-worker-1.lab.local worker-1.lab.local
         10.1.1.62  k3s-worker-2.lab.local worker-2.lab.local
-        # MetalLB service IPs on home network
-        10.1.1.200 apps.lab.local
-        10.1.1.201 api.lab.local
-        10.1.1.202 argocd.lab.local
+        # Traefik ingress (all apps route through here)
+        10.1.1.230 traefik.lab.local apps.lab.local
+        10.1.1.230 hello.lab.local
+        10.1.1.230 argocd.lab.local
         fallthrough
       }
       cache 30
