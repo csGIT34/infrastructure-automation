@@ -1,5 +1,9 @@
 # terraform/modules/network-rules/main.tf
 # Configures firewall and network access rules for Azure resources
+#
+# NOTE: Key Vault network rules must be configured on the azurerm_key_vault
+# resource itself using the network_acls block, not as a separate resource.
+# This module handles Storage, PostgreSQL, and Azure SQL network rules.
 
 terraform {
   required_version = ">= 1.5.0"
@@ -12,12 +16,12 @@ terraform {
 }
 
 variable "resource_type" {
-  description = "Type of resource: keyvault, storage, postgresql, azure_sql"
+  description = "Type of resource: storage, postgresql, azure_sql"
   type        = string
 
   validation {
-    condition     = contains(["keyvault", "storage", "postgresql", "azure_sql"], var.resource_type)
-    error_message = "Resource type must be keyvault, storage, postgresql, or azure_sql."
+    condition     = contains(["storage", "postgresql", "azure_sql"], var.resource_type)
+    error_message = "Resource type must be storage, postgresql, or azure_sql. Key Vault network rules must be configured on the azurerm_key_vault resource."
   }
 }
 
@@ -67,46 +71,45 @@ variable "bypass_azure_services" {
   default     = true
 }
 
-# Key Vault network rules
-resource "azurerm_key_vault_network_acls" "keyvault" {
-  count = var.resource_type == "keyvault" ? 1 : 0
-
-  key_vault_id         = var.resource_id
-  default_action       = var.default_action
-  bypass               = var.bypass_azure_services ? "AzureServices" : "None"
-  ip_rules             = var.allowed_ips
-  virtual_network_subnet_ids = var.allowed_subnet_ids
-}
-
 # Storage account network rules
 resource "azurerm_storage_account_network_rules" "storage" {
   count = var.resource_type == "storage" ? 1 : 0
 
-  storage_account_id   = var.resource_id
-  default_action       = var.default_action
-  bypass               = var.bypass_azure_services ? ["AzureServices"] : []
-  ip_rules             = var.allowed_ips
+  storage_account_id         = var.resource_id
+  default_action             = var.default_action
+  bypass                     = var.bypass_azure_services ? ["AzureServices"] : []
+  ip_rules                   = var.allowed_ips
   virtual_network_subnet_ids = var.allowed_subnet_ids
 }
 
 # PostgreSQL firewall rules - individual rules per IP
 resource "azurerm_postgresql_flexible_server_firewall_rule" "postgresql" {
-  for_each = var.resource_type == "postgresql" ? { for idx, ip in var.allowed_ips : idx => ip } : {}
+  for_each = var.resource_type == "postgresql" ? toset(var.allowed_ips) : toset([])
 
-  name             = "allow-ip-${each.key}"
+  name             = "allow-${replace(each.value, "/", "-")}"
   server_id        = var.resource_id
-  start_ip_address = cidrhost(each.value, 0)
-  end_ip_address   = cidrhost(each.value, -1)
+  start_ip_address = split("/", each.value)[0]
+  end_ip_address   = split("/", each.value)[0]
+}
+
+# PostgreSQL allow Azure services
+resource "azurerm_postgresql_flexible_server_firewall_rule" "postgresql_azure_services" {
+  count = var.resource_type == "postgresql" && var.bypass_azure_services ? 1 : 0
+
+  name             = "AllowAzureServices"
+  server_id        = var.resource_id
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "0.0.0.0"
 }
 
 # Azure SQL firewall rules
 resource "azurerm_mssql_firewall_rule" "azure_sql" {
-  for_each = var.resource_type == "azure_sql" ? { for idx, ip in var.allowed_ips : idx => ip } : {}
+  for_each = var.resource_type == "azure_sql" ? toset(var.allowed_ips) : toset([])
 
-  name             = "allow-ip-${each.key}"
+  name             = "allow-${replace(each.value, "/", "-")}"
   server_id        = var.resource_id
-  start_ip_address = cidrhost(each.value, 0)
-  end_ip_address   = cidrhost(each.value, -1)
+  start_ip_address = split("/", each.value)[0]
+  end_ip_address   = split("/", each.value)[0]
 }
 
 # Azure SQL allow Azure services

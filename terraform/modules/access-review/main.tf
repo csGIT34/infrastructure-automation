@@ -1,6 +1,14 @@
 # terraform/modules/access-review/main.tf
-# Creates Entra ID access reviews for privileged groups
-# Note: Access reviews require Azure AD Premium P2 license
+# Access Review configuration placeholder
+#
+# NOTE: Azure AD Access Reviews cannot be managed via Terraform.
+# The azuread provider does not support access review resources.
+# Access reviews must be configured manually via:
+#   - Azure Portal: Entra ID > Identity Governance > Access Reviews
+#   - Microsoft Graph API
+#   - PowerShell (Microsoft.Graph module)
+#
+# This module outputs instructions for manual setup.
 
 terraform {
   required_version = ">= 1.5.0"
@@ -8,10 +16,6 @@ terraform {
     azuread = {
       source  = "hashicorp/azuread"
       version = "~> 2.0"
-    }
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0"
     }
   }
 }
@@ -54,93 +58,53 @@ variable "duration_days" {
   default     = 14
 }
 
-# Look up reviewers
-data "azuread_users" "reviewers" {
-  count                = length(var.reviewer_emails) > 0 ? 1 : 0
-  user_principal_names = var.reviewer_emails
-}
-
 locals {
-  frequency_config = {
-    quarterly = {
-      interval    = 3
-      recurrence  = "absoluteMonthly"
-      description = "Quarterly access review"
-    }
-    semi-annual = {
-      interval    = 6
-      recurrence  = "absoluteMonthly"
-      description = "Semi-annual access review"
-    }
-    annual = {
-      interval    = 12
-      recurrence  = "absoluteMonthly"
-      description = "Annual access review"
-    }
-  }
-
-  reviewer_ids = length(var.reviewer_emails) > 0 ? data.azuread_users.reviewers[0].object_ids : []
-}
-
-# Note: azuread_access_review_definition requires AzureAD provider >= 2.47.0
-# and Azure AD Premium P2 license. If not available, this resource will be skipped.
-resource "azuread_access_review_schedule_definition" "review" {
-  count = length(local.reviewer_ids) > 0 ? 1 : 0
-
-  display_name = "Access Review: ${var.group_name}"
-  description  = local.frequency_config[var.frequency].description
-
-  scope {
-    query      = "/groups/${var.group_id}/members"
-    query_type = "MicrosoftGraph"
-  }
-
-  reviewer {
-    query      = "/users/${local.reviewer_ids[0]}"
-    query_type = "MicrosoftGraph"
-  }
-
-  settings {
-    mail_notifications_enabled        = true
-    reminder_notifications_enabled    = true
-    justification_required_on_approval = true
-
-    default_decision         = var.auto_remove_on_deny ? "Deny" : "None"
-    default_decision_enabled = false
-
-    instance_duration_in_days = var.duration_days
-
-    recurrence {
-      type = local.frequency_config[var.frequency].recurrence
-      pattern {
-        type     = "absoluteMonthly"
-        interval = local.frequency_config[var.frequency].interval
-      }
-      range {
-        type       = "noEnd"
-        start_date = formatdate("YYYY-MM-DD", timestamp())
-      }
-    }
-  }
-
-  lifecycle {
-    ignore_changes = [
-      settings[0].recurrence[0].range[0].start_date, # Don't update start date on subsequent applies
-    ]
+  frequency_display = {
+    quarterly   = "every 3 months"
+    semi-annual = "every 6 months"
+    annual      = "every 12 months"
   }
 }
 
 output "review_id" {
-  description = "Access review definition ID"
-  value       = length(azuread_access_review_schedule_definition.review) > 0 ? azuread_access_review_schedule_definition.review[0].id : null
+  description = "Access review definition ID (not created - manual setup required)"
+  value       = null
 }
 
 output "review_name" {
   description = "Access review display name"
-  value       = length(azuread_access_review_schedule_definition.review) > 0 ? azuread_access_review_schedule_definition.review[0].display_name : null
+  value       = "Access Review: ${var.group_name}"
 }
 
 output "enabled" {
-  description = "Whether access review was created"
-  value       = length(azuread_access_review_schedule_definition.review) > 0
+  description = "Whether access review was created (always false - manual setup required)"
+  value       = false
+}
+
+output "setup_instructions" {
+  description = "Instructions for manual access review setup"
+  value       = <<-EOT
+    Access Review Manual Setup Required
+    ====================================
+    Azure AD Access Reviews cannot be managed via Terraform.
+
+    To configure access review for group "${var.group_name}":
+
+    1. Go to Azure Portal > Entra ID > Identity Governance > Access Reviews
+    2. Click "New access review"
+    3. Configure:
+       - Review name: Access Review: ${var.group_name}
+       - Scope: Groups and Teams > ${var.group_name}
+       - Reviewers: ${join(", ", var.reviewer_emails)}
+       - Frequency: ${local.frequency_display[var.frequency]}
+       - Duration: ${var.duration_days} days
+       - Auto-apply results: ${var.auto_remove_on_deny ? "Yes" : "No"}
+
+    Or use PowerShell:
+      Install-Module Microsoft.Graph
+      Connect-MgGraph -Scopes "AccessReview.ReadWrite.All"
+      # See Microsoft Graph documentation for New-MgAccessReview
+
+    Group ID: ${var.group_id}
+  EOT
 }
