@@ -1,23 +1,23 @@
 locals {
-    # Determine which resource was created
-    is_consumption = local.use_consumption
-    is_linux       = local.os_type == "Linux"
+    # Determine which resource type was created
+    is_flex = local.use_flex_consumption
+    is_linux = local.os_type == "Linux"
 
     # Get values from the appropriate resource
-    func_id = local.is_consumption ? (
-        local.is_linux ? azapi_resource.consumption_function_app[0].id : null
+    func_id = local.is_flex ? (
+        local.is_linux ? azurerm_function_app_flex_consumption.main[0].id : null
     ) : (
         local.is_linux ? azurerm_linux_function_app.main[0].id : azurerm_windows_function_app.main[0].id
     )
 
-    func_hostname = local.is_consumption ? (
-        local.is_linux ? jsondecode(azapi_resource.consumption_function_app[0].output).properties.defaultHostName : null
+    func_hostname = local.is_flex ? (
+        local.is_linux ? azurerm_function_app_flex_consumption.main[0].default_hostname : null
     ) : (
         local.is_linux ? azurerm_linux_function_app.main[0].default_hostname : azurerm_windows_function_app.main[0].default_hostname
     )
 
-    func_principal_id = local.is_consumption ? (
-        local.is_linux ? jsondecode(azapi_resource.consumption_function_app[0].output).identity.principalId : null
+    func_principal_id = local.is_flex ? (
+        local.is_linux ? azurerm_function_app_flex_consumption.main[0].identity[0].principal_id : null
     ) : (
         local.is_linux ? azurerm_linux_function_app.main[0].identity[0].principal_id : azurerm_windows_function_app.main[0].identity[0].principal_id
     )

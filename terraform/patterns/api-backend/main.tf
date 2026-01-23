@@ -5,9 +5,8 @@
 terraform {
   required_version = ">= 1.5.0"
   required_providers {
-    azurerm = { source = "hashicorp/azurerm", version = "~> 3.0" }
+    azurerm = { source = "hashicorp/azurerm", version = ">= 4.0" }
     azuread = { source = "hashicorp/azuread", version = "~> 2.0" }
-    azapi   = { source = "azure/azapi", version = "~> 1.0" }
     random  = { source = "hashicorp/random", version = "~> 3.0" }
   }
   backend "azurerm" { use_oidc = true }
@@ -18,7 +17,6 @@ provider "azurerm" {
   use_oidc = true
 }
 provider "azuread" { use_oidc = true }
-provider "azapi" { use_oidc = true }
 
 # Variables
 variable "project" { type = string }
@@ -40,7 +38,7 @@ variable "database_type" {
 # Sizing
 variable "function_sku" {
   type    = string
-  default = "Y1"  # Consumption plan - uses azapi provider to avoid quota issues
+  default = "FC1"  # Flex Consumption - no VM quota required
 }
 variable "db_sku" {
   type    = string

@@ -24,7 +24,7 @@ use_cases:
 sizing:
   small:
     dev:
-      function_sku: Y1  # Consumption plan - uses azapi to avoid quota issues
+      function_sku: FC1  # Flex Consumption - no VM quota required
       db_sku: Free
       enable_diagnostics: false
     staging:
