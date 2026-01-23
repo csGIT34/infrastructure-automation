@@ -1,0 +1,33 @@
+# Key Vault Pattern Request
+# Secure secrets storage with security groups and access reviews
+#
+# This pattern provisions:
+# - Azure Key Vault (secrets/keys/certificates)
+# - Security Groups (readers + admins)
+# - RBAC Assignments (Key Vault roles)
+# - Access Reviews (prod only, quarterly)
+# - Diagnostics (staging/prod)
+#
+# Cost: ~$5/month (standard) or ~$30/month (premium with HSM)
+
+version: "1"
+
+metadata:
+  project: myapp
+  environment: dev
+  business_unit: engineering
+  owners:
+    - alice@company.com
+    - bob@company.com
+  location: eastus
+
+pattern: keyvault
+config:
+  name: secrets
+  size: small                         # small, medium, large (optional)
+
+  # Optional pattern-specific config:
+  # access_reviewers:                  # Required for prod
+  #   - security@company.com
+  # enable_private_endpoint: false     # Private endpoint access
+  # subnet_id: ""                      # Subnet for private endpoint

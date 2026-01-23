@@ -3,29 +3,17 @@
 #
 # Required secrets:
 #   INFRA_SERVICE_BUS_SAS_KEY - Service Bus SAS key for submitting requests
-#     Get it from your platform team or run:
-#       az servicebus namespace authorization-rule keys list \
-#         --namespace-name sb-infra-api-rrkkz6a8 \
-#         --resource-group rg-infrastructure-api \
-#         --name RootManageSharedAccessKey \
-#         --query primaryKey -o tsv
-#
 #   INFRA_APP_ID - GitHub App ID for Infrastructure Dispatch app
 #   INFRA_APP_PRIVATE_KEY - GitHub App private key (PEM format)
-#     Get these from your platform team or create the app at:
-#     https://github.com/settings/apps
+#
+# Supports both:
+#   - Pattern-based requests (recommended): Single pattern with t-shirt sizing
+#   - Legacy resource-based requests: List of individual resources
 #
 # Usage:
-# 1. Create infrastructure.yaml in your repo root (see templates/infrastructure.yaml)
-# 2. Create a PR to see the plan preview with additions/deletions
-# 3. Merge to main to provision resources (triggers immediate processing)
-#
-# Features:
-# - Validates YAML syntax and required fields
-# - Shows plan preview comparing against last successful deployment
-# - Indicates which resources will be added, removed, or unchanged
-# - Posts plan as PR comment
-# - Submits to provisioning queue on merge
+# 1. Create infrastructure.yaml in your repo root
+# 2. Create a PR to see the plan preview
+# 3. Merge to main to provision resources
 
 name: Infrastructure GitOps
 
@@ -88,33 +76,81 @@ jobs:
                   f.write("result=failed\n")
               sys.exit(1)
 
-          # Validate required fields
           errors = []
 
+          # Check if this is a pattern-based or resource-based request
+          is_pattern = 'pattern' in config
+          is_resources = 'resources' in config
+
+          if not is_pattern and not is_resources:
+              errors.append("Must specify either 'pattern' or 'resources'")
+
+          # Validate metadata (required for both types)
           if 'metadata' not in config:
               errors.append("Missing 'metadata' section")
           else:
               metadata = config['metadata']
-              required_meta = ['project_name', 'environment', 'business_unit', 'cost_center', 'owner_email']
-              for field in required_meta:
-                  if field not in metadata:
-                      errors.append(f"Missing metadata.{field}")
 
-          if 'resources' not in config:
-              errors.append("Missing 'resources' section")
-          elif not isinstance(config.get('resources'), list):
-              errors.append("'resources' must be a list")
-          elif len(config.get('resources', [])) == 0:
-              errors.append("'resources' list is empty")
-          else:
-              valid_types = ['storage_account', 'keyvault', 'postgresql', 'mongodb', 'azure_sql', 'eventhub', 'function_app', 'linux_vm', 'aks_namespace', 'static_web_app']
-              for i, resource in enumerate(config['resources']):
-                  if 'type' not in resource:
-                      errors.append(f"Resource {i+1}: missing 'type'")
-                  elif resource['type'] not in valid_types:
-                      errors.append(f"Resource {i+1}: invalid type '{resource['type']}'. Valid: {', '.join(valid_types)}")
-                  if 'name' not in resource:
-                      errors.append(f"Resource {i+1}: missing 'name'")
+              # Pattern-based requests use different metadata fields
+              if is_pattern:
+                  required_meta = ['project', 'environment', 'business_unit', 'owners']
+                  for field in required_meta:
+                      if field not in metadata:
+                          errors.append(f"Missing metadata.{field}")
+                  # owners must be a list
+                  if 'owners' in metadata and not isinstance(metadata['owners'], list):
+                      errors.append("metadata.owners must be a list of email addresses")
+              else:
+                  # Legacy resource-based requests
+                  required_meta = ['project_name', 'environment', 'business_unit', 'cost_center', 'owner_email']
+                  for field in required_meta:
+                      if field not in metadata:
+                          errors.append(f"Missing metadata.{field}")
+
+              # Validate environment
+              env = metadata.get('environment', '')
+              if env not in ['dev', 'staging', 'prod']:
+                  errors.append(f"Invalid environment: {env}. Must be dev, staging, or prod")
+
+          # Validate pattern-based request
+          if is_pattern:
+              valid_patterns = [
+                  'keyvault', 'postgresql', 'mongodb', 'storage', 'function-app',
+                  'sql-database', 'eventhub', 'aks-namespace', 'linux-vm', 'static-site',
+                  'web-app', 'api-backend', 'microservice', 'data-pipeline'
+              ]
+              pattern = config.get('pattern', '')
+              if pattern not in valid_patterns:
+                  errors.append(f"Invalid pattern: {pattern}. Valid patterns: {', '.join(valid_patterns)}")
+
+              # Validate config section
+              if 'config' not in config:
+                  errors.append("Missing 'config' section for pattern request")
+              else:
+                  cfg = config['config']
+                  if 'name' not in cfg:
+                      errors.append("Missing config.name")
+                  if 'size' in cfg and cfg['size'] not in ['small', 'medium', 'large']:
+                      errors.append(f"Invalid size: {cfg['size']}. Must be small, medium, or large")
+
+          # Validate resource-based request
+          if is_resources:
+              if not isinstance(config.get('resources'), list):
+                  errors.append("'resources' must be a list")
+              elif len(config.get('resources', [])) == 0:
+                  errors.append("'resources' list is empty")
+              else:
+                  valid_types = [
+                      'storage_account', 'keyvault', 'postgresql', 'mongodb', 'azure_sql',
+                      'eventhub', 'function_app', 'linux_vm', 'aks_namespace', 'static_web_app'
+                  ]
+                  for i, resource in enumerate(config['resources']):
+                      if 'type' not in resource:
+                          errors.append(f"Resource {i+1}: missing 'type'")
+                      elif resource['type'] not in valid_types:
+                          errors.append(f"Resource {i+1}: invalid type '{resource['type']}'. Valid: {', '.join(valid_types)}")
+                      if 'name' not in resource:
+                          errors.append(f"Resource {i+1}: missing 'name'")
 
           if errors:
               print("::error::Validation failed")
@@ -125,9 +161,10 @@ jobs:
                   f.write(f"errors={json.dumps(errors)}\n")
               sys.exit(1)
 
-          print("Validation passed!")
+          print(f"Validation passed! Request type: {'pattern' if is_pattern else 'resources'}")
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write("result=passed\n")
+              f.write(f"request_type={'pattern' if is_pattern else 'resources'}\n")
           EOF
 
       - name: Generate Plan Preview
@@ -143,95 +180,108 @@ jobs:
 
           PLAN_API_URL = os.environ['PLAN_API_URL']
 
-          # Load current config
           with open("infrastructure.yaml", 'r') as f:
               yaml_content = f.read()
               config = yaml.safe_load(yaml_content)
 
-          metadata = config['metadata']
-          project = metadata.get('project_name', 'unknown')
-          env = metadata.get('environment', 'dev')
+          metadata = config.get('metadata', {})
+          is_pattern = 'pattern' in config
 
-          # Call the plan API to compare against last successful deployment
-          try:
-              response = requests.post(PLAN_API_URL, json={
-                  'project_name': project,
-                  'environment': env,
-                  'proposed_yaml': yaml_content
-              }, timeout=30)
-              response.raise_for_status()
-              plan_data = response.json()
-          except Exception as e:
-              print(f"Warning: Could not reach plan API: {e}")
-              print("Falling back to showing all resources as new")
-              plan_data = {
-                  'changes': {
-                      'added': [{'type': r['type'], 'name': r['name'], 'azure_name': 'unknown'} for r in config.get('resources', [])],
-                      'removed': [],
-                      'unchanged': []
-                  },
-                  'summary': {'added': len(config.get('resources', [])), 'removed': 0, 'unchanged': 0},
-                  'warnings': ['Could not connect to plan API. Showing all resources as additions.'],
-                  'last_deployment': None
-              }
-
-          changes = plan_data.get('changes', {})
-          summary = plan_data.get('summary', {})
-          warnings = plan_data.get('warnings', [])
-          last_deployment = plan_data.get('last_deployment')
+          # Extract project info based on request type
+          if is_pattern:
+              project = metadata.get('project', 'unknown')
+              env = metadata.get('environment', 'dev')
+              pattern = config.get('pattern', '')
+              cfg = config.get('config', {})
+              size = cfg.get('size', 'small')
+          else:
+              project = metadata.get('project_name', 'unknown')
+              env = metadata.get('environment', 'dev')
+              pattern = None
+              size = None
 
           # Generate markdown preview
           preview = "## Infrastructure Plan Preview\n\n"
-          preview += "### Project Information\n"
-          preview += "| Property | Value |\n"
-          preview += "|----------|-------|\n"
-          preview += f"| Project Name | `{metadata.get('project_name')}` |\n"
-          preview += f"| Environment | `{metadata.get('environment')}` |\n"
-          preview += f"| Business Unit | `{metadata.get('business_unit')}` |\n"
-          preview += f"| Cost Center | `{metadata.get('cost_center')}` |\n"
-          preview += f"| Owner | `{metadata.get('owner_email')}` |\n"
-          preview += f"| Location | `{metadata.get('location', 'centralus')}` |\n\n"
-          preview += "### Last Successful Deployment\n"
-          if last_deployment:
-              preview += "| Property | Value |\n|----------|-------|\n"
-              preview += f"| Request ID | `{last_deployment.get('request_id', 'N/A')}` |\n"
-              preview += f"| Deployed At | `{last_deployment.get('deployed_at', 'N/A')}` |\n"
+
+          if is_pattern:
+              preview += "### Pattern Request\n"
+              preview += "| Property | Value |\n"
+              preview += "|----------|-------|\n"
+              preview += f"| Pattern | `{pattern}` |\n"
+              preview += f"| Project | `{project}` |\n"
+              preview += f"| Environment | `{env}` |\n"
+              preview += f"| Size | `{size}` |\n"
+              preview += f"| Business Unit | `{metadata.get('business_unit', 'N/A')}` |\n"
+              preview += f"| Owners | `{', '.join(metadata.get('owners', []))}` |\n"
+              preview += f"| Location | `{metadata.get('location', 'eastus')}` |\n\n"
+
+              # Pattern-specific config
+              preview += "### Configuration\n"
+              preview += "| Setting | Value |\n"
+              preview += "|---------|-------|\n"
+              for key, value in cfg.items():
+                  preview += f"| {key} | `{value}` |\n"
+              preview += "\n"
+
+              # What will be created
+              preview += "### What Will Be Created\n"
+              pattern_components = {
+                  'keyvault': ['Key Vault', 'Security Groups', 'RBAC Assignments'],
+                  'postgresql': ['PostgreSQL Server', 'Database', 'Key Vault', 'Security Groups'],
+                  'mongodb': ['Cosmos DB (MongoDB)', 'Key Vault', 'Security Groups'],
+                  'storage': ['Storage Account', 'Blob Containers', 'Security Groups'],
+                  'function-app': ['Function App', 'App Service Plan', 'Storage Account', 'Key Vault', 'Security Groups'],
+                  'sql-database': ['SQL Server', 'Database', 'Key Vault', 'Security Groups'],
+                  'eventhub': ['Event Hub Namespace', 'Event Hub', 'Key Vault', 'Security Groups'],
+                  'aks-namespace': ['Kubernetes Namespace', 'Resource Quotas', 'Security Groups'],
+                  'linux-vm': ['Virtual Machine', 'Network Interface', 'Key Vault', 'Security Groups'],
+                  'static-site': ['Static Web App', 'Security Groups'],
+                  'web-app': ['Static Web App', 'Function App', 'Database', 'Key Vault', 'Security Groups'],
+                  'api-backend': ['Function App', 'Database', 'Key Vault', 'Security Groups'],
+                  'microservice': ['AKS Namespace', 'Event Hub', 'Storage', 'Key Vault', 'Security Groups'],
+                  'data-pipeline': ['Event Hub', 'Function App', 'Data Lake Storage', 'MongoDB', 'Key Vault', 'Security Groups']
+              }
+              components = pattern_components.get(pattern, ['Unknown components'])
+              for component in components:
+                  preview += f"- {component}\n"
+              preview += "\n"
+
+              # Environment features
+              preview += "### Environment Features\n"
+              if env == 'prod':
+                  preview += "- Diagnostic logging enabled\n"
+                  preview += "- Access reviews enabled\n"
+                  preview += "- Geo-redundant backup (if applicable)\n"
+                  preview += "- Purge protection enabled\n"
+              elif env == 'staging':
+                  preview += "- Diagnostic logging enabled\n"
+                  preview += "- Standard backup retention\n"
+              else:
+                  preview += "- Development configuration\n"
+                  preview += "- Minimal backup retention\n"
+              preview += "\n"
+
           else:
-              preview += "_No previous deployment found for this project/environment._\n"
-          preview += "\n### Changes Summary (vs. Last Deployment)\n"
-          preview += "| Added | Removed | Unchanged |\n"
-          preview += "|-------|---------|----------|\n"
-          preview += f"| {summary.get('added', 0)} | {summary.get('removed', 0)} | {summary.get('unchanged', 0)} |\n\n"
-          preview += "### Resource Changes\n\n"
-          preview += "| Status | Type | Name | Azure Resource |\n"
-          preview += "|--------|------|------|----------------|\n"
+              # Legacy resource-based preview
+              preview += "### Project Information\n"
+              preview += "| Property | Value |\n"
+              preview += "|----------|-------|\n"
+              preview += f"| Project Name | `{project}` |\n"
+              preview += f"| Environment | `{env}` |\n"
+              preview += f"| Business Unit | `{metadata.get('business_unit', 'N/A')}` |\n"
+              preview += f"| Cost Center | `{metadata.get('cost_center', 'N/A')}` |\n"
+              preview += f"| Owner | `{metadata.get('owner_email', 'N/A')}` |\n\n"
 
-          # Show added resources
-          for r in changes.get('added', []):
-              preview += f"| + **Add** | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
+              preview += "### Resources\n"
+              preview += "| Type | Name |\n"
+              preview += "|------|------|\n"
+              for r in config.get('resources', []):
+                  preview += f"| `{r.get('type', 'unknown')}` | `{r.get('name', 'unknown')}` |\n"
+              preview += "\n"
 
-          # Show removed resources
-          for r in changes.get('removed', []):
-              preview += f"| - **Remove** | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
-
-          # Show unchanged resources
-          for r in changes.get('unchanged', []):
-              preview += f"| = No change | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
-
-          preview += f"\n### Resource Group\n"
+          preview += f"### Resource Group\n"
           preview += f"`rg-{project}-{env}`\n\n"
           preview += "---\n"
-
-          # Show warnings
-          if warnings:
-              for warning in warnings:
-                  preview += f"**Note:** {warning}\n\n"
-
-          if summary.get('added', 0) > 0 or summary.get('removed', 0) > 0:
-              preview += "**This PR will modify infrastructure.** Review changes carefully before merging.\n\n"
-          else:
-              preview += "**No infrastructure changes detected.**\n\n"
-
           preview += "**On merge to main**, these changes will be automatically applied.\n\n"
           preview += "Track provisioning status at: https://wonderful-field-088efae10.1.azurestaticapps.net\n"
 
@@ -335,8 +385,12 @@ jobs:
           timestamp = int(time.time())
           request_id = f"gitops-{repo.replace('/', '-')}-{sha}-{timestamp}"
 
+          # Determine environment from either pattern or legacy format
+          metadata = config.get('metadata', {})
+          environment = metadata.get('environment', 'dev')
+
           namespace = "sb-infra-api-rrkkz6a8"
-          queue_name = f"infrastructure-requests-{config['metadata']['environment']}"
+          queue_name = f"infrastructure-requests-{environment}"
           sas_key = os.environ['SAS_KEY']
           sas_key_name = "RootManageSharedAccessKey"
 
@@ -348,16 +402,26 @@ jobs:
           ).decode('utf-8')
           sas_token = f"SharedAccessSignature sr={urllib.parse.quote_plus(uri)}&sig={urllib.parse.quote_plus(signature)}&se={expiry}&skn={sas_key_name}"
 
+          # Determine owner email based on request type
+          is_pattern = 'pattern' in config
+          if is_pattern:
+              owners = metadata.get('owners', [])
+              owner_email = owners[0] if owners else 'gitops@automation'
+          else:
+              owner_email = metadata.get('owner_email', 'gitops@automation')
+
           message = {
               'request_id': request_id,
               'yaml_content': yaml_content,
-              'requester_email': config['metadata'].get('owner_email', 'gitops@automation'),
+              'requester_email': owner_email,
               'metadata': {
                   'source': 'gitops',
                   'repository': repo,
                   'commit_sha': os.environ.get('GITHUB_SHA'),
                   'triggered_by': os.environ.get('GITHUB_ACTOR'),
-                  'environment': config['metadata']['environment'],
+                  'environment': environment,
+                  'request_type': 'pattern' if is_pattern else 'resources',
+                  'pattern': config.get('pattern') if is_pattern else None,
                   'submitted_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
               }
           }
@@ -375,6 +439,9 @@ jobs:
               print(f"   Request ID: {request_id}")
               print(f"   Queue: {queue_name}")
               print(f"   Repository: {repo}")
+              print(f"   Type: {'pattern' if is_pattern else 'resources'}")
+              if is_pattern:
+                  print(f"   Pattern: {config['pattern']}")
               print(f"\nTrack status at: https://wonderful-field-088efae10.1.azurestaticapps.net")
 
               with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
@@ -384,6 +451,9 @@ jobs:
                   f.write(f"| Request ID | `{request_id}` |\n")
                   f.write(f"| Queue | `{queue_name}` |\n")
                   f.write(f"| Repository | `{repo}` |\n")
+                  f.write(f"| Type | `{'pattern' if is_pattern else 'resources'}` |\n")
+                  if is_pattern:
+                      f.write(f"| Pattern | `{config['pattern']}` |\n")
                   f.write(f"\n[Track Status](https://wonderful-field-088efae10.1.azurestaticapps.net)\n")
 
           except urllib.error.HTTPError as e:

@@ -1,0 +1,101 @@
+# Pattern: microservice
+# Kubernetes microservice with event streaming
+
+name: microservice
+description: |
+  AKS namespace with Event Hub and Storage for event-driven microservices.
+  Includes RBAC for namespace access and Key Vault for secrets.
+
+category: composite
+components:
+  - aks-namespace
+  - eventhub (optional)
+  - storage-account (optional)
+  - keyvault
+  - security-groups
+  - rbac-assignments
+
+use_cases:
+  - Kubernetes microservices
+  - Event-driven services
+  - Container workloads
+  - Distributed systems
+
+sizing:
+  small:
+    dev:
+      cpu_limit: "2"
+      memory_limit: "4Gi"
+      eventhub_sku: Basic
+      enable_diagnostics: false
+    staging:
+      cpu_limit: "2"
+      memory_limit: "4Gi"
+      eventhub_sku: Basic
+      enable_diagnostics: true
+    prod:
+      cpu_limit: "4"
+      memory_limit: "8Gi"
+      eventhub_sku: Standard
+      enable_diagnostics: true
+
+  medium:
+    dev:
+      cpu_limit: "4"
+      memory_limit: "8Gi"
+      eventhub_sku: Basic
+      enable_diagnostics: false
+    staging:
+      cpu_limit: "4"
+      memory_limit: "8Gi"
+      eventhub_sku: Standard
+      enable_diagnostics: true
+    prod:
+      cpu_limit: "8"
+      memory_limit: "16Gi"
+      eventhub_sku: Standard
+      enable_diagnostics: true
+
+  large:
+    dev:
+      cpu_limit: "8"
+      memory_limit: "16Gi"
+      eventhub_sku: Standard
+      enable_diagnostics: true
+    staging:
+      cpu_limit: "8"
+      memory_limit: "16Gi"
+      eventhub_sku: Standard
+      enable_diagnostics: true
+    prod:
+      cpu_limit: "16"
+      memory_limit: "32Gi"
+      eventhub_sku: Standard
+      enable_diagnostics: true
+
+config:
+  required:
+    - name
+    - aks_cluster_name
+    - aks_resource_group
+  optional:
+    - enable_eventhub:
+        type: boolean
+        default: true
+    - enable_storage:
+        type: boolean
+        default: true
+
+estimated_costs:
+  small:
+    dev: 15
+    staging: 45
+    prod: 120
+  medium:
+    dev: 45
+    staging: 120
+    prod: 250
+  large:
+    dev: 120
+    staging: 250
+    prod: 500

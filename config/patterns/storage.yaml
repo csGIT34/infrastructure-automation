@@ -1,0 +1,104 @@
+# Pattern: storage
+# Azure Storage Account with blob containers and RBAC
+
+name: storage
+description: |
+  Azure Storage Account with blob containers, security group access,
+  and optional private endpoint.
+
+category: single-resource
+components:
+  - storage-account
+  - blob-containers
+  - security-groups
+  - rbac-assignments
+  - diagnostic-settings (staging/prod)
+  - private-endpoint (optional)
+  - network-rules (optional)
+
+use_cases:
+  - Application file storage
+  - Static asset hosting
+  - Data lake staging
+  - Backup storage
+  - Log archival
+
+sizing:
+  small:
+    dev:
+      account_tier: Standard
+      replication_type: LRS
+      access_tier: Hot
+      enable_diagnostics: false
+    staging:
+      account_tier: Standard
+      replication_type: LRS
+      access_tier: Hot
+      enable_diagnostics: true
+    prod:
+      account_tier: Standard
+      replication_type: GRS
+      access_tier: Hot
+      enable_diagnostics: true
+
+  medium:
+    dev:
+      account_tier: Standard
+      replication_type: LRS
+      access_tier: Hot
+      enable_diagnostics: false
+    staging:
+      account_tier: Standard
+      replication_type: GRS
+      access_tier: Hot
+      enable_diagnostics: true
+    prod:
+      account_tier: Standard
+      replication_type: RAGRS
+      access_tier: Hot
+      enable_diagnostics: true
+
+  large:
+    dev:
+      account_tier: Standard
+      replication_type: GRS
+      access_tier: Hot
+      enable_diagnostics: true
+    staging:
+      account_tier: Standard
+      replication_type: RAGRS
+      access_tier: Hot
+      enable_diagnostics: true
+    prod:
+      account_tier: Premium
+      replication_type: ZRS
+      access_tier: Hot
+      enable_diagnostics: true
+
+config:
+  required:
+    - name
+  optional:
+    - containers:
+        type: array
+        items: string
+        description: List of blob containers to create
+    - enable_private_endpoint:
+        type: boolean
+        default: false
+    - subnet_id:
+        type: string
+
+estimated_costs:
+  small:
+    dev: 2
+    staging: 5
+    prod: 25
+  medium:
+    dev: 5
+    staging: 25
+    prod: 50
+  large:
+    dev: 25
+    staging: 50
+    prod: 100

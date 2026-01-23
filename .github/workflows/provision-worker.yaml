@@ -105,13 +105,11 @@ jobs:
                   def update_cosmos_status(request_id, status, extra_fields=None):
                       """Update request status in Cosmos DB, preserving existing fields"""
                       try:
-                          # Read existing record first to preserve original fields
                           try:
                               existing = container.read_item(item=request_id, partition_key=request_id)
                           except Exception:
                               existing = {'id': request_id, 'requestId': request_id}
 
-                          # Update with new values
                           existing['status'] = status
                           existing['updated_at'] = datetime.utcnow().isoformat()
                           if extra_fields:
@@ -122,27 +120,64 @@ jobs:
                       except Exception as e:
                           print(f"Warning: Failed to update Cosmos DB: {e}")
 
-                  def run_terraform(config, request_id):
-                      """Run Terraform init, plan, and apply"""
-                      # Create workspace directory
-                      os.makedirs('terraform-workspace', exist_ok=True)
+                  def resolve_pattern_request(config):
+                      """Resolve pattern request to Terraform variables using resolve-pattern.py"""
+                      # Check if this is a pattern-based request
+                      if 'pattern' in config:
+                          # Write temp file for resolver
+                          with open('/tmp/pattern-request.yaml', 'w') as f:
+                              yaml.dump(config, f)
 
-                      # Write config file
-                      with open('terraform-workspace/config.yaml', 'w') as f:
-                          yaml.dump(config, f)
+                          # Run pattern resolver
+                          result = subprocess.run(
+                              ['python3', 'scripts/resolve-pattern.py', '/tmp/pattern-request.yaml', '--output', 'json'],
+                              capture_output=True,
+                              text=True
+                          )
 
-                      # Copy Terraform files
-                      subprocess.run(['cp', '-r', 'terraform/catalog', 'terraform-workspace/'], check=True)
-                      subprocess.run(['cp', '-r', 'terraform/modules', 'terraform-workspace/'], check=True)
+                          if result.returncode != 0:
+                              raise Exception(f"Pattern resolution failed: {result.stderr}")
+
+                          tfvars = json.loads(result.stdout)
+                          pattern_name = config['pattern']
+
+                          return {
+                              'type': 'pattern',
+                              'pattern': pattern_name,
+                              'tfvars': tfvars,
+                              'tf_dir': f'terraform/patterns/{pattern_name}'
+                          }
+                      else:
+                          # Legacy catalog-based request (resources list)
+                          return {
+                              'type': 'catalog',
+                              'config': config,
+                              'tf_dir': 'terraform/catalog'
+                          }
+
+                  def run_terraform_pattern(pattern_info, request_id):
+                      """Run Terraform for pattern-based request"""
+                      pattern = pattern_info['pattern']
+                      tfvars = pattern_info['tfvars']
+                      tf_dir = pattern_info['tf_dir']
 
                       # Extract metadata for state key
-                      metadata = config.get('metadata', {})
-                      project_name = metadata.get('project_name', 'unknown')
-                      environment = metadata.get('environment', 'dev')
-                      business_unit = metadata.get('business_unit', 'default')
-                      state_key = f"{business_unit}/{environment}/{project_name}/terraform.tfstate"
+                      project = tfvars.get('project', 'unknown')
+                      environment = tfvars.get('environment', 'dev')
+                      business_unit = tfvars.get('business_unit', 'default')
+                      name = tfvars.get('name', pattern)
+                      state_key = f"{business_unit}/{environment}/{project}/{pattern}-{name}/terraform.tfstate"
 
-                      work_dir = 'terraform-workspace/catalog'
+                      # Create workspace and copy files
+                      os.makedirs('terraform-workspace', exist_ok=True)
+                      subprocess.run(['cp', '-r', tf_dir, 'terraform-workspace/pattern'], check=True)
+                      subprocess.run(['cp', '-r', 'terraform/modules', 'terraform-workspace/'], check=True)
+
+                      work_dir = 'terraform-workspace/pattern'
+
+                      # Write tfvars file
+                      with open(f'{work_dir}/terraform.tfvars.json', 'w') as f:
+                          json.dump(tfvars, f, indent=2)
 
                       # Terraform init
                       print(f"Running terraform init with state key: {state_key}")
@@ -168,7 +203,7 @@ jobs:
                       plan_result = subprocess.run(
                           [
                               'terraform', 'plan',
-                              '-var=config_file=../config.yaml',
+                              '-var-file=terraform.tfvars.json',
                               '-out=tfplan',
                               '-no-color'
                           ],
@@ -203,11 +238,83 @@ jobs:
 
                       return outputs
 
+                  def run_terraform_catalog(config, request_id):
+                      """Run Terraform for legacy catalog-based request"""
+                      os.makedirs('terraform-workspace', exist_ok=True)
+
+                      with open('terraform-workspace/config.yaml', 'w') as f:
+                          yaml.dump(config, f)
+
+                      subprocess.run(['cp', '-r', 'terraform/catalog', 'terraform-workspace/'], check=True)
+                      subprocess.run(['cp', '-r', 'terraform/modules', 'terraform-workspace/'], check=True)
+
+                      metadata = config.get('metadata', {})
+                      project_name = metadata.get('project_name', 'unknown')
+                      environment = metadata.get('environment', 'dev')
+                      business_unit = metadata.get('business_unit', 'default')
+                      state_key = f"{business_unit}/{environment}/{project_name}/terraform.tfstate"
+
+                      work_dir = 'terraform-workspace/catalog'
+
+                      print(f"Running terraform init with state key: {state_key}")
+                      init_result = subprocess.run(
+                          [
+                              'terraform', 'init',
+                              f'-backend-config=storage_account_name={TF_STATE_STORAGE_ACCOUNT}',
+                              f'-backend-config=container_name={TF_STATE_CONTAINER}',
+                              f'-backend-config=key={state_key}',
+                              '-backend-config=use_oidc=true',
+                              '-backend-config=use_azuread_auth=true'
+                          ],
+                          cwd=work_dir,
+                          capture_output=True,
+                          text=True
+                      )
+                      if init_result.returncode != 0:
+                          raise Exception(f"Terraform init failed: {init_result.stderr}")
+                      print(init_result.stdout)
+
+                      print("Running terraform plan")
+                      plan_result = subprocess.run(
+                          [
+                              'terraform', 'plan',
+                              '-var=config_file=../config.yaml',
+                              '-out=tfplan',
+                              '-no-color'
+                          ],
+                          cwd=work_dir,
+                          capture_output=True,
+                          text=True
+                      )
+                      if plan_result.returncode != 0:
+                          raise Exception(f"Terraform plan failed: {plan_result.stderr}")
+                      print(plan_result.stdout)
+
+                      print("Running terraform apply")
+                      apply_result = subprocess.run(
+                          ['terraform', 'apply', '-auto-approve', 'tfplan'],
+                          cwd=work_dir,
+                          capture_output=True,
+                          text=True
+                      )
+                      if apply_result.returncode != 0:
+                          raise Exception(f"Terraform apply failed: {apply_result.stderr}")
+                      print(apply_result.stdout)
+
+                      output_result = subprocess.run(
+                          ['terraform', 'output', '-json'],
+                          cwd=work_dir,
+                          capture_output=True,
+                          text=True
+                      )
+                      outputs = json.loads(output_result.stdout) if output_result.returncode == 0 else {}
+
+                      return outputs
+
                   # Main processing logic
                   receiver = servicebus_client.get_queue_receiver(QUEUE_NAME, max_wait_time=5)
 
                   try:
-                      # Receive a single message
                       messages = receiver.receive_messages(max_message_count=1, max_wait_time=5)
 
                       if not messages:
@@ -219,20 +326,23 @@ jobs:
                       message = messages[0]
 
                       try:
-                          # Parse message body
                           body = json.loads(str(message))
                           request_id = body['request_id']
                           yaml_content = body['yaml_content']
                           config = yaml.safe_load(yaml_content)
 
-                          # Extract metadata for tracking
+                          # Determine request type (pattern vs catalog)
+                          is_pattern = 'pattern' in config
                           metadata = config.get('metadata', {})
-                          project_name = metadata.get('project_name', 'unknown')
+                          project_name = metadata.get('project', metadata.get('project_name', 'unknown'))
                           environment = metadata.get('environment', 'dev')
                           requester_email = body.get('requester_email', metadata.get('owner_email', 'unknown'))
 
                           print(f"Processing request: {request_id}")
+                          print(f"  Type: {'pattern' if is_pattern else 'catalog'}")
                           print(f"  Project: {project_name}, Environment: {environment}")
+                          if is_pattern:
+                              print(f"  Pattern: {config['pattern']}")
 
                           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                               f.write("has_message=true\n")
@@ -244,31 +354,36 @@ jobs:
                               'environment': environment,
                               'requester_email': requester_email,
                               'github_run_id': GITHUB_RUN_ID,
-                              'github_run_url': GITHUB_RUN_URL
+                              'github_run_url': GITHUB_RUN_URL,
+                              'request_type': 'pattern' if is_pattern else 'catalog',
+                              'pattern': config.get('pattern', None)
                           })
 
-                          # Run Terraform
-                          outputs = run_terraform(config, request_id)
+                          # Run Terraform based on request type
+                          if is_pattern:
+                              pattern_info = resolve_pattern_request(config)
+                              outputs = run_terraform_pattern(pattern_info, request_id)
+                          else:
+                              outputs = run_terraform_catalog(config, request_id)
 
-                          # Update status to completed with full deployment state
+                          # Update status to completed
                           update_cosmos_status(request_id, 'completed', {
                               'project_name': project_name,
                               'environment': environment,
                               'requester_email': requester_email,
                               'yaml_content': yaml_content,
-                              'resources': config.get('resources', []),
+                              'request_type': 'pattern' if is_pattern else 'catalog',
+                              'pattern': config.get('pattern', None),
                               'completed_at': datetime.utcnow().isoformat(),
                               'terraform_outputs': outputs
                           })
 
-                          # Complete the message (remove from queue)
                           receiver.complete_message(message)
                           print(f"Request {request_id} completed successfully")
 
                       except Exception as e:
                           print(f"Error processing request: {e}")
 
-                          # Update status to failed
                           if 'request_id' in dir():
                               failed_fields = {'error_message': str(e)}
                               if 'project_name' in dir():
@@ -276,7 +391,6 @@ jobs:
                                   failed_fields['environment'] = environment
                               update_cosmos_status(request_id, 'failed', failed_fields)
 
-                          # Abandon the message (return to queue for retry)
                           receiver.abandon_message(message)
                           print("Message abandoned for retry")
                           sys.exit(1)
