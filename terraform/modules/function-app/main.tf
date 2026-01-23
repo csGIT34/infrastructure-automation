@@ -4,6 +4,10 @@ terraform {
             source  = "hashicorp/azurerm"
             version = "~> 3.0"
         }
+        azapi = {
+            source  = "azure/azapi"
+            version = "~> 1.0"
+        }
         random = {
             source  = "hashicorp/random"
             version = "~> 3.0"
@@ -22,6 +26,9 @@ locals {
     sku_name = lookup(var.config, "sku", "Y1")
     os_type  = lookup(var.config, "os_type", "Linux")
     app_settings = lookup(var.config, "app_settings", {})
+
+    # Use consumption plan for Y1 (created via azapi to avoid quota issues)
+    use_consumption = local.sku_name == "Y1"
 
     # Default versions per runtime
     default_versions = {
@@ -42,8 +49,16 @@ locals {
     dotnet_version     = local.runtime == "dotnet" ? local.runtime_version : null
     java_version       = local.runtime == "java" ? local.runtime_version : null
     powershell_version = local.runtime == "powershell" ? local.runtime_version : null
+
+    # Linux FX version string for azapi
+    linux_fx_version = local.runtime == "python" ? "PYTHON|${local.runtime_version}" : (
+        local.runtime == "node" ? "NODE|${local.runtime_version}" : (
+        local.runtime == "dotnet" ? "DOTNET|${local.runtime_version}" : (
+        local.runtime == "java" ? "JAVA|${local.runtime_version}" : ""
+    )))
 }
 
+# Storage account for function app
 resource "azurerm_storage_account" "func" {
     name                     = "stfunc${random_string.storage_suffix.result}"
     resource_group_name      = var.resource_group_name
@@ -55,7 +70,12 @@ resource "azurerm_storage_account" "func" {
     tags = var.tags
 }
 
+# ---------------------------------------------------------
+# Dedicated App Service Plan (for non-consumption SKUs)
+# ---------------------------------------------------------
 resource "azurerm_service_plan" "main" {
+    count = local.use_consumption ? 0 : 1
+
     name                = "asp-${var.name}"
     resource_group_name = var.resource_group_name
     location            = var.location
@@ -65,8 +85,11 @@ resource "azurerm_service_plan" "main" {
     tags = var.tags
 }
 
+# ---------------------------------------------------------
+# Non-Consumption Function Apps (using azurerm provider)
+# ---------------------------------------------------------
 resource "azurerm_linux_function_app" "main" {
-    count = local.os_type == "Linux" ? 1 : 0
+    count = !local.use_consumption && local.os_type == "Linux" ? 1 : 0
 
     name                = var.name
     resource_group_name = var.resource_group_name
@@ -74,7 +97,7 @@ resource "azurerm_linux_function_app" "main" {
 
     storage_account_name       = azurerm_storage_account.func.name
     storage_account_access_key = azurerm_storage_account.func.primary_access_key
-    service_plan_id            = azurerm_service_plan.main.id
+    service_plan_id            = azurerm_service_plan.main[0].id
 
     site_config {
         application_stack {
@@ -101,7 +124,7 @@ resource "azurerm_linux_function_app" "main" {
 }
 
 resource "azurerm_windows_function_app" "main" {
-    count = local.os_type == "Windows" ? 1 : 0
+    count = !local.use_consumption && local.os_type == "Windows" ? 1 : 0
 
     name                = var.name
     resource_group_name = var.resource_group_name
@@ -109,7 +132,7 @@ resource "azurerm_windows_function_app" "main" {
 
     storage_account_name       = azurerm_storage_account.func.name
     storage_account_access_key = azurerm_storage_account.func.primary_access_key
-    service_plan_id            = azurerm_service_plan.main.id
+    service_plan_id            = azurerm_service_plan.main[0].id
 
     site_config {
         application_stack {
@@ -130,3 +153,58 @@ resource "azurerm_windows_function_app" "main" {
 
     tags = var.tags
 }
+
+# ---------------------------------------------------------
+# Consumption Function App (using azapi to avoid quota issues)
+# Creates function app with shared regional consumption plan
+# ---------------------------------------------------------
+resource "azapi_resource" "consumption_function_app" {
+    count = local.use_consumption && local.os_type == "Linux" ? 1 : 0
+
+    type      = "Microsoft.Web/sites@2023-01-01"
+    name      = var.name
+    location  = var.location
+    parent_id = "/subscriptions/${data.azurerm_subscription.current.subscription_id}/resourceGroups/${var.resource_group_name}"
+
+    identity {
+        type = "SystemAssigned"
+    }
+
+    body = jsonencode({
+        kind = "functionapp,linux"
+        properties = {
+            reserved = true
+            siteConfig = {
+                linuxFxVersion = local.linux_fx_version
+                appSettings = concat([
+                    {
+                        name  = "FUNCTIONS_WORKER_RUNTIME"
+                        value = local.runtime
+                    },
+                    {
+                        name  = "FUNCTIONS_EXTENSION_VERSION"
+                        value = "~4"
+                    },
+                    {
+                        name  = "AzureWebJobsStorage"
+                        value = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.func.name};AccountKey=${azurerm_storage_account.func.primary_access_key};EndpointSuffix=core.windows.net"
+                    },
+                    {
+                        name  = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"
+                        value = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.func.name};AccountKey=${azurerm_storage_account.func.primary_access_key};EndpointSuffix=core.windows.net"
+                    },
+                    {
+                        name  = "WEBSITE_CONTENTSHARE"
+                        value = lower(var.name)
+                    }
+                ], [for k, v in local.app_settings : { name = k, value = v }])
+            }
+        }
+    })
+
+    tags = var.tags
+
+    response_export_values = ["properties.defaultHostName", "identity.principalId"]
+}
+
+data "azurerm_subscription" "current" {}

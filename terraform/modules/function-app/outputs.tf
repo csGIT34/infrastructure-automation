@@ -1,5 +1,30 @@
+locals {
+    # Determine which resource was created
+    is_consumption = local.use_consumption
+    is_linux       = local.os_type == "Linux"
+
+    # Get values from the appropriate resource
+    func_id = local.is_consumption ? (
+        local.is_linux ? azapi_resource.consumption_function_app[0].id : null
+    ) : (
+        local.is_linux ? azurerm_linux_function_app.main[0].id : azurerm_windows_function_app.main[0].id
+    )
+
+    func_hostname = local.is_consumption ? (
+        local.is_linux ? jsondecode(azapi_resource.consumption_function_app[0].output).properties.defaultHostName : null
+    ) : (
+        local.is_linux ? azurerm_linux_function_app.main[0].default_hostname : azurerm_windows_function_app.main[0].default_hostname
+    )
+
+    func_principal_id = local.is_consumption ? (
+        local.is_linux ? jsondecode(azapi_resource.consumption_function_app[0].output).identity.principalId : null
+    ) : (
+        local.is_linux ? azurerm_linux_function_app.main[0].identity[0].principal_id : azurerm_windows_function_app.main[0].identity[0].principal_id
+    )
+}
+
 output "id" {
-    value       = local.os_type == "Linux" ? azurerm_linux_function_app.main[0].id : azurerm_windows_function_app.main[0].id
+    value       = local.func_id
     description = "Function App resource ID"
 }
 
@@ -9,17 +34,17 @@ output "name" {
 }
 
 output "default_hostname" {
-    value       = local.os_type == "Linux" ? azurerm_linux_function_app.main[0].default_hostname : azurerm_windows_function_app.main[0].default_hostname
+    value       = local.func_hostname
     description = "Function App default hostname"
 }
 
 output "url" {
-    value       = "https://${local.os_type == "Linux" ? azurerm_linux_function_app.main[0].default_hostname : azurerm_windows_function_app.main[0].default_hostname}"
+    value       = "https://${local.func_hostname}"
     description = "Function App HTTPS URL"
 }
 
 output "principal_id" {
-    value       = local.os_type == "Linux" ? azurerm_linux_function_app.main[0].identity[0].principal_id : azurerm_windows_function_app.main[0].identity[0].principal_id
+    value       = local.func_principal_id
     description = "Function App managed identity principal ID"
 }
 

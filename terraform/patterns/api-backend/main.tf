@@ -7,6 +7,7 @@ terraform {
   required_providers {
     azurerm = { source = "hashicorp/azurerm", version = "~> 3.0" }
     azuread = { source = "hashicorp/azuread", version = "~> 2.0" }
+    azapi   = { source = "azure/azapi", version = "~> 1.0" }
     random  = { source = "hashicorp/random", version = "~> 3.0" }
   }
   backend "azurerm" { use_oidc = true }
@@ -17,6 +18,7 @@ provider "azurerm" {
   use_oidc = true
 }
 provider "azuread" { use_oidc = true }
+provider "azapi" { use_oidc = true }
 
 # Variables
 variable "project" { type = string }
@@ -38,7 +40,7 @@ variable "database_type" {
 # Sizing
 variable "function_sku" {
   type    = string
-  default = "B1"  # Y1 (Consumption) has quota issues on some subscriptions
+  default = "Y1"  # Consumption plan - uses azapi provider to avoid quota issues
 }
 variable "db_sku" {
   type    = string
