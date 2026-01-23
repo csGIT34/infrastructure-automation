@@ -25,43 +25,43 @@ sizing:
   small:
     dev:
       function_sku: Y1
-      db_sku: B_Standard_B1ms
+      db_sku: Free
       enable_diagnostics: false
     staging:
       function_sku: Y1
-      db_sku: B_Standard_B1ms
+      db_sku: Basic
       enable_diagnostics: true
     prod:
       function_sku: B1
-      db_sku: GP_Standard_D2s_v3
+      db_sku: S0
       enable_diagnostics: true
 
   medium:
     dev:
       function_sku: Y1
-      db_sku: B_Standard_B2s
+      db_sku: Basic
       enable_diagnostics: false
     staging:
       function_sku: B1
-      db_sku: GP_Standard_D2s_v3
+      db_sku: S1
       enable_diagnostics: true
     prod:
       function_sku: S1
-      db_sku: GP_Standard_D4s_v3
+      db_sku: S2
       enable_diagnostics: true
 
   large:
     dev:
       function_sku: B1
-      db_sku: GP_Standard_D2s_v3
+      db_sku: S0
       enable_diagnostics: true
     staging:
       function_sku: S1
-      db_sku: GP_Standard_D4s_v3
+      db_sku: S2
       enable_diagnostics: true
     prod:
       function_sku: P1v2
-      db_sku: GP_Standard_D8s_v3
+      db_sku: S3
       enable_diagnostics: true
 
 config:
@@ -70,8 +70,8 @@ config:
   optional:
     - database_type:
         type: string
-        default: postgresql
-        enum: [postgresql, azure_sql, mongodb, none]
+        default: azure_sql
+        enum: [azure_sql, postgresql, mongodb, none]
     - runtime:
         type: string
         default: python

@@ -30,9 +30,9 @@ variable "location" {
 }
 
 variable "database_type" {
-  description = "Database type: postgresql, azure_sql, mongodb, or none"
+  description = "Database type: azure_sql, postgresql, mongodb, or none"
   type        = string
-  default     = "postgresql"
+  default     = "azure_sql"
 }
 
 # Sizing
@@ -42,7 +42,7 @@ variable "function_sku" {
 }
 variable "db_sku" {
   type    = string
-  default = "B_Standard_B1ms"
+  default = "Free"
 }
 
 # Pattern-specific

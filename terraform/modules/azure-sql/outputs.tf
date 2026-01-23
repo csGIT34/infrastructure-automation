@@ -21,6 +21,11 @@ output "databases" {
     description = "Map of database names to their IDs"
 }
 
+output "database_name" {
+    value       = length(azurerm_mssql_database.databases) > 0 ? values(azurerm_mssql_database.databases)[0].name : null
+    description = "Name of the first database (for single-database patterns)"
+}
+
 output "principal_id" {
     value       = azurerm_mssql_server.main.identity[0].principal_id
     description = "SQL Server managed identity principal ID"

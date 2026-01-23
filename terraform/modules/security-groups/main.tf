@@ -44,8 +44,10 @@ data "azuread_users" "owners" {
 data "azuread_client_config" "current" {}
 
 locals {
-  # Use provided owners or fall back to current service principal
-  owner_ids = length(var.owner_emails) > 0 ? data.azuread_users.owners[0].object_ids : [data.azuread_client_config.current.object_id]
+  # Always include the creating principal as owner (required with Group.Create permission)
+  # Plus any user-specified owners
+  user_owner_ids = length(var.owner_emails) > 0 ? data.azuread_users.owners[0].object_ids : []
+  owner_ids      = distinct(concat([data.azuread_client_config.current.object_id], local.user_owner_ids))
 }
 
 resource "azuread_group" "groups" {
