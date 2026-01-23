@@ -1,0 +1,211 @@
+name: Infrastructure Provision
+
+on:
+  repository_dispatch:
+    types: [provision]
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'Source repository (owner/repo)'
+        required: true
+        type: string
+      commit_sha:
+        description: 'Commit SHA'
+        required: true
+        type: string
+      yaml_url:
+        description: 'Raw URL to infrastructure.yaml'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  TF_STATE_STORAGE_ACCOUNT: ${{ secrets.TF_STATE_STORAGE_ACCOUNT }}
+  TF_STATE_CONTAINER: "tfstate"
+
+jobs:
+  provision:
+    runs-on: ["self-hosted", "linux"]
+
+    steps:
+      - name: Checkout infrastructure-automation
+        uses: actions/checkout@v4
+
+      - name: Extract request info
+        id: request
+        run: |
+          # Handle both repository_dispatch and workflow_dispatch
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            REPO="${{ github.event.client_payload.repository }}"
+            SHA="${{ github.event.client_payload.commit_sha }}"
+            YAML_URL="${{ github.event.client_payload.yaml_url }}"
+          else
+            REPO="${{ inputs.repository }}"
+            SHA="${{ inputs.commit_sha }}"
+            YAML_URL="${{ inputs.yaml_url }}"
+          fi
+
+          echo "repository=$REPO" >> $GITHUB_OUTPUT
+          echo "commit_sha=$SHA" >> $GITHUB_OUTPUT
+          echo "yaml_url=$YAML_URL" >> $GITHUB_OUTPUT
+          echo "request_id=provision-${REPO//\//-}-${SHA:0:8}-$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Download infrastructure.yaml
+        run: |
+          curl -sL "${{ steps.request.outputs.yaml_url }}" -o infrastructure.yaml
+          echo "Downloaded infrastructure.yaml from ${{ steps.request.outputs.repository }}"
+          cat infrastructure.yaml
+
+      - name: Install Python dependencies
+        run: |
+          pip3 install --quiet --break-system-packages pyyaml
+
+      - name: Resolve pattern and validate
+        id: resolve
+        run: |
+          python3 << 'PYTHON_SCRIPT'
+          import yaml
+          import json
+          import os
+          import subprocess
+          import sys
+
+          with open('infrastructure.yaml', 'r') as f:
+              config = yaml.safe_load(f)
+
+          # Check if this is a pattern-based request
+          if 'pattern' not in config:
+              print("::error::Only pattern-based requests are supported")
+              sys.exit(1)
+
+          metadata = config.get('metadata', {})
+          pattern = config['pattern']
+          environment = metadata.get('environment', 'dev')
+          project = metadata.get('project', 'unknown')
+          business_unit = metadata.get('business_unit', 'default')
+
+          print(f"Pattern: {pattern}")
+          print(f"Project: {project}")
+          print(f"Environment: {environment}")
+          print(f"Business Unit: {business_unit}")
+
+          # Write temp file for resolver
+          with open('/tmp/pattern-request.yaml', 'w') as f:
+              yaml.dump(config, f)
+
+          # Run pattern resolver
+          result = subprocess.run(
+              ['python3', 'scripts/resolve-pattern.py', '/tmp/pattern-request.yaml', '--output', 'json'],
+              capture_output=True,
+              text=True
+          )
+
+          if result.returncode != 0:
+              print(f"::error::Pattern resolution failed: {result.stderr}")
+              sys.exit(1)
+
+          tfvars = json.loads(result.stdout)
+
+          # Write tfvars for Terraform
+          with open('terraform.tfvars.json', 'w') as f:
+              json.dump(tfvars, f, indent=2)
+
+          print("Resolved tfvars:")
+          print(json.dumps(tfvars, indent=2))
+
+          # Output for subsequent steps
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"pattern={pattern}\n")
+              f.write(f"environment={environment}\n")
+              f.write(f"project={project}\n")
+              f.write(f"business_unit={business_unit}\n")
+              name = config.get('config', {}).get('name', pattern)
+              state_key = f"{business_unit}/{environment}/{project}/{pattern}-{name}/terraform.tfstate"
+              f.write(f"state_key={state_key}\n")
+          PYTHON_SCRIPT
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.resolve.outputs.environment)] }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform workspace
+        run: |
+          PATTERN="${{ steps.resolve.outputs.pattern }}"
+          mkdir -p terraform-workspace
+          cp -r "terraform/patterns/$PATTERN" terraform-workspace/pattern
+          cp -r terraform/modules terraform-workspace/
+          cp terraform.tfvars.json terraform-workspace/pattern/
+
+      - name: Terraform Init
+        working-directory: terraform-workspace/pattern
+        env:
+          ARM_USE_OIDC: true
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.resolve.outputs.environment)] }}
+        run: |
+          terraform init \
+            -backend-config="storage_account_name=${{ env.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ env.TF_STATE_CONTAINER }}" \
+            -backend-config="key=${{ steps.resolve.outputs.state_key }}" \
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
+
+      - name: Terraform Plan
+        working-directory: terraform-workspace/pattern
+        env:
+          ARM_USE_OIDC: true
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.resolve.outputs.environment)] }}
+        run: |
+          terraform plan \
+            -var-file=terraform.tfvars.json \
+            -out=tfplan \
+            -no-color
+
+      - name: Terraform Apply
+        working-directory: terraform-workspace/pattern
+        env:
+          ARM_USE_OIDC: true
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.resolve.outputs.environment)] }}
+        run: |
+          terraform apply -auto-approve tfplan
+
+      - name: Capture Terraform Outputs
+        id: outputs
+        working-directory: terraform-workspace/pattern
+        run: |
+          terraform output -json > /tmp/tf-outputs.json
+          echo "Terraform outputs:"
+          cat /tmp/tf-outputs.json
+
+      - name: Create Job Summary
+        run: |
+          cat << EOF >> $GITHUB_STEP_SUMMARY
+          ## Infrastructure Provisioned
+
+          | Property | Value |
+          |----------|-------|
+          | Request ID | \`${{ steps.request.outputs.request_id }}\` |
+          | Source Repository | \`${{ steps.request.outputs.repository }}\` |
+          | Commit | \`${{ steps.request.outputs.commit_sha }}\` |
+          | Pattern | \`${{ steps.resolve.outputs.pattern }}\` |
+          | Project | \`${{ steps.resolve.outputs.project }}\` |
+          | Environment | \`${{ steps.resolve.outputs.environment }}\` |
+
+          ### Terraform Outputs
+          \`\`\`json
+          $(cat /tmp/tf-outputs.json)
+          \`\`\`
+          EOF

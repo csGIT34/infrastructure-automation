@@ -47,8 +47,6 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     jinja2 \
     azure-identity \
     azure-mgmt-resource \
-    azure-servicebus \
-    azure-cosmos \
     requests \
     click
 

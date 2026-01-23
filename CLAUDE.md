@@ -4,18 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Enterprise Infrastructure Self-Service Platform: A **pattern-based**, multi-tenant infrastructure provisioning system that allows teams to request cloud resources via GitOps (GitHub Actions) or REST API. Developers interact **only through patterns** - curated, opinionated compositions that include all necessary supporting infrastructure.
+Infrastructure Self-Service Platform: A **pattern-based** infrastructure provisioning system that allows teams to request cloud resources via GitOps (GitHub Actions). Developers interact **only through patterns** - curated, opinionated compositions that include all necessary supporting infrastructure.
 
-Uses event-driven architecture with Azure Functions, Service Bus, Cosmos DB, and GitHub Actions for Terraform execution.
+Uses direct GitHub workflow triggers (`repository_dispatch`) for simple, reliable provisioning.
 
 ## Common Commands
-
-### API Gateway (Local Testing)
-```bash
-cd infrastructure/api-gateway
-pip install -r requirements.txt
-func start                                    # Start locally
-```
 
 ### Terraform (Pattern-Based)
 ```bash
@@ -77,36 +70,35 @@ Developers interact **only through patterns** - not individual modules. Each pat
 
 ### Request Processing Flow
 ```
-GitOps/API → Azure Functions API Gateway → Service Bus Queues (prod/staging/dev)
-→ GitHub Actions Queue Consumer (cron: every minute)
-→ Provision Worker (parallel: up to 10 workers)
-→ Pattern Resolution → Terraform Apply → Azure Resources + Cosmos DB tracking
+Developer PR (infrastructure.yaml)
+→ Validation + Plan Preview (PR comment)
+→ Merge to main
+→ repository_dispatch to infrastructure-automation repo
+→ Provision workflow runs on self-hosted runner
+→ Pattern Resolution → Terraform Apply → Azure Resources
 ```
 
 ### Key Components
 
-1. **API Gateway** (`infrastructure/api-gateway/function_app.py`) - Azure Functions HTTP API that:
-   - Validates pattern request schema and policy (cost limits per environment)
-   - Estimates infrastructure costs based on pattern + size
-   - Stores requests in Cosmos DB (partitioned by `requestId`)
-   - Queues to Service Bus with environment-based priority
+1. **GitOps Workflow Template** (`templates/infrastructure-workflow.yaml`) - Template for consuming repos:
+   - Validates pattern request schema
+   - Shows plan preview on PR
+   - Triggers provisioning via `repository_dispatch` on merge
 
-2. **Queue Consumer** (`.github/workflows/queue-consumer.yaml`) - Scheduled workflow that polls three Service Bus queues and dispatches to provision workers
-
-3. **Provision Worker** (`.github/workflows/provision-worker.yaml`) - Reusable workflow that:
-   - Resolves pattern request to Terraform variables
+2. **Provision Workflow** (`.github/workflows/provision.yaml`) - Triggered by `repository_dispatch`:
+   - Downloads infrastructure.yaml from source repo
+   - Resolves pattern to Terraform variables
    - Runs `terraform apply` on the pattern directory
-   - Updates Cosmos DB status and captures outputs
 
-4. **Pattern Resolution** (`scripts/resolve-pattern.py`) - Resolves pattern requests:
+3. **Pattern Resolution** (`scripts/resolve-pattern.py`) - Resolves pattern requests:
    - Validates pattern name and config
    - Resolves t-shirt sizing based on environment
    - Evaluates conditional features (prod-only, etc.)
    - Outputs Terraform tfvars
 
-5. **Per-Pattern Terraform** (`terraform/patterns/`) - Each pattern has its own isolated Terraform config that composes modules
+4. **Per-Pattern Terraform** (`terraform/patterns/`) - Each pattern has its own isolated Terraform config that composes modules
 
-6. **Utility Modules** (`terraform/modules/`) - Shared modules used by patterns:
+5. **Utility Modules** (`terraform/modules/`) - Shared modules used by patterns:
    - `naming/` - Resource naming conventions
    - `security-groups/` - Entra ID group creation
    - `rbac-assignments/` - Azure role assignments
@@ -115,11 +107,10 @@ GitOps/API → Azure Functions API Gateway → Service Bus Queues (prod/staging/
    - `diagnostic-settings/` - Log Analytics integration
 
 ### Environment Separation
-- Three Service Bus queues with priority: prod > staging > dev
-- Cost limits enforced: prod ($10k), staging ($2k), dev ($500)
 - Separate Terraform state per pattern instance in Azure Storage
 - State path: `{business_unit}/{environment}/{project}/{pattern}-{name}/terraform.tfstate`
 - OIDC-based authentication for GitHub Actions runners
+- Environment-specific Azure client IDs (AZURE_CLIENT_ID_dev, AZURE_CLIENT_ID_staging, AZURE_CLIENT_ID_prod)
 
 ### Multi-Tenancy
 - Business unit isolation via resource groups (pattern: `rg-{project}-{environment}`)
@@ -128,16 +119,24 @@ GitOps/API → Azure Functions API Gateway → Service Bus Queues (prod/staging/
 
 ## Configuration
 
-### Required Environment Variables
+### Required Secrets (infrastructure-automation repo)
 
-**API Gateway:**
-- `SERVICEBUS_CONNECTION` - Service Bus connection string
-- `COSMOS_DB_ENDPOINT` - Cosmos DB endpoint URL
-- `COSMOS_DB_KEY` - Cosmos DB access key
+**Azure Authentication:**
+- `AZURE_TENANT_ID` - Azure tenant ID
+- `AZURE_SUBSCRIPTION_ID` - Azure subscription ID
+- `AZURE_CLIENT_ID_dev` - Service principal for dev environment
+- `AZURE_CLIENT_ID_staging` - Service principal for staging environment
+- `AZURE_CLIENT_ID_prod` - Service principal for prod environment
 
 **Terraform State:**
 - `TF_STATE_STORAGE_ACCOUNT` - Azure Storage account for state
-- `TF_STATE_CONTAINER` - Blob container name
+- `TF_STATE_CONTAINER` - Blob container name (default: tfstate)
+
+### Required Secrets (consuming repos)
+
+**GitHub App for Cross-Repo Dispatch:**
+- `INFRA_APP_ID` - GitHub App ID
+- `INFRA_APP_PRIVATE_KEY` - GitHub App private key (PEM format)
 
 ### Pattern Request Format
 
@@ -346,45 +345,21 @@ module "access_review" {
 
 ## Operations & Maintenance
 
-### Cleaning Up Stuck Requests
+### Viewing Provisioning Status
 
-When infrastructure requests get stuck in "pending", "processing", or "queued" state, use the cleanup script:
+Check GitHub Actions in the infrastructure-automation repository:
+- Navigate to Actions tab
+- Look for "Infrastructure Provision" workflow runs
+- Each run shows the source repository, commit, and Terraform outputs
 
+### Manual Provisioning
+
+Trigger provisioning manually via workflow_dispatch:
 ```bash
-# Preview what would be cleaned up (dry run)
-./scripts/cleanup-stuck-requests.sh --dry-run
-
-# Actually clean up stuck requests
-./scripts/cleanup-stuck-requests.sh
-```
-
-The script will:
-1. Query Cosmos DB for records with status: pending, processing, or queued
-2. Update those records to status: failed with cleanup message
-3. Remove corresponding messages from all Service Bus queues (dev, staging, prod)
-
-**Prerequisites:**
-- Azure CLI installed and logged in (`az login`)
-- Python 3 with `azure-servicebus` package (`pip install azure-servicebus`)
-
-**When to use:**
-- Requests stuck for extended periods (workflow failures, runner issues)
-- After infrastructure incidents that left orphaned requests
-- Before maintenance windows to clear the queue
-
-### Monitoring Queue Health
-
-Check Service Bus queue status:
-```bash
-# Check all queues
-for q in infrastructure-requests-dev infrastructure-requests-staging infrastructure-requests-prod; do
-  az servicebus queue show \
-    --namespace-name sb-infra-api-rrkkz6a8 \
-    --resource-group rg-infrastructure-api \
-    --name $q \
-    --query "{queue: name, active: countDetails.activeMessageCount, dlq: countDetails.deadLetterMessageCount}" \
-    -o json
-done
+gh workflow run provision.yaml \
+  -f repository=owner/repo \
+  -f commit_sha=abc123 \
+  -f yaml_url=https://raw.githubusercontent.com/owner/repo/abc123/infrastructure.yaml
 ```
 
 ### Managing Self-Hosted Runners (ArgoCD)
@@ -436,14 +411,7 @@ kubectl exec -n github-runners <pod-name> -c runner -- pip3 list | grep -E "yaml
 **Image configuration:**
 - Registry: `docker.io/csdock34/actions-runner:latest`
 - `imagePullPolicy: Always` ensures new images are pulled on pod creation
-- Packages included: pyyaml, azure-servicebus, azure-identity, azure-cosmos, terraform, azure-cli
-
-### Reprocessing Failed Requests
-
-To resubmit a failed request:
-1. Find the request in Cosmos DB by requestId
-2. Update status back to "pending"
-3. Resubmit to Service Bus queue
+- Packages included: pyyaml, azure-identity, terraform, azure-cli
 
 ## Project RBAC and Secrets Management
 
@@ -507,13 +475,6 @@ On the subscription or target resource group scope:
 - `Contributor` - Create and manage resources
 - `User Access Administrator` - Create RBAC role assignments
 - `Key Vault Secrets Officer` - Store secrets in Key Vault
-
-## Error Handling Patterns
-
-- Failed Service Bus messages go to DLQ for retry
-- Failed requests marked as "failed" in Cosmos DB with error details
-- Policy violations return 403 with specific violation message
-- Schema validation errors return 400 with field-level details
 
 ## Home Lab Networking
 
@@ -607,7 +568,6 @@ kubectl rollout restart deployment dnsmasq -n dns
 ## Key Documentation
 
 - `infrastructure-platform-guide.md` - Comprehensive platform guide
-- `docs/ARCHITECTURE.md` - System design diagrams
 - `docs/LOCAL-K8S-SETUP.md` - Local k3s cluster setup for self-hosted runners
 - `infrastructure/local-runners/networking/README.md` - Network architecture details
 - `infrastructure/local-runners/dnsmasq/README.md` - DNS server configuration
