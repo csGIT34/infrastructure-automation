@@ -23,6 +23,13 @@ locals {
     sku_name        = lookup(var.config, "sku", "Y1")
     os_type         = lookup(var.config, "os_type", "Linux")
     app_settings    = lookup(var.config, "app_settings", {})
+
+    # Version strings per runtime - only the matching runtime gets a value
+    python_version = local.runtime == "python" ? local.runtime_version : null
+    node_version   = local.runtime == "node" ? local.runtime_version : null
+    dotnet_version = local.runtime == "dotnet" ? local.runtime_version : null
+    java_version   = local.runtime == "java" ? local.runtime_version : null
+    powershell_version = local.runtime == "powershell" ? local.runtime_version : null
 }
 
 resource "azurerm_storage_account" "func" {
@@ -58,29 +65,11 @@ resource "azurerm_linux_function_app" "main" {
     service_plan_id            = azurerm_service_plan.main.id
 
     site_config {
-        dynamic "application_stack" {
-            for_each = local.runtime == "python" ? [1] : []
-            content {
-                python_version = local.runtime_version
-            }
-        }
-        dynamic "application_stack" {
-            for_each = local.runtime == "node" ? [1] : []
-            content {
-                node_version = local.runtime_version
-            }
-        }
-        dynamic "application_stack" {
-            for_each = local.runtime == "dotnet" ? [1] : []
-            content {
-                dotnet_version = local.runtime_version
-            }
-        }
-        dynamic "application_stack" {
-            for_each = local.runtime == "java" ? [1] : []
-            content {
-                java_version = local.runtime_version
-            }
+        application_stack {
+            python_version = local.python_version
+            node_version   = local.node_version
+            dotnet_version = local.dotnet_version
+            java_version   = local.java_version
         }
 
         cors {
@@ -111,29 +100,11 @@ resource "azurerm_windows_function_app" "main" {
     service_plan_id            = azurerm_service_plan.main.id
 
     site_config {
-        dynamic "application_stack" {
-            for_each = local.runtime == "powershell" ? [1] : []
-            content {
-                powershell_core_version = local.runtime_version
-            }
-        }
-        dynamic "application_stack" {
-            for_each = local.runtime == "node" ? [1] : []
-            content {
-                node_version = local.runtime_version
-            }
-        }
-        dynamic "application_stack" {
-            for_each = local.runtime == "dotnet" ? [1] : []
-            content {
-                dotnet_version = local.runtime_version
-            }
-        }
-        dynamic "application_stack" {
-            for_each = local.runtime == "java" ? [1] : []
-            content {
-                java_version = local.runtime_version
-            }
+        application_stack {
+            powershell_core_version = local.powershell_version
+            node_version            = local.node_version
+            dotnet_version          = local.dotnet_version
+            java_version            = local.java_version
         }
     }
 
