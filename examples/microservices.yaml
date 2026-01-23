@@ -1,41 +1,35 @@
-# Microservices Infrastructure
-# This template provisions infrastructure for a microservices application
+# Microservice Pattern Request
+# Kubernetes microservice: AKS namespace + Event Hub + Storage
+#
+# This pattern provisions:
+# - AKS Namespace (with resource quotas)
+# - Event Hub (event streaming)
+# - Storage Account (state/data)
+# - Key Vault (secrets)
+# - Security Groups (owner delegation)
+# - RBAC Assignments (AKS + Azure access)
+# - Network Policies (namespace isolation)
+
+version: "1"
 
 metadata:
-  project_name: order-service
-  environment: staging
-  business_unit: commerce
-  cost_center: CC-COM-001
-  owner_email: commerce-team@company.com
+  project: order-service
+  environment: dev
+  business_unit: platform
+  owners:
+    - platform-team@company.com
+    - bob@company.com
   location: eastus
-  tags:
-    Application: OrderService
-    Team: Commerce
-    Architecture: Microservices
 
-resources:
-  # MongoDB for document storage
-  - type: mongodb
-    name: orders-db
-    config:
-      consistency_level: Session
-      serverless: false
-      throughput: 400
+pattern: microservice
+config:
+  name: orders
+  size: small                         # small, medium, large (optional)
 
-  # Key Vault for secrets and certificates
-  - type: keyvault
-    name: secrets
-    config:
-      sku: standard
-      rbac_enabled: true
-      purge_protection: true
+  # Required for microservice pattern:
+  aks_cluster_name: aks-shared-dev
+  aks_resource_group: rg-aks-shared-dev
 
-  # Storage Account for files
-  - type: storage_account
-    name: files
-    config:
-      tier: Standard
-      replication: ZRS                # Zone-redundant for higher availability
-      containers:
-        - name: documents
-        - name: images
+  # Optional pattern-specific config:
+  # enable_eventhub: true             # Include Event Hub
+  # enable_storage: true              # Include Storage Account

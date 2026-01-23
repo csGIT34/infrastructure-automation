@@ -1,49 +1,33 @@
-# Web Application Infrastructure Stack
-# This template provisions a complete web application infrastructure
+# Web Application Pattern Request
+# Full-stack web application: Static frontend + Function backend + PostgreSQL
+#
+# This pattern provisions:
+# - Azure Static Web App (frontend)
+# - Azure Function App (API backend)
+# - PostgreSQL Flexible Server (database)
+# - Key Vault (secrets management)
+# - Security Groups (owner delegation)
+# - RBAC Assignments (least-privilege access)
+# - Diagnostics (staging/prod)
+# - Access Reviews (prod only)
+
+version: "1"
 
 metadata:
-  project_name: my-web-app
+  project: my-web-app
   environment: dev                    # dev, staging, prod
   business_unit: engineering
-  cost_center: CC-ENG-001
-  owner_email: webteam@company.com
+  owners:
+    - webteam@company.com
+    - alice@company.com
   location: eastus
-  tags:
-    Application: MyWebApp
-    Team: WebTeam
 
-resources:
-  # PostgreSQL Database
-  - type: postgresql
-    name: main-db
-    config:
-      version: "14"
-      sku: B_Standard_B1ms            # Burstable tier for dev
-      storage_mb: 32768               # 32GB
-      backup_retention_days: 7
-      geo_redundant_backup: false
+pattern: web-app
+config:
+  name: main
+  size: small                         # small, medium, large (optional)
 
-  # Key Vault for secrets
-  - type: keyvault
-    name: secrets
-    config:
-      sku: standard
-      soft_delete_days: 7
-      purge_protection: false
-      rbac_enabled: true
-
-  # Storage Account for uploads and static files
-  - type: storage_account
-    name: data
-    config:
-      tier: Standard
-      replication: LRS
-      versioning: true
-      soft_delete_days: 7
-      containers:
-        - name: uploads
-          access_type: private
-        - name: static
-          access_type: blob
-        - name: backups
-          access_type: private
+  # Optional pattern-specific config:
+  # frontend_framework: react         # react, vue, angular
+  # api_runtime: python               # python, node, dotnet
+  # database_version: "14"            # PostgreSQL version

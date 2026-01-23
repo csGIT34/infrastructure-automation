@@ -1,0 +1,140 @@
+# Pattern: keyvault
+# Secure secrets management with RBAC and access reviews
+
+name: keyvault
+description: |
+  Azure Key Vault for secure secrets, keys, and certificates management.
+  Includes security groups, RBAC assignments, and optional access reviews.
+
+category: single-resource
+components:
+  - keyvault
+  - security-groups
+  - rbac-assignments
+  - access-review (prod only)
+  - diagnostic-settings (staging/prod)
+  - private-endpoint (optional)
+
+use_cases:
+  - Application secrets storage
+  - API keys and tokens
+  - Database connection strings
+  - Certificates and encryption keys
+
+# T-shirt sizing matrix
+sizing:
+  small:
+    dev:
+      sku: standard
+      soft_delete_days: 7
+      purge_protection: false
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      sku: standard
+      soft_delete_days: 30
+      purge_protection: false
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      sku: premium
+      soft_delete_days: 90
+      purge_protection: true
+      enable_diagnostics: true
+      enable_access_review: true
+
+  medium:
+    dev:
+      sku: standard
+      soft_delete_days: 7
+      purge_protection: false
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      sku: standard
+      soft_delete_days: 60
+      purge_protection: true
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      sku: premium
+      soft_delete_days: 90
+      purge_protection: true
+      enable_diagnostics: true
+      enable_access_review: true
+
+  large:
+    dev:
+      sku: standard
+      soft_delete_days: 30
+      purge_protection: false
+      enable_diagnostics: true
+      enable_access_review: false
+    staging:
+      sku: premium
+      soft_delete_days: 90
+      purge_protection: true
+      enable_diagnostics: true
+      enable_access_review: true
+    prod:
+      sku: premium
+      soft_delete_days: 90
+      purge_protection: true
+      enable_diagnostics: true
+      enable_access_review: true
+
+# Configuration schema
+config:
+  required:
+    - name
+  optional:
+    - access_reviewers:
+        type: array
+        items: string
+        description: Email addresses of access reviewers (required for prod)
+    - enable_private_endpoint:
+        type: boolean
+        default: false
+        description: Enable private endpoint connectivity
+    - subnet_id:
+        type: string
+        description: Subnet ID for private endpoint (required if enable_private_endpoint)
+
+# Excludable components (cost optimization)
+excludable:
+  - diagnostics:
+      description: Disable diagnostic logs to Log Analytics
+      cost_impact: ~$20/month
+  - access_review:
+      description: Disable quarterly access reviews
+      requires_justification: true
+      prod_only: true
+
+# Estimated costs (USD/month)
+estimated_costs:
+  small:
+    dev: 0.03
+    staging: 20
+    prod: 50
+  medium:
+    dev: 0.03
+    staging: 30
+    prod: 75
+  large:
+    dev: 20
+    staging: 75
+    prod: 150
+
+# Example request
+example:
+  version: "1"
+  metadata:
+    project: myapp
+    environment: dev
+    business_unit: engineering
+    owners:
+      - alice@example.com
+  pattern: keyvault
+  config:
+    name: secrets
+    size: small

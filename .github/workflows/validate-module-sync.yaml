@@ -1,110 +1,199 @@
-name: Validate Module Sync
+name: Validate Pattern Sync
 
 on:
   pull_request:
     paths:
       - 'mcp-server/src/index.ts'
       - 'templates/infrastructure-workflow.yaml'
+      - 'config/patterns/*.yaml'
+      - 'terraform/patterns/*/main.tf'
   push:
     branches:
       - main
     paths:
       - 'mcp-server/src/index.ts'
       - 'templates/infrastructure-workflow.yaml'
+      - 'config/patterns/*.yaml'
+      - 'terraform/patterns/*/main.tf'
 
 jobs:
   validate-sync:
-    name: Validate MODULE_DEFINITIONS sync
+    name: Validate patterns are in sync
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '20'
+          python-version: '3.11'
 
-      - name: Extract valid_types from MODULE_DEFINITIONS
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Extract patterns from all sources
         id: extract
         run: |
-          cd mcp-server
+          python << 'EOF'
+          import os
+          import re
+          import json
+          import yaml
+          from pathlib import Path
 
-          # Extract module names from MODULE_DEFINITIONS in index.ts
-          # Look for lines like "  module_name: {" at the start of module definitions
-          MODULES=$(grep -E "^  [a-z_]+: \{$" src/index.ts | sed 's/: {$//' | sed 's/  //' | sort | tr '\n' ',' | sed 's/,$//')
+          errors = []
+          warnings = []
 
-          # Convert to JSON array format
-          MODULES_JSON=$(echo "$MODULES" | sed 's/,/","/g' | sed 's/^/["/' | sed 's/$/"]/')
+          # 1. Get patterns from terraform/patterns directories
+          tf_patterns = []
+          patterns_dir = Path('terraform/patterns')
+          if patterns_dir.exists():
+              for p in patterns_dir.iterdir():
+                  if p.is_dir() and (p / 'main.tf').exists():
+                      tf_patterns.append(p.name)
+          tf_patterns.sort()
+          print(f"Terraform patterns: {tf_patterns}")
 
-          echo "Modules from code: $MODULES_JSON"
-          echo "modules=$MODULES_JSON" >> $GITHUB_OUTPUT
+          # 2. Get patterns from config/patterns/*.yaml
+          config_patterns = []
+          config_dir = Path('config/patterns')
+          if config_dir.exists():
+              for f in config_dir.glob('*.yaml'):
+                  with open(f) as fh:
+                      try:
+                          data = yaml.safe_load(fh)
+                          if data and 'name' in data:
+                              config_patterns.append(data['name'])
+                      except:
+                          pass
+          config_patterns.sort()
+          print(f"Config patterns: {config_patterns}")
 
-      - name: Extract valid_types from workflow template
-        id: template
-        run: |
-          # Extract the valid_types list from the template
-          TEMPLATE_TYPES=$(grep -o "valid_types = \[.*\]" templates/infrastructure-workflow.yaml | head -1 | sed "s/valid_types = //" | sed "s/'/\"/g")
+          # 3. Get valid_patterns from workflow template
+          workflow_patterns = []
+          template_file = Path('templates/infrastructure-workflow.yaml')
+          if template_file.exists():
+              with open(template_file) as f:
+                  content = f.read()
+                  # Look for valid_patterns = [...] in Python code block
+                  match = re.search(r"valid_patterns = \[(.*?)\]", content, re.DOTALL)
+                  if match:
+                      pattern_str = match.group(1)
+                      # Extract quoted strings
+                      workflow_patterns = re.findall(r"'([^']+)'", pattern_str)
+          workflow_patterns.sort()
+          print(f"Workflow patterns: {workflow_patterns}")
 
-          echo "Types from template: $TEMPLATE_TYPES"
-          echo "types=$TEMPLATE_TYPES" >> $GITHUB_OUTPUT
+          # 4. Get PATTERN_DEFINITIONS from MCP server (if exists)
+          mcp_patterns = []
+          mcp_file = Path('mcp-server/src/index.ts')
+          if mcp_file.exists():
+              with open(mcp_file) as f:
+                  content = f.read()
+                  # Look for pattern definitions - either PATTERN_DEFINITIONS or MODULE_DEFINITIONS
+                  # For now, we'll look for patterns in a more flexible way
+                  if 'PATTERN_DEFINITIONS' in content:
+                      # Find pattern names in PATTERN_DEFINITIONS object
+                      matches = re.findall(r'^\s{2}([a-z][a-z0-9_-]*): \{', content, re.MULTILINE)
+                      mcp_patterns = [m for m in matches if m not in ['name', 'description', 'config', 'required', 'optional']]
+                  elif 'MODULE_DEFINITIONS' in content:
+                      # Legacy: extract from MODULE_DEFINITIONS
+                      matches = re.findall(r'^\s{2}([a-z][a-z0-9_]+): \{', content, re.MULTILINE)
+                      mcp_patterns = [m for m in matches if m not in ['name', 'description', 'config']]
+          mcp_patterns.sort()
+          print(f"MCP patterns: {mcp_patterns}")
 
-      - name: Compare and validate
-        run: |
-          CODE_MODULES='${{ steps.extract.outputs.modules }}'
-          TEMPLATE_TYPES='${{ steps.template.outputs.types }}'
+          # Compare sources - Terraform patterns is the source of truth
+          source_of_truth = tf_patterns
 
-          echo "MODULE_DEFINITIONS: $CODE_MODULES"
-          echo "Workflow Template:  $TEMPLATE_TYPES"
+          # Check config patterns match
+          missing_in_config = set(source_of_truth) - set(config_patterns)
+          extra_in_config = set(config_patterns) - set(source_of_truth)
+          if missing_in_config:
+              warnings.append(f"Patterns in terraform/ but not in config/: {list(missing_in_config)}")
+          if extra_in_config:
+              warnings.append(f"Patterns in config/ but not in terraform/: {list(extra_in_config)}")
 
-          # Sort both for comparison
-          CODE_SORTED=$(echo "$CODE_MODULES" | jq -c 'sort')
-          TEMPLATE_SORTED=$(echo "$TEMPLATE_TYPES" | jq -c 'sort')
+          # Check workflow patterns match
+          missing_in_workflow = set(source_of_truth) - set(workflow_patterns)
+          extra_in_workflow = set(workflow_patterns) - set(source_of_truth)
+          if missing_in_workflow:
+              errors.append(f"Patterns in terraform/ but not in workflow template: {list(missing_in_workflow)}")
+          if extra_in_workflow:
+              errors.append(f"Patterns in workflow template but not in terraform/: {list(extra_in_workflow)}")
 
-          echo ""
-          echo "Sorted MODULE_DEFINITIONS: $CODE_SORTED"
-          echo "Sorted Workflow Template:  $TEMPLATE_SORTED"
+          # Output results
+          results = {
+              'terraform_patterns': tf_patterns,
+              'config_patterns': config_patterns,
+              'workflow_patterns': workflow_patterns,
+              'mcp_patterns': mcp_patterns,
+              'errors': errors,
+              'warnings': warnings,
+              'in_sync': len(errors) == 0
+          }
 
-          if [ "$CODE_SORTED" != "$TEMPLATE_SORTED" ]; then
-            echo ""
-            echo "::error::MODULE_DEFINITIONS and workflow template are out of sync!"
-            echo ""
-            echo "Modules in code but not in template:"
-            echo "$CODE_MODULES" | jq -r '.[]' | while read m; do
-              if ! echo "$TEMPLATE_TYPES" | grep -q "\"$m\""; then
-                echo "  - $m"
-              fi
-            done
+          with open('sync_results.json', 'w') as f:
+              json.dump(results, f, indent=2)
 
-            echo ""
-            echo "Modules in template but not in code:"
-            echo "$TEMPLATE_TYPES" | jq -r '.[]' | while read m; do
-              if ! echo "$CODE_MODULES" | grep -q "\"$m\""; then
-                echo "  - $m"
-              fi
-            done
+          # Set outputs
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"tf_patterns={json.dumps(tf_patterns)}\n")
+              f.write(f"workflow_patterns={json.dumps(workflow_patterns)}\n")
+              f.write(f"in_sync={'true' if len(errors) == 0 else 'false'}\n")
 
-            echo ""
-            echo "To fix, run: ./scripts/sync-workflow-template.sh"
-            echo "Or manually update templates/infrastructure-workflow.yaml with: valid_types = $CODE_MODULES"
-            exit 1
-          fi
+          if errors:
+              print("\n::error::Pattern sync validation failed!")
+              for e in errors:
+                  print(f"  - {e}")
+              exit(1)
 
-          echo ""
-          echo "✅ MODULE_DEFINITIONS and workflow template are in sync!"
+          if warnings:
+              print("\nWarnings:")
+              for w in warnings:
+                  print(f"  - {w}")
+
+          print("\n✅ All patterns are in sync!")
+          EOF
 
       - name: Create summary
         if: always()
         run: |
-          echo "## Module Sync Validation" >> $GITHUB_STEP_SUMMARY
+          echo "## Pattern Sync Validation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### MODULE_DEFINITIONS (source of truth)" >> $GITHUB_STEP_SUMMARY
-          echo '```json' >> $GITHUB_STEP_SUMMARY
-          echo '${{ steps.extract.outputs.modules }}' | jq '.' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Workflow Template valid_types" >> $GITHUB_STEP_SUMMARY
-          echo '```json' >> $GITHUB_STEP_SUMMARY
-          echo '${{ steps.template.outputs.types }}' | jq '.' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          if [ -f sync_results.json ]; then
+            echo "### Source of Truth: terraform/patterns/" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            jq '.terraform_patterns' sync_results.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "### Workflow Template valid_patterns" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            jq '.workflow_patterns' sync_results.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$(jq -r '.in_sync' sync_results.json)" == "true" ]; then
+              echo "### Status: ✅ In Sync" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### Status: ❌ Out of Sync" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Errors:**" >> $GITHUB_STEP_SUMMARY
+              jq -r '.errors[]' sync_results.json | while read e; do
+                echo "- $e" >> $GITHUB_STEP_SUMMARY
+              done
+            fi
+
+            WARNINGS=$(jq -r '.warnings | length' sync_results.json)
+            if [ "$WARNINGS" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Warnings:**" >> $GITHUB_STEP_SUMMARY
+              jq -r '.warnings[]' sync_results.json | while read w; do
+                echo "- $w" >> $GITHUB_STEP_SUMMARY
+              done
+            fi
+          fi

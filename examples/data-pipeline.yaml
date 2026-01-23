@@ -1,47 +1,38 @@
-# Data Pipeline Infrastructure
-# This template provisions infrastructure for a data processing pipeline
+# Data Pipeline Pattern Request
+# Event-driven data processing: Event Hub + Function + Storage + MongoDB
+#
+# This pattern provisions:
+# - Azure Event Hubs namespace (streaming ingestion)
+# - Azure Function App (event processor)
+# - Azure Storage Account (raw + processed data)
+# - Cosmos DB with MongoDB API (processed data store)
+# - Key Vault (connection strings)
+# - Security Groups (owner delegation)
+# - RBAC Assignments (least-privilege access)
+# - Diagnostics (staging/prod)
+
+version: "1"
 
 metadata:
-  project_name: data-pipeline
+  project: analytics-pipeline
   environment: dev
-  business_unit: data-science
-  cost_center: CC-DS-001
-  owner_email: datateam@company.com
+  business_unit: data-engineering
+  owners:
+    - data-team@company.com
   location: eastus
-  tags:
-    Application: DataPipeline
-    Team: DataScience
 
-resources:
-  # Event Hub for data ingestion
-  - type: eventhub
-    name: ingestion
-    config:
-      sku: Standard
-      capacity: 1
-      partition_count: 4
-      message_retention: 7
-      hubs:
-        - name: events
-          partition_count: 4
-        - name: metrics
-          partition_count: 2
+pattern: data-pipeline
+config:
+  name: analytics
+  size: small                         # small, medium, large (optional)
 
-  # Storage Account for data lake
-  - type: storage_account
-    name: datalake
-    config:
-      tier: Standard
-      replication: LRS
-      is_hns_enabled: true            # Hierarchical namespace for ADLS Gen2
-      containers:
-        - name: raw
-        - name: processed
-        - name: curated
-
-  # Key Vault for credentials
-  - type: keyvault
-    name: secrets
-    config:
-      sku: standard
-      rbac_enabled: true
+  # Optional pattern-specific config:
+  # input_hubs:                        # Event hubs for ingestion
+  #   - events
+  #   - logs
+  # output_hubs:                       # Event hubs for processed data
+  #   - enriched
+  # storage_containers:                # Storage containers
+  #   - raw
+  #   - processed
+  #   - archive

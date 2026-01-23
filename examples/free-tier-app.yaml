@@ -1,48 +1,33 @@
-# Example: Free Tier Web Application
-# Cost: $0/month (within free tier limits)
+# API Backend Pattern Request (Dev/Free Tier)
+# Backend API without frontend: Function App + SQL Database
 #
-# This configuration uses Azure's free tier offerings:
-# - Azure Functions Consumption Plan (Y1): 1M free executions/month
-# - Azure SQL Free: 100k vCore seconds/month, 32GB storage
+# This pattern provisions:
+# - Azure Function App (REST API)
+# - Azure SQL Database (relational data)
+# - Key Vault (connection strings)
+# - Security Groups (owner delegation)
+# - RBAC Assignments (least-privilege access)
 #
-# Perfect for development, prototyping, and learning.
+# Cost: ~$5/month in dev (uses consumption plan + basic SQL)
+
+version: "1"
 
 metadata:
-  project_name: myapp
+  project: my-api
   environment: dev
   business_unit: engineering
-  cost_center: CC-1234
-  owner_email: developer@example.com
-  location: centralus
+  owners:
+    - developer@company.com
+  location: eastus
 
-resources:
-  # API backend using Azure Functions (free consumption plan)
-  - type: function_app
-    name: api
-    config:
-      runtime: python
-      runtime_version: "3.11"
-      sku: Y1                      # Consumption plan - FREE
-      os_type: Linux
-      app_settings:
-        ENVIRONMENT: "development"
+pattern: api-backend
+config:
+  name: api
+  size: small                         # Uses consumption plan + basic SQL
 
-  # Database using Azure SQL Free tier
-  - type: azure_sql
-    name: db
-    config:
-      sku: Free                    # Free tier - FREE
-      databases:
-        - name: appdb
-          sku: Free
-          max_size_gb: 32          # Free tier max
-
-  # Storage for files (low cost, ~$0.02/GB)
-  - type: storage_account
-    name: files
-    config:
-      tier: Standard
-      replication: LRS             # Cheapest replication
-      containers:
-        - name: uploads
-          access_type: private
+  # Optional pattern-specific config:
+  # runtime: python                   # python, node, dotnet, java
+  # databases:                        # SQL databases to create
+  #   - main
+  #   - analytics
+  # enable_openapi: true              # Enable OpenAPI docs

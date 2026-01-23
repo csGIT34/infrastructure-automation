@@ -1,5 +1,0 @@
-azure-functions
-azure-servicebus
-azure-cosmos
-azure-identity
-pyyaml

@@ -2,30 +2,15 @@
 # Copy this file to your repository: .github/workflows/infrastructure.yaml
 #
 # Required secrets:
-#   INFRA_SERVICE_BUS_SAS_KEY - Service Bus SAS key for submitting requests
-#     Get it from your platform team or run:
-#       az servicebus namespace authorization-rule keys list \
-#         --namespace-name sb-infra-api-rrkkz6a8 \
-#         --resource-group rg-infrastructure-api \
-#         --name RootManageSharedAccessKey \
-#         --query primaryKey -o tsv
-#
 #   INFRA_APP_ID - GitHub App ID for Infrastructure Dispatch app
 #   INFRA_APP_PRIVATE_KEY - GitHub App private key (PEM format)
-#     Get these from your platform team or create the app at:
-#     https://github.com/settings/apps
+#
+# Supports pattern-based requests with t-shirt sizing (small/medium/large)
 #
 # Usage:
-# 1. Create infrastructure.yaml in your repo root (see templates/infrastructure.yaml)
-# 2. Create a PR to see the plan preview with additions/deletions
-# 3. Merge to main to provision resources (triggers immediate processing)
-#
-# Features:
-# - Validates YAML syntax and required fields
-# - Shows plan preview comparing against last successful deployment
-# - Indicates which resources will be added, removed, or unchanged
-# - Posts plan as PR comment
-# - Submits to provisioning queue on merge
+# 1. Create infrastructure.yaml in your repo root
+# 2. Create a PR to see the plan preview
+# 3. Merge to main to provision resources
 
 name: Infrastructure GitOps
 
@@ -48,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       validation_result: ${{ steps.validate.outputs.result }}
-      plan_markdown: ${{ steps.plan.outputs.markdown }}
+      environment: ${{ steps.validate.outputs.environment }}
 
     steps:
       - name: Checkout repository
@@ -60,7 +45,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install pyyaml requests
+        run: pip install pyyaml
 
       - name: Validate infrastructure YAML
         id: validate
@@ -88,33 +73,51 @@ jobs:
                   f.write("result=failed\n")
               sys.exit(1)
 
-          # Validate required fields
           errors = []
 
+          # Only pattern-based requests are supported
+          if 'pattern' not in config:
+              errors.append("Missing 'pattern' field. Only pattern-based requests are supported.")
+
+          # Validate metadata
           if 'metadata' not in config:
               errors.append("Missing 'metadata' section")
           else:
               metadata = config['metadata']
-              required_meta = ['project_name', 'environment', 'business_unit', 'cost_center', 'owner_email']
+              required_meta = ['project', 'environment', 'business_unit', 'owners']
               for field in required_meta:
                   if field not in metadata:
                       errors.append(f"Missing metadata.{field}")
 
-          if 'resources' not in config:
-              errors.append("Missing 'resources' section")
-          elif not isinstance(config.get('resources'), list):
-              errors.append("'resources' must be a list")
-          elif len(config.get('resources', [])) == 0:
-              errors.append("'resources' list is empty")
-          else:
-              valid_types = ['storage_account', 'keyvault', 'postgresql', 'mongodb', 'azure_sql', 'eventhub', 'function_app', 'linux_vm', 'aks_namespace', 'static_web_app']
-              for i, resource in enumerate(config['resources']):
-                  if 'type' not in resource:
-                      errors.append(f"Resource {i+1}: missing 'type'")
-                  elif resource['type'] not in valid_types:
-                      errors.append(f"Resource {i+1}: invalid type '{resource['type']}'. Valid: {', '.join(valid_types)}")
-                  if 'name' not in resource:
-                      errors.append(f"Resource {i+1}: missing 'name'")
+              # owners must be a list
+              if 'owners' in metadata and not isinstance(metadata['owners'], list):
+                  errors.append("metadata.owners must be a list of email addresses")
+
+              # Validate environment
+              env = metadata.get('environment', '')
+              if env not in ['dev', 'staging', 'prod']:
+                  errors.append(f"Invalid environment: {env}. Must be dev, staging, or prod")
+
+          # Validate pattern
+          if 'pattern' in config:
+              valid_patterns = [
+                  'keyvault', 'postgresql', 'mongodb', 'storage', 'function-app',
+                  'sql-database', 'eventhub', 'aks-namespace', 'linux-vm', 'static-site',
+                  'web-app', 'api-backend', 'microservice', 'data-pipeline'
+              ]
+              pattern = config.get('pattern', '')
+              if pattern not in valid_patterns:
+                  errors.append(f"Invalid pattern: {pattern}. Valid patterns: {', '.join(valid_patterns)}")
+
+              # Validate config section
+              if 'config' not in config:
+                  errors.append("Missing 'config' section for pattern request")
+              else:
+                  cfg = config['config']
+                  if 'name' not in cfg:
+                      errors.append("Missing config.name")
+                  if 'size' in cfg and cfg['size'] not in ['small', 'medium', 'large']:
+                      errors.append(f"Invalid size: {cfg['size']}. Must be small, medium, or large")
 
           if errors:
               print("::error::Validation failed")
@@ -125,115 +128,94 @@ jobs:
                   f.write(f"errors={json.dumps(errors)}\n")
               sys.exit(1)
 
-          print("Validation passed!")
+          environment = config.get('metadata', {}).get('environment', 'dev')
+          print(f"Validation passed! Pattern: {config['pattern']}, Environment: {environment}")
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write("result=passed\n")
+              f.write(f"environment={environment}\n")
           EOF
 
       - name: Generate Plan Preview
         id: plan
-        env:
-          PLAN_API_URL: https://func-infra-api-rrkkz6a8.azurewebsites.net/api/plan
         run: |
           python << 'PLANEOF'
           import yaml
           import json
           import os
-          import requests
 
-          PLAN_API_URL = os.environ['PLAN_API_URL']
-
-          # Load current config
           with open("infrastructure.yaml", 'r') as f:
-              yaml_content = f.read()
-              config = yaml.safe_load(yaml_content)
+              config = yaml.safe_load(f)
 
-          metadata = config['metadata']
-          project = metadata.get('project_name', 'unknown')
+          metadata = config.get('metadata', {})
+          project = metadata.get('project', 'unknown')
           env = metadata.get('environment', 'dev')
-
-          # Call the plan API to compare against last successful deployment
-          try:
-              response = requests.post(PLAN_API_URL, json={
-                  'project_name': project,
-                  'environment': env,
-                  'proposed_yaml': yaml_content
-              }, timeout=30)
-              response.raise_for_status()
-              plan_data = response.json()
-          except Exception as e:
-              print(f"Warning: Could not reach plan API: {e}")
-              print("Falling back to showing all resources as new")
-              plan_data = {
-                  'changes': {
-                      'added': [{'type': r['type'], 'name': r['name'], 'azure_name': 'unknown'} for r in config.get('resources', [])],
-                      'removed': [],
-                      'unchanged': []
-                  },
-                  'summary': {'added': len(config.get('resources', [])), 'removed': 0, 'unchanged': 0},
-                  'warnings': ['Could not connect to plan API. Showing all resources as additions.'],
-                  'last_deployment': None
-              }
-
-          changes = plan_data.get('changes', {})
-          summary = plan_data.get('summary', {})
-          warnings = plan_data.get('warnings', [])
-          last_deployment = plan_data.get('last_deployment')
+          pattern = config.get('pattern', '')
+          cfg = config.get('config', {})
+          size = cfg.get('size', 'small')
 
           # Generate markdown preview
           preview = "## Infrastructure Plan Preview\n\n"
-          preview += "### Project Information\n"
+          preview += "### Pattern Request\n"
           preview += "| Property | Value |\n"
           preview += "|----------|-------|\n"
-          preview += f"| Project Name | `{metadata.get('project_name')}` |\n"
-          preview += f"| Environment | `{metadata.get('environment')}` |\n"
-          preview += f"| Business Unit | `{metadata.get('business_unit')}` |\n"
-          preview += f"| Cost Center | `{metadata.get('cost_center')}` |\n"
-          preview += f"| Owner | `{metadata.get('owner_email')}` |\n"
-          preview += f"| Location | `{metadata.get('location', 'centralus')}` |\n\n"
-          preview += "### Last Successful Deployment\n"
-          if last_deployment:
-              preview += "| Property | Value |\n|----------|-------|\n"
-              preview += f"| Request ID | `{last_deployment.get('request_id', 'N/A')}` |\n"
-              preview += f"| Deployed At | `{last_deployment.get('deployed_at', 'N/A')}` |\n"
+          preview += f"| Pattern | `{pattern}` |\n"
+          preview += f"| Project | `{project}` |\n"
+          preview += f"| Environment | `{env}` |\n"
+          preview += f"| Size | `{size}` |\n"
+          preview += f"| Business Unit | `{metadata.get('business_unit', 'N/A')}` |\n"
+          preview += f"| Owners | `{', '.join(metadata.get('owners', []))}` |\n"
+          preview += f"| Location | `{metadata.get('location', 'eastus')}` |\n\n"
+
+          # Pattern-specific config
+          preview += "### Configuration\n"
+          preview += "| Setting | Value |\n"
+          preview += "|---------|-------|\n"
+          for key, value in cfg.items():
+              preview += f"| {key} | `{value}` |\n"
+          preview += "\n"
+
+          # What will be created
+          preview += "### What Will Be Created\n"
+          pattern_components = {
+              'keyvault': ['Key Vault', 'Security Groups', 'RBAC Assignments'],
+              'postgresql': ['PostgreSQL Server', 'Database', 'Key Vault', 'Security Groups'],
+              'mongodb': ['Cosmos DB (MongoDB)', 'Key Vault', 'Security Groups'],
+              'storage': ['Storage Account', 'Blob Containers', 'Security Groups'],
+              'function-app': ['Function App', 'App Service Plan', 'Storage Account', 'Key Vault', 'Security Groups'],
+              'sql-database': ['SQL Server', 'Database', 'Key Vault', 'Security Groups'],
+              'eventhub': ['Event Hub Namespace', 'Event Hub', 'Key Vault', 'Security Groups'],
+              'aks-namespace': ['Kubernetes Namespace', 'Resource Quotas', 'Security Groups'],
+              'linux-vm': ['Virtual Machine', 'Network Interface', 'Key Vault', 'Security Groups'],
+              'static-site': ['Static Web App', 'Security Groups'],
+              'web-app': ['Static Web App', 'Function App', 'Database', 'Key Vault', 'Security Groups'],
+              'api-backend': ['Function App', 'Database', 'Key Vault', 'Security Groups'],
+              'microservice': ['AKS Namespace', 'Event Hub', 'Storage', 'Key Vault', 'Security Groups'],
+              'data-pipeline': ['Event Hub', 'Function App', 'Data Lake Storage', 'MongoDB', 'Key Vault', 'Security Groups']
+          }
+          components = pattern_components.get(pattern, ['Unknown components'])
+          for component in components:
+              preview += f"- {component}\n"
+          preview += "\n"
+
+          # Environment features
+          preview += "### Environment Features\n"
+          if env == 'prod':
+              preview += "- Diagnostic logging enabled\n"
+              preview += "- Access reviews enabled\n"
+              preview += "- Geo-redundant backup (if applicable)\n"
+              preview += "- Purge protection enabled\n"
+          elif env == 'staging':
+              preview += "- Diagnostic logging enabled\n"
+              preview += "- Standard backup retention\n"
           else:
-              preview += "_No previous deployment found for this project/environment._\n"
-          preview += "\n### Changes Summary (vs. Last Deployment)\n"
-          preview += "| Added | Removed | Unchanged |\n"
-          preview += "|-------|---------|----------|\n"
-          preview += f"| {summary.get('added', 0)} | {summary.get('removed', 0)} | {summary.get('unchanged', 0)} |\n\n"
-          preview += "### Resource Changes\n\n"
-          preview += "| Status | Type | Name | Azure Resource |\n"
-          preview += "|--------|------|------|----------------|\n"
+              preview += "- Development configuration\n"
+              preview += "- Minimal backup retention\n"
+          preview += "\n"
 
-          # Show added resources
-          for r in changes.get('added', []):
-              preview += f"| + **Add** | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
-
-          # Show removed resources
-          for r in changes.get('removed', []):
-              preview += f"| - **Remove** | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
-
-          # Show unchanged resources
-          for r in changes.get('unchanged', []):
-              preview += f"| = No change | `{r['type']}` | `{r['name']}` | `{r.get('azure_name', '')}` |\n"
-
-          preview += f"\n### Resource Group\n"
+          preview += f"### Resource Group\n"
           preview += f"`rg-{project}-{env}`\n\n"
           preview += "---\n"
-
-          # Show warnings
-          if warnings:
-              for warning in warnings:
-                  preview += f"**Note:** {warning}\n\n"
-
-          if summary.get('added', 0) > 0 or summary.get('removed', 0) > 0:
-              preview += "**This PR will modify infrastructure.** Review changes carefully before merging.\n\n"
-          else:
-              preview += "**No infrastructure changes detected.**\n\n"
-
-          preview += "**On merge to main**, these changes will be automatically applied.\n\n"
-          preview += "Track provisioning status at: https://wonderful-field-088efae10.1.azurestaticapps.net\n"
+          preview += "**On merge to main**, these changes will be automatically provisioned.\n"
 
           with open('plan_preview.md', 'w') as f:
               f.write(preview)
@@ -293,7 +275,7 @@ jobs:
             cat plan_preview.md >> $GITHUB_STEP_SUMMARY
           fi
 
-  # Submit to queue on merge to main
+  # Trigger provisioning on merge to main
   provision:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -302,95 +284,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install pyyaml
-
-      - name: Submit to Infrastructure Queue
-        env:
-          SAS_KEY: ${{ secrets.INFRA_SERVICE_BUS_SAS_KEY }}
-        run: |
-          python << 'EOF'
-          import yaml
-          import json
-          import hashlib
-          import hmac
-          import base64
-          import time
-          import urllib.parse
-          import urllib.request
-          import os
-
-          with open("infrastructure.yaml", 'r') as f:
-              yaml_content = f.read()
-              config = yaml.safe_load(yaml_content)
-
-          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
-          sha = os.environ.get('GITHUB_SHA', 'unknown')[:8]
-          timestamp = int(time.time())
-          request_id = f"gitops-{repo.replace('/', '-')}-{sha}-{timestamp}"
-
-          namespace = "sb-infra-api-rrkkz6a8"
-          queue_name = f"infrastructure-requests-{config['metadata']['environment']}"
-          sas_key = os.environ['SAS_KEY']
-          sas_key_name = "RootManageSharedAccessKey"
-
-          uri = f"https://{namespace}.servicebus.windows.net/{queue_name}".lower()
-          expiry = int(time.time()) + 3600
-          string_to_sign = f"{urllib.parse.quote_plus(uri)}\n{expiry}"
-          signature = base64.b64encode(
-              hmac.new(sas_key.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).digest()
-          ).decode('utf-8')
-          sas_token = f"SharedAccessSignature sr={urllib.parse.quote_plus(uri)}&sig={urllib.parse.quote_plus(signature)}&se={expiry}&skn={sas_key_name}"
-
-          message = {
-              'request_id': request_id,
-              'yaml_content': yaml_content,
-              'requester_email': config['metadata'].get('owner_email', 'gitops@automation'),
-              'metadata': {
-                  'source': 'gitops',
-                  'repository': repo,
-                  'commit_sha': os.environ.get('GITHUB_SHA'),
-                  'triggered_by': os.environ.get('GITHUB_ACTOR'),
-                  'environment': config['metadata']['environment'],
-                  'submitted_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-              }
-          }
-
-          url = f"https://{namespace}.servicebus.windows.net/{queue_name}/messages"
-          data = json.dumps(message).encode('utf-8')
-
-          req = urllib.request.Request(url, data=data, method='POST')
-          req.add_header('Authorization', sas_token)
-          req.add_header('Content-Type', 'application/json')
-
-          try:
-              response = urllib.request.urlopen(req)
-              print(f"Successfully submitted infrastructure request!")
-              print(f"   Request ID: {request_id}")
-              print(f"   Queue: {queue_name}")
-              print(f"   Repository: {repo}")
-              print(f"\nTrack status at: https://wonderful-field-088efae10.1.azurestaticapps.net")
-
-              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
-                  f.write("## Infrastructure Request Submitted\n\n")
-                  f.write(f"| Property | Value |\n")
-                  f.write(f"|----------|-------|\n")
-                  f.write(f"| Request ID | `{request_id}` |\n")
-                  f.write(f"| Queue | `{queue_name}` |\n")
-                  f.write(f"| Repository | `{repo}` |\n")
-                  f.write(f"\n[Track Status](https://wonderful-field-088efae10.1.azurestaticapps.net)\n")
-
-          except urllib.error.HTTPError as e:
-              print(f"::error::Failed to submit: {e.code} {e.reason}")
-              print(e.read().decode())
-              exit(1)
-          EOF
 
       - name: Generate GitHub App Token
         id: app-token
@@ -401,13 +294,41 @@ jobs:
           owner: csGIT34
           repositories: infrastructure-automation
 
-      - name: Trigger Queue Consumer
+      - name: Trigger Provisioning
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          # Build the raw URL to infrastructure.yaml
+          YAML_URL="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/infrastructure.yaml"
+
           curl -X POST \
             -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/csGIT34/infrastructure-automation/dispatches \
-            -d '{"event_type":"infrastructure-request","client_payload":{"source":"${{ github.repository }}","sha":"${{ github.sha }}"}}'
-          echo "Triggered infrastructure queue consumer"
+            -d "{
+              \"event_type\": \"provision\",
+              \"client_payload\": {
+                \"repository\": \"${{ github.repository }}\",
+                \"commit_sha\": \"${{ github.sha }}\",
+                \"yaml_url\": \"$YAML_URL\"
+              }
+            }"
+
+          echo "Triggered infrastructure provisioning"
+          echo ""
+          echo "Request details:"
+          echo "  Repository: ${{ github.repository }}"
+          echo "  Commit: ${{ github.sha }}"
+          echo "  YAML URL: $YAML_URL"
+
+          cat << EOF >> $GITHUB_STEP_SUMMARY
+          ## Infrastructure Provisioning Triggered
+
+          | Property | Value |
+          |----------|-------|
+          | Repository | \`${{ github.repository }}\` |
+          | Commit | \`${{ github.sha }}\` |
+          | Triggered By | \`${{ github.actor }}\` |
+
+          Provisioning is running in the [infrastructure-automation](https://github.com/csGIT34/infrastructure-automation/actions) repository.
+          EOF

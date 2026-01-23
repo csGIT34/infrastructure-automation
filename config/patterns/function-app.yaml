@@ -1,0 +1,92 @@
+# Pattern: function-app
+# Serverless Azure Functions with managed identity
+
+name: function-app
+description: |
+  Azure Functions serverless compute with managed identity and Key Vault integration.
+  Automatically creates storage account and app service plan.
+
+category: single-resource
+components:
+  - function-app
+  - storage-account (backend)
+  - keyvault
+  - security-groups
+  - rbac-assignments
+  - diagnostic-settings (staging/prod)
+
+use_cases:
+  - REST APIs
+  - Event-driven processing
+  - Scheduled tasks
+  - Webhooks
+  - Microservice backends
+
+sizing:
+  small:
+    dev:
+      sku: Y1
+      enable_diagnostics: false
+    staging:
+      sku: Y1
+      enable_diagnostics: true
+    prod:
+      sku: B1
+      enable_diagnostics: true
+
+  medium:
+    dev:
+      sku: Y1
+      enable_diagnostics: false
+    staging:
+      sku: B1
+      enable_diagnostics: true
+    prod:
+      sku: S1
+      enable_diagnostics: true
+
+  large:
+    dev:
+      sku: B1
+      enable_diagnostics: true
+    staging:
+      sku: S1
+      enable_diagnostics: true
+    prod:
+      sku: P1v2
+      enable_diagnostics: true
+
+config:
+  required:
+    - name
+  optional:
+    - runtime:
+        type: string
+        default: python
+        enum: [python, node, dotnet, java, powershell]
+    - runtime_version:
+        type: string
+    - os_type:
+        type: string
+        default: Linux
+        enum: [Linux, Windows]
+    - app_settings:
+        type: object
+        description: Additional app settings
+    - cors_origins:
+        type: array
+        items: string
+
+estimated_costs:
+  small:
+    dev: 0
+    staging: 10
+    prod: 55
+  medium:
+    dev: 0
+    staging: 55
+    prod: 73
+  large:
+    dev: 55
+    staging: 73
+    prod: 146
