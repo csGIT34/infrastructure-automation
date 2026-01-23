@@ -52,7 +52,7 @@ variable "runtime" {
 }
 variable "runtime_version" {
   type    = string
-  default = "3.11"
+  default = ""  # Empty = use module's runtime-appropriate default
 }
 variable "enable_diagnostics" {
   type    = bool

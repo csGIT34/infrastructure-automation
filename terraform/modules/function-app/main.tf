@@ -18,17 +18,29 @@ resource "random_string" "storage_suffix" {
 }
 
 locals {
-    runtime         = lookup(var.config, "runtime", "python")
-    runtime_version = lookup(var.config, "runtime_version", "3.11")
-    sku_name        = lookup(var.config, "sku", "Y1")
-    os_type         = lookup(var.config, "os_type", "Linux")
-    app_settings    = lookup(var.config, "app_settings", {})
+    runtime  = lookup(var.config, "runtime", "python")
+    sku_name = lookup(var.config, "sku", "Y1")
+    os_type  = lookup(var.config, "os_type", "Linux")
+    app_settings = lookup(var.config, "app_settings", {})
+
+    # Default versions per runtime
+    default_versions = {
+        python     = "3.11"
+        node       = "20"
+        dotnet     = "8.0"
+        java       = "17"
+        powershell = "7.4"
+    }
+
+    # Use provided version or runtime-appropriate default (empty string = use default)
+    provided_version = lookup(var.config, "runtime_version", "")
+    runtime_version  = local.provided_version != "" ? local.provided_version : local.default_versions[local.runtime]
 
     # Version strings per runtime - only the matching runtime gets a value
-    python_version = local.runtime == "python" ? local.runtime_version : null
-    node_version   = local.runtime == "node" ? local.runtime_version : null
-    dotnet_version = local.runtime == "dotnet" ? local.runtime_version : null
-    java_version   = local.runtime == "java" ? local.runtime_version : null
+    python_version     = local.runtime == "python" ? local.runtime_version : null
+    node_version       = local.runtime == "node" ? local.runtime_version : null
+    dotnet_version     = local.runtime == "dotnet" ? local.runtime_version : null
+    java_version       = local.runtime == "java" ? local.runtime_version : null
     powershell_version = local.runtime == "powershell" ? local.runtime_version : null
 }
 
