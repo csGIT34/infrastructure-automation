@@ -1672,8 +1672,8 @@ jobs:
         env:
           GH_TOKEN: \${{ steps.app-token.outputs.token }}
         run: |
-          # Build the raw URL to infrastructure.yaml
-          YAML_URL="https://raw.githubusercontent.com/\${{ github.repository }}/\${{ github.sha }}/infrastructure.yaml"
+          # Base64 encode the YAML content to safely pass in JSON payload
+          YAML_CONTENT=\$(base64 -w0 infrastructure.yaml)
 
           curl -X POST \\
             -H "Authorization: token \$GH_TOKEN" \\
@@ -1684,7 +1684,7 @@ jobs:
               \\"client_payload\\": {
                 \\"repository\\": \\"\${{ github.repository }}\\",
                 \\"commit_sha\\": \\"\${{ github.sha }}\\",
-                \\"yaml_url\\": \\"\$YAML_URL\\"
+                \\"yaml_content\\": \\"\$YAML_CONTENT\\"
               }
             }"
 
@@ -1693,7 +1693,6 @@ jobs:
           echo "Request details:"
           echo "  Repository: \${{ github.repository }}"
           echo "  Commit: \${{ github.sha }}"
-          echo "  YAML URL: \$YAML_URL"
 
           cat << EOF >> \$GITHUB_STEP_SUMMARY
           ## Infrastructure Provisioning Triggered

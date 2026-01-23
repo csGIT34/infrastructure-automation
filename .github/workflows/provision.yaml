@@ -55,10 +55,16 @@ jobs:
           echo "yaml_url=$YAML_URL" >> $GITHUB_OUTPUT
           echo "request_id=provision-${REPO//\//-}-${SHA:0:8}-$(date +%s)" >> $GITHUB_OUTPUT
 
-      - name: Download infrastructure.yaml
+      - name: Write infrastructure.yaml
         run: |
-          curl -sL "${{ steps.request.outputs.yaml_url }}" -o infrastructure.yaml
-          echo "Downloaded infrastructure.yaml from ${{ steps.request.outputs.repository }}"
+          # Get YAML content from payload (base64 encoded for safety)
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "${{ github.event.client_payload.yaml_content }}" | base64 -d > infrastructure.yaml
+          else
+            # For manual workflow_dispatch, download from URL (requires public repo or auth)
+            curl -sL "${{ steps.request.outputs.yaml_url }}" -o infrastructure.yaml
+          fi
+          echo "Infrastructure request from ${{ steps.request.outputs.repository }}:"
           cat infrastructure.yaml
 
       - name: Install Python dependencies
