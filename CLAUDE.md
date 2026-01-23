@@ -76,7 +76,22 @@ Developer PR (infrastructure.yaml)
 → repository_dispatch to infrastructure-automation repo
 → Provision workflow runs on self-hosted runner
 → Pattern Resolution → Terraform Apply → Azure Resources
+→ Status + Issue created in source repo (success or failure)
 ```
+
+### Feedback Loop
+
+The provision workflow reports back to the source repository:
+
+1. **Commit Status**: Updates the commit with pending/success/failure status
+   - Visible as a check mark or X on the commit in GitHub
+   - Links to the provisioning workflow run
+
+2. **Issue Creation**: Creates an issue in the source repo with results
+   - **Success**: Resource details, outputs, security groups, access instructions
+   - **Failure**: Error details, troubleshooting tips, link to workflow logs
+
+3. **Retry**: Developers can retry by pushing a new commit to `infrastructure.yaml`
 
 ### Key Components
 
@@ -86,9 +101,10 @@ Developer PR (infrastructure.yaml)
    - Triggers provisioning via `repository_dispatch` on merge
 
 2. **Provision Workflow** (`.github/workflows/provision.yaml`) - Triggered by `repository_dispatch`:
-   - Downloads infrastructure.yaml from source repo
+   - Receives base64-encoded infrastructure.yaml from source repo
    - Resolves pattern to Terraform variables
    - Runs `terraform apply` on the pattern directory
+   - Reports status back to source repo (commit status + issue)
 
 3. **Pattern Resolution** (`scripts/resolve-pattern.py`) - Resolves pattern requests:
    - Validates pattern name and config
@@ -131,6 +147,10 @@ Developer PR (infrastructure.yaml)
 **Terraform State:**
 - `TF_STATE_STORAGE_ACCOUNT` - Azure Storage account for state
 - `TF_STATE_CONTAINER` - Blob container name (default: tfstate)
+
+**GitHub App for Status Reporting:**
+- `INFRA_APP_ID` - GitHub App ID (same app as consuming repos)
+- `INFRA_APP_PRIVATE_KEY` - GitHub App private key (PEM format)
 
 ### Required Secrets (consuming repos)
 
@@ -475,6 +495,24 @@ On the subscription or target resource group scope:
 - `Contributor` - Create and manage resources
 - `User Access Administrator` - Create RBAC role assignments
 - `Key Vault Secrets Officer` - Store secrets in Key Vault
+
+### GitHub App Permissions (Infrastructure Dispatch)
+
+The GitHub App (`INFRA_APP_ID`) must be installed on **both** infrastructure-automation and consuming repos with these permissions:
+
+| Permission | Access | Purpose |
+|------------|--------|---------|
+| `contents` | Read | Read infrastructure.yaml from source repos |
+| `statuses` | Write | Update commit status (pending/success/failure) |
+| `issues` | Write | Create results/failure issues in source repos |
+| `metadata` | Read | Basic repo access |
+
+**Installation:**
+1. Create a GitHub App in your organization
+2. Generate a private key
+3. Install the app on infrastructure-automation repo
+4. Install the app on each consuming repo
+5. Add `INFRA_APP_ID` and `INFRA_APP_PRIVATE_KEY` to both repos' secrets
 
 ## Home Lab Networking
 

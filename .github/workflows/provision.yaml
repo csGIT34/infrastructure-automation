@@ -50,10 +50,37 @@ jobs:
             YAML_URL="${{ inputs.yaml_url }}"
           fi
 
+          # Extract owner and repo name for GitHub App token
+          REPO_OWNER="${REPO%%/*}"
+          REPO_NAME="${REPO##*/}"
+
           echo "repository=$REPO" >> $GITHUB_OUTPUT
+          echo "repo_owner=$REPO_OWNER" >> $GITHUB_OUTPUT
+          echo "repo_name=$REPO_NAME" >> $GITHUB_OUTPUT
           echo "commit_sha=$SHA" >> $GITHUB_OUTPUT
           echo "yaml_url=$YAML_URL" >> $GITHUB_OUTPUT
           echo "request_id=provision-${REPO//\//-}-${SHA:0:8}-$(date +%s)" >> $GITHUB_OUTPUT
+
+      # Generate token for communicating back to the source repo
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.INFRA_APP_ID }}
+          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+          owner: ${{ steps.request.outputs.repo_owner }}
+          repositories: ${{ steps.request.outputs.repo_name }}
+
+      # Set commit status to pending immediately
+      - name: Set Commit Status - Pending
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api repos/${{ steps.request.outputs.repository }}/statuses/${{ steps.request.outputs.commit_sha }} \
+            -f state=pending \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Infrastructure provisioning in progress..." \
+            -f context="infrastructure/provision"
 
       - name: Write infrastructure.yaml
         run: |
@@ -196,6 +223,46 @@ jobs:
           echo "Terraform outputs:"
           cat /tmp/tf-outputs.json
 
+          # Extract key outputs for the issue body (filter sensitive data)
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import os
+
+          with open('/tmp/tf-outputs.json') as f:
+              outputs = json.load(f)
+
+          # Build a markdown-friendly output summary
+          summary_lines = []
+          access_info = []
+
+          for key, value in outputs.items():
+              val = value.get('value', '')
+              sensitive = value.get('sensitive', False)
+
+              if sensitive:
+                  summary_lines.append(f"| {key} | *(sensitive - see Key Vault)* |")
+              elif key == 'access_info':
+                  access_info.append(val)
+              elif isinstance(val, dict):
+                  for k, v in val.items():
+                      summary_lines.append(f"| {key}.{k} | `{v}` |")
+              elif isinstance(val, list):
+                  summary_lines.append(f"| {key} | `{', '.join(str(v) for v in val)}` |")
+              else:
+                  summary_lines.append(f"| {key} | `{val}` |")
+
+          with open('/tmp/outputs-summary.md', 'w') as f:
+              if summary_lines:
+                  f.write("| Output | Value |\n")
+                  f.write("|--------|-------|\n")
+                  f.write("\n".join(summary_lines))
+                  f.write("\n")
+              if access_info:
+                  f.write("\n### Access Information\n\n")
+                  f.write("\n".join(access_info))
+
+          PYTHON_SCRIPT
+
       - name: Create Job Summary
         run: |
           cat << EOF >> $GITHUB_STEP_SUMMARY
@@ -215,3 +282,141 @@ jobs:
           $(cat /tmp/tf-outputs.json)
           \`\`\`
           EOF
+
+      # =========================================================================
+      # SUCCESS: Report back to source repository
+      # =========================================================================
+      - name: Set Commit Status - Success
+        if: success()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api repos/${{ steps.request.outputs.repository }}/statuses/${{ steps.request.outputs.commit_sha }} \
+            -f state=success \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Infrastructure provisioned successfully" \
+            -f context="infrastructure/provision"
+
+      - name: Create Success Issue in Source Repo
+        if: success()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # Build issue body
+          OUTPUTS_SUMMARY=""
+          if [ -f /tmp/outputs-summary.md ]; then
+            OUTPUTS_SUMMARY=$(cat /tmp/outputs-summary.md)
+          fi
+
+          ISSUE_BODY=$(cat << 'ISSUE_EOF'
+          ## ✅ Infrastructure Provisioned Successfully
+
+          Your infrastructure request has been provisioned.
+
+          ### Request Details
+
+          | Property | Value |
+          |----------|-------|
+          | Pattern | `${{ steps.resolve.outputs.pattern }}` |
+          | Project | `${{ steps.resolve.outputs.project }}` |
+          | Environment | `${{ steps.resolve.outputs.environment }}` |
+          | Business Unit | `${{ steps.resolve.outputs.business_unit }}` |
+          | Commit | `${{ steps.request.outputs.commit_sha }}` |
+
+          ### Resources Created
+
+          ISSUE_EOF
+          )
+
+          # Append outputs summary
+          ISSUE_BODY="${ISSUE_BODY}
+          ${OUTPUTS_SUMMARY}
+
+          ### Next Steps
+
+          1. **Request access**: Ask your team lead to add you to the appropriate security group
+          2. **Access secrets**: Once added, retrieve secrets from Key Vault:
+             \`\`\`bash
+             az keyvault secret list --vault-name <vault-name>
+             az keyvault secret show --vault-name <vault-name> --name <secret-name>
+             \`\`\`
+          3. **View provisioning details**: [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          ### Questions or Issues?
+
+          If you encounter problems, create an issue in the [infrastructure-automation](https://github.com/${{ github.repository }}) repository.
+
+          ---
+          *Provisioned by Infrastructure Platform • Request ID: \`${{ steps.request.outputs.request_id }}\`*
+          "
+
+          # Create the issue
+          gh issue create \
+            --repo "${{ steps.request.outputs.repository }}" \
+            --title "✅ Infrastructure Provisioned: ${{ steps.resolve.outputs.pattern }} (${{ steps.resolve.outputs.environment }})" \
+            --body "$ISSUE_BODY" \
+            --label "infrastructure"
+
+      # =========================================================================
+      # FAILURE: Report back to source repository
+      # =========================================================================
+      - name: Set Commit Status - Failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api repos/${{ steps.request.outputs.repository }}/statuses/${{ steps.request.outputs.commit_sha }} \
+            -f state=failure \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Infrastructure provisioning failed" \
+            -f context="infrastructure/provision" || true
+
+      - name: Create Failure Issue in Source Repo
+        if: failure()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          ISSUE_BODY=$(cat << 'ISSUE_EOF'
+          ## ❌ Infrastructure Provisioning Failed
+
+          Your infrastructure request failed to provision. Please review the error and try again.
+
+          ### Request Details
+
+          | Property | Value |
+          |----------|-------|
+          | Pattern | `${{ steps.resolve.outputs.pattern }}` |
+          | Project | `${{ steps.resolve.outputs.project }}` |
+          | Environment | `${{ steps.resolve.outputs.environment }}` |
+          | Commit | `${{ steps.request.outputs.commit_sha }}` |
+
+          ### What to do
+
+          1. **View the error**: Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed error messages
+          2. **Fix the issue**: Update your `infrastructure.yaml` based on the error
+          3. **Retry**: Commit and push to trigger a new provisioning attempt
+
+          ### Common Issues
+
+          - **Invalid pattern configuration**: Check that all required fields are present
+          - **Naming conflicts**: Resource names must be unique within Azure
+          - **Permission errors**: The service principal may not have required permissions
+          - **Quota limits**: Your subscription may have hit resource limits
+
+          ### Need Help?
+
+          Create an issue in the [infrastructure-automation](https://github.com/${{ github.repository }}) repository with:
+          - Your `infrastructure.yaml` content
+          - The error message from the workflow run
+
+          ---
+          *Infrastructure Platform • Request ID: \`${{ steps.request.outputs.request_id }}\`*
+          ISSUE_EOF
+          )
+
+          # Create the issue
+          gh issue create \
+            --repo "${{ steps.request.outputs.repository }}" \
+            --title "❌ Infrastructure Failed: ${{ steps.resolve.outputs.pattern }} (${{ steps.resolve.outputs.environment }})" \
+            --body "$ISSUE_BODY" \
+            --label "infrastructure,failed" || true
