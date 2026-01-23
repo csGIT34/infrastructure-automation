@@ -24,7 +24,7 @@ use_cases:
 sizing:
   small:
     dev:
-      function_sku: Y1
+      function_sku: B1  # Y1 (Consumption) has quota issues on some subscriptions
       db_sku: Free
       enable_diagnostics: false
     staging:

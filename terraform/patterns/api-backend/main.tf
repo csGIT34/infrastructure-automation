@@ -38,7 +38,7 @@ variable "database_type" {
 # Sizing
 variable "function_sku" {
   type    = string
-  default = "Y1"
+  default = "B1"  # Y1 (Consumption) has quota issues on some subscriptions
 }
 variable "db_sku" {
   type    = string
