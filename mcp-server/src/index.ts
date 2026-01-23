@@ -1165,23 +1165,48 @@ function validatePatternRequest(yamlContent: string): string {
   try {
     const config = YAML.parse(yamlContent);
 
+    // Validate top-level structure - only allowed keys
+    const allowedTopLevel = ["version", "metadata", "pattern", "config"];
+    for (const key of Object.keys(config)) {
+      if (!allowedTopLevel.includes(key)) {
+        errors.push(`Unknown top-level key '${key}'. Only allowed: ${allowedTopLevel.join(", ")}`);
+      }
+    }
+
     // Validate metadata
     if (!config.metadata) {
       errors.push("Missing 'metadata' section");
     } else {
       const requiredMeta = ["project", "environment", "business_unit", "owners"];
+      const allowedMeta = [...requiredMeta, "location", "cost_center", "tags"];
+
       for (const field of requiredMeta) {
         if (!config.metadata[field]) {
           errors.push(`Missing metadata.${field}`);
         }
       }
 
+      // Check for unknown metadata fields
+      for (const key of Object.keys(config.metadata)) {
+        if (!allowedMeta.includes(key)) {
+          errors.push(`Unknown metadata field '${key}'. Allowed: ${allowedMeta.join(", ")}`);
+        }
+      }
+
       if (config.metadata.environment && !["dev", "staging", "prod"].includes(config.metadata.environment)) {
-        warnings.push(`Environment '${config.metadata.environment}' is not standard (dev, staging, prod)`);
+        errors.push(`Invalid environment '${config.metadata.environment}'. Must be: dev, staging, or prod`);
       }
 
       if (!Array.isArray(config.metadata.owners) || config.metadata.owners.length === 0) {
         errors.push("metadata.owners must be a non-empty array of email addresses");
+      } else {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        for (const owner of config.metadata.owners) {
+          if (typeof owner !== "string" || !emailRegex.test(owner)) {
+            errors.push(`Invalid owner email format: '${owner}'`);
+          }
+        }
       }
     }
 
@@ -1201,10 +1226,10 @@ function validatePatternRequest(yamlContent: string): string {
         }
       }
 
-      // Check unknown config options
+      // Check unknown config options - this is an ERROR, not a warning
       for (const key of Object.keys(patternConfig)) {
         if (!patternDef.config.required.includes(key) && !(key in patternDef.config.optional) && key !== "size") {
-          warnings.push(`Unknown config option '${key}' for pattern '${config.pattern}'`);
+          errors.push(`Unknown config option '${key}' for pattern '${config.pattern}'. Allowed: ${[...patternDef.config.required, ...Object.keys(patternDef.config.optional), "size"].join(", ")}`);
         }
       }
 
