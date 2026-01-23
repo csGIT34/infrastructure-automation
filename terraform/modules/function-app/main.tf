@@ -23,6 +23,23 @@ locals {
     sku_name        = lookup(var.config, "sku", "Y1")
     os_type         = lookup(var.config, "os_type", "Linux")
     app_settings    = lookup(var.config, "app_settings", {})
+
+    # Application stack configuration - only one should be set
+    linux_app_stack = {
+        python = local.runtime == "python" ? { python_version = local.runtime_version } : null
+        node   = local.runtime == "node" ? { node_version = local.runtime_version } : null
+        dotnet = local.runtime == "dotnet" ? { dotnet_version = local.runtime_version } : null
+        java   = local.runtime == "java" ? { java_version = local.runtime_version } : null
+    }
+
+    # Get the non-null stack config
+    active_linux_stack = coalesce(
+        local.linux_app_stack.python,
+        local.linux_app_stack.node,
+        local.linux_app_stack.dotnet,
+        local.linux_app_stack.java,
+        { python_version = "3.11" }  # fallback
+    )
 }
 
 resource "azurerm_storage_account" "func" {
@@ -59,10 +76,10 @@ resource "azurerm_linux_function_app" "main" {
 
     site_config {
         application_stack {
-            python_version = local.runtime == "python" ? local.runtime_version : null
-            node_version   = local.runtime == "node" ? local.runtime_version : null
-            dotnet_version = local.runtime == "dotnet" ? local.runtime_version : null
-            java_version   = local.runtime == "java" ? local.runtime_version : null
+            python_version = lookup(local.active_linux_stack, "python_version", null)
+            node_version   = lookup(local.active_linux_stack, "node_version", null)
+            dotnet_version = lookup(local.active_linux_stack, "dotnet_version", null)
+            java_version   = lookup(local.active_linux_stack, "java_version", null)
         }
 
         cors {
