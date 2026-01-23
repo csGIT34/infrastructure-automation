@@ -144,7 +144,17 @@ class PatternResolver:
         tfvars.update(sizing)
 
         # Add pattern-specific config values
-        optional_config = pattern.get("config", {}).get("optional", {})
+        # Handle both list format (from YAML files) and dict format
+        optional_raw = pattern.get("config", {}).get("optional", {})
+        if isinstance(optional_raw, list):
+            # Convert list of single-key dicts to a flat dict
+            optional_config = {}
+            for item in optional_raw:
+                if isinstance(item, dict):
+                    optional_config.update(item)
+        else:
+            optional_config = optional_raw
+
         for key, spec in optional_config.items():
             if key in config:
                 tfvars[key] = config[key]
