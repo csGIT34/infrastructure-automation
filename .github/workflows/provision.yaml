@@ -172,13 +172,14 @@ jobs:
       - name: Setup Terraform workspace
         run: |
           PATTERN="${{ steps.resolve.outputs.pattern }}"
-          mkdir -p terraform-workspace
-          cp -r "terraform/patterns/$PATTERN" terraform-workspace/pattern
-          cp -r terraform/modules terraform-workspace/
-          cp terraform.tfvars.json terraform-workspace/pattern/
+          # Preserve directory structure so ../../modules/ paths work
+          mkdir -p terraform-workspace/terraform/patterns
+          cp -r "terraform/patterns/$PATTERN" "terraform-workspace/terraform/patterns/$PATTERN"
+          cp -r terraform/modules terraform-workspace/terraform/
+          cp terraform.tfvars.json "terraform-workspace/terraform/patterns/$PATTERN/"
 
       - name: Terraform Init
-        working-directory: terraform-workspace/pattern
+        working-directory: terraform-workspace/terraform/patterns/${{ steps.resolve.outputs.pattern }}
         env:
           ARM_USE_OIDC: true
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -193,7 +194,7 @@ jobs:
             -backend-config="use_azuread_auth=true"
 
       - name: Terraform Plan
-        working-directory: terraform-workspace/pattern
+        working-directory: terraform-workspace/terraform/patterns/${{ steps.resolve.outputs.pattern }}
         env:
           ARM_USE_OIDC: true
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -206,7 +207,7 @@ jobs:
             -no-color
 
       - name: Terraform Apply
-        working-directory: terraform-workspace/pattern
+        working-directory: terraform-workspace/terraform/patterns/${{ steps.resolve.outputs.pattern }}
         env:
           ARM_USE_OIDC: true
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -217,7 +218,7 @@ jobs:
 
       - name: Capture Terraform Outputs
         id: outputs
-        working-directory: terraform-workspace/pattern
+        working-directory: terraform-workspace/terraform/patterns/${{ steps.resolve.outputs.pattern }}
         run: |
           terraform output -json > /tmp/tf-outputs.json
           echo "Terraform outputs:"
