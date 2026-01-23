@@ -351,12 +351,15 @@ jobs:
           *Provisioned by Infrastructure Platform • Request ID: \`${{ steps.request.outputs.request_id }}\`*
           "
 
-          # Create the issue
+          # Create the issue (ignore label errors if label doesn't exist)
           gh issue create \
             --repo "${{ steps.request.outputs.repository }}" \
             --title "✅ Infrastructure Provisioned: ${{ steps.resolve.outputs.pattern }} (${{ steps.resolve.outputs.environment }})" \
             --body "$ISSUE_BODY" \
-            --label "infrastructure"
+            --label "infrastructure" || gh issue create \
+            --repo "${{ steps.request.outputs.repository }}" \
+            --title "✅ Infrastructure Provisioned: ${{ steps.resolve.outputs.pattern }} (${{ steps.resolve.outputs.environment }})" \
+            --body "$ISSUE_BODY"
 
       # =========================================================================
       # FAILURE: Report back to source repository
