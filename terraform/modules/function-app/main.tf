@@ -155,8 +155,41 @@ resource "azurerm_windows_function_app" "main" {
 }
 
 # ---------------------------------------------------------
+# Consumption Plan (using azapi to avoid quota issues)
+# Azure CLI creates regional plans like "EastUS2LinuxDynamicPlan"
+# We use azapi_resource_action to create-or-update (PUT is idempotent)
+# ---------------------------------------------------------
+locals {
+    # Format location for plan name (remove spaces, title case)
+    location_formatted = replace(title(replace(var.location, "-", " ")), " ", "")
+    consumption_plan_name = "${local.location_formatted}LinuxDynamicPlan"
+    consumption_plan_id   = "/subscriptions/${data.azurerm_subscription.current.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Web/serverfarms/${local.consumption_plan_name}"
+}
+
+# Use resource_action with PUT to create-or-update the consumption plan (idempotent)
+resource "azapi_resource_action" "consumption_plan" {
+    count = local.use_consumption && local.os_type == "Linux" ? 1 : 0
+
+    type        = "Microsoft.Web/serverfarms@2023-01-01"
+    resource_id = local.consumption_plan_id
+    method      = "PUT"
+
+    body = jsonencode({
+        location = var.location
+        kind     = "functionapp"
+        sku = {
+            name = "Y1"
+            tier = "Dynamic"
+        }
+        properties = {
+            reserved = true  # Required for Linux
+        }
+        tags = var.tags
+    })
+}
+
+# ---------------------------------------------------------
 # Consumption Function App (using azapi to avoid quota issues)
-# Creates function app with shared regional consumption plan
 # ---------------------------------------------------------
 resource "azapi_resource" "consumption_function_app" {
     count = local.use_consumption && local.os_type == "Linux" ? 1 : 0
@@ -173,6 +206,7 @@ resource "azapi_resource" "consumption_function_app" {
     body = jsonencode({
         kind = "functionapp,linux"
         properties = {
+            serverFarmId = local.consumption_plan_id
             reserved = true
             siteConfig = {
                 linuxFxVersion = local.linux_fx_version
@@ -205,6 +239,8 @@ resource "azapi_resource" "consumption_function_app" {
     tags = var.tags
 
     response_export_values = ["properties.defaultHostName", "identity.principalId"]
+
+    depends_on = [azapi_resource_action.consumption_plan]
 }
 
 data "azurerm_subscription" "current" {}
