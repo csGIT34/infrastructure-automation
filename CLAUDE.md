@@ -4,19 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Enterprise Infrastructure Self-Service Platform: A **pattern-based**, multi-tenant infrastructure provisioning system that allows teams to request cloud resources via CLI, REST API, or web portal. Developers interact **only through patterns** - curated, opinionated compositions that include all necessary supporting infrastructure.
+Enterprise Infrastructure Self-Service Platform: A **pattern-based**, multi-tenant infrastructure provisioning system that allows teams to request cloud resources via GitOps (GitHub Actions) or REST API. Developers interact **only through patterns** - curated, opinionated compositions that include all necessary supporting infrastructure.
 
 Uses event-driven architecture with Azure Functions, Service Bus, Cosmos DB, and GitHub Actions for Terraform execution.
 
 ## Common Commands
-
-### CLI Development
-```bash
-cd cli
-pip install -e .                              # Install CLI in dev mode
-infra provision <file.yaml> --email <email>   # Submit request
-infra status <request-id>                     # Check status
-```
 
 ### API Gateway (Local Testing)
 ```bash
@@ -85,7 +77,7 @@ Developers interact **only through patterns** - not individual modules. Each pat
 
 ### Request Processing Flow
 ```
-CLI/API → Azure Functions API Gateway → Service Bus Queues (prod/staging/dev)
+GitOps/API → Azure Functions API Gateway → Service Bus Queues (prod/staging/dev)
 → GitHub Actions Queue Consumer (cron: every minute)
 → Provision Worker (parallel: up to 10 workers)
 → Pattern Resolution → Terraform Apply → Azure Resources + Cosmos DB tracking
@@ -93,30 +85,28 @@ CLI/API → Azure Functions API Gateway → Service Bus Queues (prod/staging/dev
 
 ### Key Components
 
-1. **CLI** (`cli/infra_cli.py`) - Click-based Python CLI that submits YAML configs to API Gateway
-
-2. **API Gateway** (`infrastructure/api-gateway/function_app.py`) - Azure Functions HTTP API that:
+1. **API Gateway** (`infrastructure/api-gateway/function_app.py`) - Azure Functions HTTP API that:
    - Validates pattern request schema and policy (cost limits per environment)
    - Estimates infrastructure costs based on pattern + size
    - Stores requests in Cosmos DB (partitioned by `requestId`)
    - Queues to Service Bus with environment-based priority
 
-3. **Queue Consumer** (`.github/workflows/queue-consumer.yaml`) - Scheduled workflow that polls three Service Bus queues and dispatches to provision workers
+2. **Queue Consumer** (`.github/workflows/queue-consumer.yaml`) - Scheduled workflow that polls three Service Bus queues and dispatches to provision workers
 
-4. **Provision Worker** (`.github/workflows/provision-worker.yaml`) - Reusable workflow that:
+3. **Provision Worker** (`.github/workflows/provision-worker.yaml`) - Reusable workflow that:
    - Resolves pattern request to Terraform variables
    - Runs `terraform apply` on the pattern directory
    - Updates Cosmos DB status and captures outputs
 
-5. **Pattern Resolution** (`scripts/resolve-pattern.py`) - Resolves pattern requests:
+4. **Pattern Resolution** (`scripts/resolve-pattern.py`) - Resolves pattern requests:
    - Validates pattern name and config
    - Resolves t-shirt sizing based on environment
    - Evaluates conditional features (prod-only, etc.)
    - Outputs Terraform tfvars
 
-6. **Per-Pattern Terraform** (`terraform/patterns/`) - Each pattern has its own isolated Terraform config that composes modules
+5. **Per-Pattern Terraform** (`terraform/patterns/`) - Each pattern has its own isolated Terraform config that composes modules
 
-7. **Utility Modules** (`terraform/modules/`) - Shared modules used by patterns:
+6. **Utility Modules** (`terraform/modules/`) - Shared modules used by patterns:
    - `naming/` - Resource naming conventions
    - `security-groups/` - Entra ID group creation
    - `rbac-assignments/` - Azure role assignments
@@ -144,10 +134,6 @@ CLI/API → Azure Functions API Gateway → Service Bus Queues (prod/staging/dev
 - `SERVICEBUS_CONNECTION` - Service Bus connection string
 - `COSMOS_DB_ENDPOINT` - Cosmos DB endpoint URL
 - `COSMOS_DB_KEY` - Cosmos DB access key
-
-**CLI:**
-- `INFRA_API_URL` - API Gateway base URL
-- `INFRA_API_KEY` - API authentication key
 
 **Terraform State:**
 - `TF_STATE_STORAGE_ACCOUNT` - Azure Storage account for state
@@ -457,7 +443,7 @@ kubectl exec -n github-runners <pod-name> -c runner -- pip3 list | grep -E "yaml
 To resubmit a failed request:
 1. Find the request in Cosmos DB by requestId
 2. Update status back to "pending"
-3. Resubmit to Service Bus queue (or use CLI to submit fresh)
+3. Resubmit to Service Bus queue
 
 ## Project RBAC and Secrets Management
 
