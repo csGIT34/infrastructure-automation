@@ -18,6 +18,11 @@ on:
           - prod
           - staging
 
+# Prevent concurrent deploys - queue them instead of running in parallel
+concurrency:
+  group: mcp-server-deploy
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/infrastructure-mcp-server
