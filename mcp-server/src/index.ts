@@ -9,8 +9,6 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as fs from "fs";
-import * as path from "path";
-import { glob } from "glob";
 import YAML from "yaml";
 import express from "express";
 import cors from "cors";
@@ -821,32 +819,6 @@ const tools: Tool[] = [
     }
   },
   {
-    name: "analyze_codebase",
-    description: "Analyze a codebase to detect what infrastructure pattern it needs. NOTE: This tool only works in LOCAL mode (stdio). When using the remote SSE server, use analyze_files instead.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "Path to the codebase to analyze"
-        },
-        include_patterns: {
-          type: "array",
-          items: { type: "string" },
-          description: "File patterns to include",
-          default: ["**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx", "**/*.py", "**/*.go", "**/*.cs", "**/*.java", "**/*.env*", "**/package.json", "**/requirements.txt", "**/go.mod"]
-        },
-        exclude_patterns: {
-          type: "array",
-          items: { type: "string" },
-          description: "File patterns to exclude",
-          default: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.git/**", "**/vendor/**"]
-        }
-      },
-      required: ["path"]
-    }
-  },
-  {
     name: "analyze_files",
     description: "Analyze file contents to detect infrastructure patterns. Use this when connecting to the remote MCP server. Useful files: package.json, requirements.txt, host.json, staticwebapp.config.json, source files with imports.",
     inputSchema: {
@@ -974,24 +946,19 @@ const tools: Tool[] = [
   },
   {
     name: "generate_workflow",
-    description: "Generate a GitHub Actions workflow file for infrastructure GitOps using patterns.",
+    description: "Generate a GitHub Actions workflow file for infrastructure GitOps using patterns. Uses repository_dispatch to trigger provisioning.",
     inputSchema: {
       type: "object",
       properties: {
-        servicebus_namespace: {
-          type: "string",
-          description: "Azure Service Bus namespace",
-          default: "sb-infra-api-rrkkz6a8"
-        },
         github_org: {
           type: "string",
-          description: "GitHub organization",
+          description: "GitHub organization that owns the infrastructure-automation repo",
           default: "csGIT34"
         },
-        tracking_url: {
+        infra_repo: {
           type: "string",
-          description: "Infrastructure tracking dashboard URL",
-          default: "https://wonderful-field-088efae10.1.azurestaticapps.net"
+          description: "Infrastructure automation repository name",
+          default: "infrastructure-automation"
         }
       }
     }
@@ -1039,91 +1006,6 @@ async function listPatterns(verbose: boolean = false, category?: string): Promis
     components: p.components,
     use_cases: p.use_cases
   })), null, 2);
-}
-
-async function analyzeCodebase(
-  targetPath: string,
-  includePatterns: string[] = ["**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx", "**/*.py", "**/*.env*", "**/package.json"],
-  excludePatterns: string[] = ["**/node_modules/**", "**/dist/**", "**/.git/**"]
-): Promise<string> {
-  const results: AnalysisResult[] = [];
-  const detectedPatterns: Map<string, { matches: string[]; totalWeight: number }> = new Map();
-
-  for (const patternName of Object.keys(PATTERN_DEFINITIONS)) {
-    detectedPatterns.set(patternName, { matches: [], totalWeight: 0 });
-  }
-
-  try {
-    const files = await glob(includePatterns, {
-      cwd: targetPath,
-      ignore: excludePatterns,
-      absolute: true,
-      nodir: true
-    });
-
-    for (const file of files.slice(0, 100)) {
-      try {
-        const content = fs.readFileSync(file, "utf-8");
-        const relativePath = path.relative(targetPath, file);
-
-        for (const [patternName, patternDef] of Object.entries(PATTERN_DEFINITIONS)) {
-          for (const { pattern, weight } of patternDef.detection_patterns) {
-            if (pattern.test(content) || pattern.test(relativePath)) {
-              const detection = detectedPatterns.get(patternName)!;
-              const matchDesc = `${relativePath}: matched ${pattern.source}`;
-              if (!detection.matches.includes(matchDesc)) {
-                detection.matches.push(matchDesc);
-                detection.totalWeight += weight;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        // Skip unreadable files
-      }
-    }
-
-    for (const [patternName, detection] of detectedPatterns) {
-      if (detection.totalWeight > 0) {
-        const confidence = Math.min(detection.totalWeight / 10, 1);
-        const patternDef = PATTERN_DEFINITIONS[patternName];
-
-        const suggestedConfig: Record<string, any> = {
-          name: "my-" + patternName.replace(/-/g, "")
-        };
-        for (const [key, opt] of Object.entries(patternDef.config.optional)) {
-          if (opt.default !== null && opt.default !== undefined) {
-            suggestedConfig[key] = opt.default;
-          }
-        }
-
-        results.push({
-          pattern: patternName,
-          confidence,
-          reasons: detection.matches.slice(0, 5),
-          suggested_config: suggestedConfig
-        });
-      }
-    }
-
-    results.sort((a, b) => b.confidence - a.confidence);
-
-    return JSON.stringify({
-      analyzed_path: targetPath,
-      files_scanned: files.length,
-      detected_patterns: results.slice(0, 5),
-      summary: results.length > 0
-        ? `Detected ${results.length} potential infrastructure patterns. Top recommendation: ${results[0].pattern}`
-        : "No specific infrastructure patterns detected",
-      hint: "Use generate_pattern_request with the recommended pattern to create your infrastructure.yaml"
-    }, null, 2);
-
-  } catch (error) {
-    return JSON.stringify({
-      error: `Failed to analyze codebase: ${error}`,
-      analyzed_path: targetPath
-    }, null, 2);
-  }
 }
 
 function analyzeFiles(params: {
@@ -1463,13 +1345,11 @@ function estimateCost(params: {
 }
 
 function generateWorkflow(params: {
-  servicebus_namespace?: string;
   github_org?: string;
-  tracking_url?: string;
+  infra_repo?: string;
 }): string {
-  const servicebusNamespace = params.servicebus_namespace || "sb-infra-api-rrkkz6a8";
   const githubOrg = params.github_org || "csGIT34";
-  const trackingUrl = params.tracking_url || "https://wonderful-field-088efae10.1.azurestaticapps.net";
+  const infraRepo = params.infra_repo || "infrastructure-automation";
 
   const validPatterns = JSON.stringify(getValidPatterns());
 
@@ -1477,9 +1357,8 @@ function generateWorkflow(params: {
 # Generated by Infrastructure MCP Server v2.0
 #
 # Required secrets:
-#   INFRA_SERVICE_BUS_SAS_KEY - Service Bus SAS key
-#   INFRA_APP_ID - GitHub App ID
-#   INFRA_APP_PRIVATE_KEY - GitHub App private key
+#   INFRA_APP_ID - GitHub App ID for Infrastructure Dispatch app
+#   INFRA_APP_PRIVATE_KEY - GitHub App private key (PEM format)
 #
 # Usage:
 # 1. Create infrastructure.yaml with a pattern request
@@ -1507,6 +1386,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       validation_result: \${{ steps.validate.outputs.result }}
+      environment: \${{ steps.validate.outputs.environment }}
 
     steps:
       - name: Checkout repository
@@ -1518,7 +1398,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install pyyaml requests
+        run: pip install pyyaml
 
       - name: Validate infrastructure YAML
         id: validate
@@ -1548,6 +1428,10 @@ jobs:
 
           errors = []
 
+          # Only pattern-based requests are supported
+          if 'pattern' not in config:
+              errors.append("Missing 'pattern' field. Only pattern-based requests are supported.")
+
           # Validate metadata
           if 'metadata' not in config:
               errors.append("Missing 'metadata' section")
@@ -1557,21 +1441,32 @@ jobs:
               for field in required_meta:
                   if field not in metadata:
                       errors.append(f"Missing metadata.{field}")
-              if not isinstance(metadata.get('owners'), list) or len(metadata.get('owners', [])) == 0:
-                  errors.append("metadata.owners must be a non-empty array")
+
+              # owners must be a list
+              if 'owners' in metadata and not isinstance(metadata['owners'], list):
+                  errors.append("metadata.owners must be a list of email addresses")
+
+              # Validate environment
+              env = metadata.get('environment', '')
+              if env not in ['dev', 'staging', 'prod']:
+                  errors.append(f"Invalid environment: {env}. Must be dev, staging, or prod")
 
           # Validate pattern
-          valid_patterns = ${validPatterns}
-          if 'pattern' not in config:
-              errors.append("Missing 'pattern' field")
-          elif config['pattern'] not in valid_patterns:
-              errors.append(f"Unknown pattern '{config['pattern']}'. Valid: {', '.join(valid_patterns)}")
+          if 'pattern' in config:
+              valid_patterns = ${validPatterns}
+              pattern = config.get('pattern', '')
+              if pattern not in valid_patterns:
+                  errors.append(f"Invalid pattern: {pattern}. Valid patterns: {', '.join(valid_patterns)}")
 
-          # Validate config
-          if 'config' not in config:
-              errors.append("Missing 'config' section")
-          elif 'name' not in config.get('config', {}):
-              errors.append("Missing config.name")
+              # Validate config section
+              if 'config' not in config:
+                  errors.append("Missing 'config' section for pattern request")
+              else:
+                  cfg = config['config']
+                  if 'name' not in cfg:
+                      errors.append("Missing config.name")
+                  if 'size' in cfg and cfg['size'] not in ['small', 'medium', 'large']:
+                      errors.append(f"Invalid size: {cfg['size']}. Must be small, medium, or large")
 
           if errors:
               print("::error::Validation failed")
@@ -1579,11 +1474,14 @@ jobs:
                   print(f"  - {err}")
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                   f.write("result=failed\\n")
+                  f.write(f"errors={json.dumps(errors)}\\n")
               sys.exit(1)
 
-          print("Validation passed!")
+          environment = config.get('metadata', {}).get('environment', 'dev')
+          print(f"Validation passed! Pattern: {config['pattern']}, Environment: {environment}")
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write("result=passed\\n")
+              f.write(f"environment={environment}\\n")
           EOF
 
       - name: Generate Plan Preview
@@ -1591,37 +1489,86 @@ jobs:
         run: |
           python << 'PLANEOF'
           import yaml
+          import json
           import os
 
           with open("infrastructure.yaml", 'r') as f:
               config = yaml.safe_load(f)
 
-          metadata = config['metadata']
-          pattern = config['pattern']
-          pattern_config = config.get('config', {})
+          metadata = config.get('metadata', {})
+          project = metadata.get('project', 'unknown')
+          env = metadata.get('environment', 'dev')
+          pattern = config.get('pattern', '')
+          cfg = config.get('config', {})
+          size = cfg.get('size', 'small')
 
+          # Generate markdown preview
           preview = "## Infrastructure Plan Preview\\n\\n"
           preview += "### Pattern Request\\n"
-          preview += "| Property | Value |\\n|----------|-------|\\n"
+          preview += "| Property | Value |\\n"
+          preview += "|----------|-------|\\n"
           preview += f"| Pattern | \`{pattern}\` |\\n"
-          preview += f"| Project | \`{metadata.get('project')}\` |\\n"
-          preview += f"| Environment | \`{metadata.get('environment')}\` |\\n"
-          preview += f"| Business Unit | \`{metadata.get('business_unit')}\` |\\n"
+          preview += f"| Project | \`{project}\` |\\n"
+          preview += f"| Environment | \`{env}\` |\\n"
+          preview += f"| Size | \`{size}\` |\\n"
+          preview += f"| Business Unit | \`{metadata.get('business_unit', 'N/A')}\` |\\n"
           preview += f"| Owners | \`{', '.join(metadata.get('owners', []))}\` |\\n"
-          preview += f"| Location | \`{metadata.get('location', 'eastus')}\` |\\n"
-          preview += f"| Size | \`{pattern_config.get('size', 'default')}\` |\\n\\n"
+          preview += f"| Location | \`{metadata.get('location', 'eastus')}\` |\\n\\n"
 
+          # Pattern-specific config
           preview += "### Configuration\\n"
-          preview += "| Setting | Value |\\n|---------|-------|\\n"
-          for key, value in pattern_config.items():
+          preview += "| Setting | Value |\\n"
+          preview += "|---------|-------|\\n"
+          for key, value in cfg.items():
               preview += f"| {key} | \`{value}\` |\\n"
+          preview += "\\n"
 
-          preview += f"\\n### Resource Group\\n\`rg-{metadata.get('project')}-{metadata.get('environment')}\`\\n\\n"
-          preview += "**On merge to main**, this pattern will be provisioned.\\n"
-          preview += f"Track status at: ${trackingUrl}\\n"
+          # What will be created
+          preview += "### What Will Be Created\\n"
+          pattern_components = {
+              'keyvault': ['Key Vault', 'Security Groups', 'RBAC Assignments'],
+              'postgresql': ['PostgreSQL Server', 'Database', 'Key Vault', 'Security Groups'],
+              'mongodb': ['Cosmos DB (MongoDB)', 'Key Vault', 'Security Groups'],
+              'storage': ['Storage Account', 'Blob Containers', 'Security Groups'],
+              'function-app': ['Function App', 'App Service Plan', 'Storage Account', 'Key Vault', 'Security Groups'],
+              'sql-database': ['SQL Server', 'Database', 'Key Vault', 'Security Groups'],
+              'eventhub': ['Event Hub Namespace', 'Event Hub', 'Key Vault', 'Security Groups'],
+              'aks-namespace': ['Kubernetes Namespace', 'Resource Quotas', 'Security Groups'],
+              'linux-vm': ['Virtual Machine', 'Network Interface', 'Key Vault', 'Security Groups'],
+              'static-site': ['Static Web App', 'Security Groups'],
+              'web-app': ['Static Web App', 'Function App', 'Database', 'Key Vault', 'Security Groups'],
+              'api-backend': ['Function App', 'Database', 'Key Vault', 'Security Groups'],
+              'microservice': ['AKS Namespace', 'Event Hub', 'Storage', 'Key Vault', 'Security Groups'],
+              'data-pipeline': ['Event Hub', 'Function App', 'Data Lake Storage', 'MongoDB', 'Key Vault', 'Security Groups']
+          }
+          components = pattern_components.get(pattern, ['Unknown components'])
+          for component in components:
+              preview += f"- {component}\\n"
+          preview += "\\n"
+
+          # Environment features
+          preview += "### Environment Features\\n"
+          if env == 'prod':
+              preview += "- Diagnostic logging enabled\\n"
+              preview += "- Access reviews enabled\\n"
+              preview += "- Geo-redundant backup (if applicable)\\n"
+              preview += "- Purge protection enabled\\n"
+          elif env == 'staging':
+              preview += "- Diagnostic logging enabled\\n"
+              preview += "- Standard backup retention\\n"
+          else:
+              preview += "- Development configuration\\n"
+              preview += "- Minimal backup retention\\n"
+          preview += "\\n"
+
+          preview += f"### Resource Group\\n"
+          preview += f"\`rg-{project}-{env}\`\\n\\n"
+          preview += "---\\n"
+          preview += "**On merge to main**, these changes will be automatically provisioned.\\n"
 
           with open('plan_preview.md', 'w') as f:
               f.write(preview)
+
           print(preview)
           PLANEOF
 
@@ -1632,19 +1579,28 @@ jobs:
           script: |
             const fs = require('fs');
             let body = '## Infrastructure Plan\\n\\n';
+
             try {
               if (fs.existsSync('plan_preview.md')) {
                 body = fs.readFileSync('plan_preview.md', 'utf8');
+              } else {
+                body += 'Infrastructure configuration validated successfully.\\n\\n';
+                body += 'Merge this PR to provision the infrastructure.';
               }
             } catch (e) {
               body += 'Validation passed. See workflow summary for details.';
             }
+
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            const botComment = comments.find(c => c.user.type === 'Bot' && c.body.includes('Infrastructure Plan'));
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Infrastructure Plan')
+            );
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -1661,6 +1617,14 @@ jobs:
               });
             }
 
+      - name: Create Job Summary
+        if: always()
+        run: |
+          if [ -f plan_preview.md ]; then
+            cat plan_preview.md >> \$GITHUB_STEP_SUMMARY
+          fi
+
+  # Trigger provisioning on merge to main
   provision:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -1670,89 +1634,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install pyyaml
-
-      - name: Submit to Infrastructure Queue
-        env:
-          SAS_KEY: \${{ secrets.INFRA_SERVICE_BUS_SAS_KEY }}
-        run: |
-          python << 'EOF'
-          import yaml
-          import json
-          import hashlib
-          import hmac
-          import base64
-          import time
-          import urllib.parse
-          import urllib.request
-          import os
-
-          with open("infrastructure.yaml", 'r') as f:
-              yaml_content = f.read()
-              config = yaml.safe_load(yaml_content)
-
-          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
-          sha = os.environ.get('GITHUB_SHA', 'unknown')[:8]
-          timestamp = int(time.time())
-          request_id = f"gitops-{repo.replace('/', '-')}-{sha}-{timestamp}"
-
-          namespace = "${servicebusNamespace}"
-          queue_name = f"infrastructure-requests-{config['metadata']['environment']}"
-          sas_key = os.environ['SAS_KEY']
-          sas_key_name = "RootManageSharedAccessKey"
-
-          uri = f"https://{namespace}.servicebus.windows.net/{queue_name}".lower()
-          expiry = int(time.time()) + 3600
-          string_to_sign = f"{urllib.parse.quote_plus(uri)}\\n{expiry}"
-          signature = base64.b64encode(
-              hmac.new(sas_key.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).digest()
-          ).decode('utf-8')
-          sas_token = f"SharedAccessSignature sr={urllib.parse.quote_plus(uri)}&sig={urllib.parse.quote_plus(signature)}&se={expiry}&skn={sas_key_name}"
-
-          owners = config['metadata'].get('owners', [])
-          primary_owner = owners[0] if owners else 'gitops@automation'
-          message = {
-              'request_id': request_id,
-              'yaml_content': yaml_content,
-              'requester_email': primary_owner,
-              'metadata': {
-                  'source': 'gitops',
-                  'repository': repo,
-                  'commit_sha': os.environ.get('GITHUB_SHA'),
-                  'triggered_by': os.environ.get('GITHUB_ACTOR'),
-                  'environment': config['metadata']['environment'],
-                  'pattern': config['pattern'],
-                  'submitted_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-              }
-          }
-
-          url = f"https://{namespace}.servicebus.windows.net/{queue_name}/messages"
-          data = json.dumps(message).encode('utf-8')
-
-          req = urllib.request.Request(url, data=data, method='POST')
-          req.add_header('Authorization', sas_token)
-          req.add_header('Content-Type', 'application/json')
-
-          try:
-              response = urllib.request.urlopen(req)
-              print(f"Successfully submitted infrastructure request!")
-              print(f"   Request ID: {request_id}")
-              print(f"   Pattern: {config['pattern']}")
-              print(f"   Queue: {queue_name}")
-              print(f"\\nTrack status at: ${trackingUrl}")
-
-          except urllib.error.HTTPError as e:
-              print(f"::error::Failed to submit: {e.code} {e.reason}")
-              print(e.read().decode())
-              exit(1)
-          EOF
-
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -1760,18 +1641,46 @@ jobs:
           app-id: \${{ secrets.INFRA_APP_ID }}
           private-key: \${{ secrets.INFRA_APP_PRIVATE_KEY }}
           owner: ${githubOrg}
-          repositories: infrastructure-automation
+          repositories: ${infraRepo}
 
-      - name: Trigger Queue Consumer
+      - name: Trigger Provisioning
         env:
           GH_TOKEN: \${{ steps.app-token.outputs.token }}
         run: |
+          # Build the raw URL to infrastructure.yaml
+          YAML_URL="https://raw.githubusercontent.com/\${{ github.repository }}/\${{ github.sha }}/infrastructure.yaml"
+
           curl -X POST \\
             -H "Authorization: token \$GH_TOKEN" \\
             -H "Accept: application/vnd.github.v3+json" \\
-            https://api.github.com/repos/${githubOrg}/infrastructure-automation/dispatches \\
-            -d '{"event_type":"infrastructure-request","client_payload":{"source":"\${{ github.repository }}","pattern":"$(grep 'pattern:' infrastructure.yaml | awk '{print $2}')"}}'
-          echo "Triggered infrastructure queue consumer"
+            https://api.github.com/repos/${githubOrg}/${infraRepo}/dispatches \\
+            -d "{
+              \\"event_type\\": \\"provision\\",
+              \\"client_payload\\": {
+                \\"repository\\": \\"\${{ github.repository }}\\",
+                \\"commit_sha\\": \\"\${{ github.sha }}\\",
+                \\"yaml_url\\": \\"\$YAML_URL\\"
+              }
+            }"
+
+          echo "Triggered infrastructure provisioning"
+          echo ""
+          echo "Request details:"
+          echo "  Repository: \${{ github.repository }}"
+          echo "  Commit: \${{ github.sha }}"
+          echo "  YAML URL: \$YAML_URL"
+
+          cat << EOF >> \$GITHUB_STEP_SUMMARY
+          ## Infrastructure Provisioning Triggered
+
+          | Property | Value |
+          |----------|-------|
+          | Repository | \\\`\${{ github.repository }}\\\` |
+          | Commit | \\\`\${{ github.sha }}\\\` |
+          | Triggered By | \\\`\${{ github.actor }}\\\` |
+
+          Provisioning is running in the [${infraRepo}](https://github.com/${githubOrg}/${infraRepo}/actions) repository.
+          EOF
 `;
 
   return workflow;
@@ -1791,14 +1700,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case "list_patterns":
         result = await listPatterns(args?.verbose as boolean, args?.category as string);
-        break;
-
-      case "analyze_codebase":
-        result = await analyzeCodebase(
-          args?.path as string,
-          args?.include_patterns as string[],
-          args?.exclude_patterns as string[]
-        );
         break;
 
       case "analyze_files":
@@ -2007,9 +1908,6 @@ async function main() {
           switch (name) {
             case "list_patterns":
               result = await listPatterns(args?.verbose as boolean, args?.category as string);
-              break;
-            case "analyze_codebase":
-              result = await analyzeCodebase(args?.path as string, args?.include_patterns as string[], args?.exclude_patterns as string[]);
               break;
             case "analyze_files":
               result = analyzeFiles(args as { files: Array<{ path: string; content: string }>; project_name?: string; });
