@@ -24,22 +24,46 @@ variable "environment" { type = string }
 variable "name" { type = string }
 variable "owners" { type = list(string) }
 variable "business_unit" { type = string }
-variable "location" { type = string default = "eastus" }
+variable "location" {
+  type    = string
+  default = "eastus"
+}
 
 # AKS cluster info
 variable "aks_cluster_name" { type = string }
 variable "aks_resource_group" { type = string }
 
 # Sizing
-variable "cpu_limit" { type = string default = "2" }
-variable "memory_limit" { type = string default = "4Gi" }
-variable "eventhub_sku" { type = string default = "Basic" }
+variable "cpu_limit" {
+  type    = string
+  default = "2"
+}
+variable "memory_limit" {
+  type    = string
+  default = "4Gi"
+}
+variable "eventhub_sku" {
+  type    = string
+  default = "Basic"
+}
 
 # Pattern-specific
-variable "enable_eventhub" { type = bool default = true }
-variable "enable_storage" { type = bool default = true }
-variable "enable_diagnostics" { type = bool default = false }
-variable "log_analytics_workspace_id" { type = string default = "" }
+variable "enable_eventhub" {
+  type    = bool
+  default = true
+}
+variable "enable_storage" {
+  type    = bool
+  default = true
+}
+variable "enable_diagnostics" {
+  type    = bool
+  default = false
+}
+variable "log_analytics_workspace_id" {
+  type    = string
+  default = ""
+}
 
 # Kubernetes provider
 data "azurerm_kubernetes_cluster" "aks" {

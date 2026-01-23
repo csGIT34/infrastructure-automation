@@ -24,7 +24,10 @@ variable "environment" { type = string }
 variable "name" { type = string }
 variable "owners" { type = list(string) }
 variable "business_unit" { type = string }
-variable "location" { type = string default = "eastus" }
+variable "location" {
+  type    = string
+  default = "eastus"
+}
 
 variable "database_type" {
   description = "Database type: postgresql, azure_sql, mongodb, or none"
@@ -33,14 +36,32 @@ variable "database_type" {
 }
 
 # Sizing
-variable "function_sku" { type = string default = "Y1" }
-variable "db_sku" { type = string default = "B_Standard_B1ms" }
+variable "function_sku" {
+  type    = string
+  default = "Y1"
+}
+variable "db_sku" {
+  type    = string
+  default = "B_Standard_B1ms"
+}
 
 # Pattern-specific
-variable "runtime" { type = string default = "python" }
-variable "runtime_version" { type = string default = "3.11" }
-variable "enable_diagnostics" { type = bool default = false }
-variable "log_analytics_workspace_id" { type = string default = "" }
+variable "runtime" {
+  type    = string
+  default = "python"
+}
+variable "runtime_version" {
+  type    = string
+  default = "3.11"
+}
+variable "enable_diagnostics" {
+  type    = bool
+  default = false
+}
+variable "log_analytics_workspace_id" {
+  type    = string
+  default = ""
+}
 
 # Resource Group
 module "naming" {

@@ -22,15 +22,36 @@ variable "environment" { type = string }
 variable "name" { type = string }
 variable "owners" { type = list(string) }
 variable "business_unit" { type = string }
-variable "location" { type = string default = "eastus" }
+variable "location" {
+  type    = string
+  default = "eastus"
+}
 
-variable "sku" { type = string default = "Basic" }
-variable "capacity" { type = number default = 1 }
-variable "partition_count" { type = number default = 2 }
-variable "message_retention" { type = number default = 1 }
+variable "sku" {
+  type    = string
+  default = "Basic"
+}
+variable "capacity" {
+  type    = number
+  default = 1
+}
+variable "partition_count" {
+  type    = number
+  default = 2
+}
+variable "message_retention" {
+  type    = number
+  default = 1
+}
 
-variable "enable_diagnostics" { type = bool default = false }
-variable "log_analytics_workspace_id" { type = string default = "" }
+variable "enable_diagnostics" {
+  type    = bool
+  default = false
+}
+variable "log_analytics_workspace_id" {
+  type    = string
+  default = ""
+}
 
 # Resource Group
 module "naming" {

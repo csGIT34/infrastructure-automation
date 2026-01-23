@@ -23,22 +23,52 @@ variable "environment" { type = string }
 variable "name" { type = string }
 variable "owners" { type = list(string) }
 variable "business_unit" { type = string }
-variable "location" { type = string default = "eastus" }
+variable "location" {
+  type    = string
+  default = "eastus"
+}
 
 # Sizing-resolved
-variable "vm_size" { type = string default = "Standard_B1s" }
-variable "os_disk_size_gb" { type = number default = 30 }
-variable "os_disk_type" { type = string default = "Standard_LRS" }
+variable "vm_size" {
+  type    = string
+  default = "Standard_B1s"
+}
+variable "os_disk_size_gb" {
+  type    = number
+  default = 30
+}
+variable "os_disk_type" {
+  type    = string
+  default = "Standard_LRS"
+}
 
 # Pattern-specific
 variable "subnet_id" { type = string }
-variable "admin_username" { type = string default = "azureuser" }
-variable "image_publisher" { type = string default = "Canonical" }
-variable "image_offer" { type = string default = "0001-com-ubuntu-server-jammy" }
-variable "image_sku" { type = string default = "22_04-lts" }
+variable "admin_username" {
+  type    = string
+  default = "azureuser"
+}
+variable "image_publisher" {
+  type    = string
+  default = "Canonical"
+}
+variable "image_offer" {
+  type    = string
+  default = "0001-com-ubuntu-server-jammy"
+}
+variable "image_sku" {
+  type    = string
+  default = "22_04-lts"
+}
 
-variable "enable_diagnostics" { type = bool default = false }
-variable "log_analytics_workspace_id" { type = string default = "" }
+variable "enable_diagnostics" {
+  type    = bool
+  default = false
+}
+variable "log_analytics_workspace_id" {
+  type    = string
+  default = ""
+}
 
 # Resource Group
 module "naming" {

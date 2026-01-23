@@ -35,17 +35,38 @@ variable "environment" { type = string }
 variable "name" { type = string }
 variable "owners" { type = list(string) }
 variable "business_unit" { type = string }
-variable "location" { type = string default = "eastus" }
+variable "location" {
+  type    = string
+  default = "eastus"
+}
 
 # Sizing-resolved
-variable "throughput" { type = number default = 400 }
-variable "max_throughput" { type = number default = 4000 }
-variable "enable_automatic_failover" { type = bool default = false }
-variable "consistency_level" { type = string default = "Session" }
+variable "throughput" {
+  type    = number
+  default = 400
+}
+variable "max_throughput" {
+  type    = number
+  default = 4000
+}
+variable "enable_automatic_failover" {
+  type    = bool
+  default = false
+}
+variable "consistency_level" {
+  type    = string
+  default = "Session"
+}
 
 # Pattern-specific
-variable "enable_diagnostics" { type = bool default = false }
-variable "log_analytics_workspace_id" { type = string default = "" }
+variable "enable_diagnostics" {
+  type    = bool
+  default = false
+}
+variable "log_analytics_workspace_id" {
+  type    = string
+  default = ""
+}
 
 # -----------------------------------------------------------------------------
 # Resource Group

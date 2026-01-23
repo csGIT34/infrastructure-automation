@@ -28,9 +28,18 @@ variable "aks_cluster_name" { type = string }
 variable "aks_resource_group" { type = string }
 
 # Sizing-resolved quotas
-variable "cpu_limit" { type = string default = "2" }
-variable "memory_limit" { type = string default = "4Gi" }
-variable "pod_limit" { type = number default = 20 }
+variable "cpu_limit" {
+  type    = string
+  default = "2"
+}
+variable "memory_limit" {
+  type    = string
+  default = "4Gi"
+}
+variable "pod_limit" {
+  type    = number
+  default = 20
+}
 
 # Kubernetes provider config
 data "azurerm_kubernetes_cluster" "aks" {

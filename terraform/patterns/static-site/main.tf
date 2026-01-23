@@ -22,18 +22,42 @@ variable "environment" { type = string }
 variable "name" { type = string }
 variable "owners" { type = list(string) }
 variable "business_unit" { type = string }
-variable "location" { type = string default = "eastus2" }
+variable "location" {
+  type    = string
+  default = "eastus2"
+}
 
 # Sizing-resolved
-variable "sku_tier" { type = string default = "Free" }
-variable "sku_size" { type = string default = "Free" }
+variable "sku_tier" {
+  type    = string
+  default = "Free"
+}
+variable "sku_size" {
+  type    = string
+  default = "Free"
+}
 
 # Pattern-specific
-variable "repository_url" { type = string default = "" }
-variable "branch" { type = string default = "main" }
-variable "app_location" { type = string default = "/" }
-variable "api_location" { type = string default = "" }
-variable "output_location" { type = string default = "build" }
+variable "repository_url" {
+  type    = string
+  default = ""
+}
+variable "branch" {
+  type    = string
+  default = "main"
+}
+variable "app_location" {
+  type    = string
+  default = "/"
+}
+variable "api_location" {
+  type    = string
+  default = ""
+}
+variable "output_location" {
+  type    = string
+  default = "build"
+}
 
 # Resource Group
 module "naming" {

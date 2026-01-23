@@ -24,21 +24,54 @@ variable "environment" { type = string }
 variable "name" { type = string }
 variable "owners" { type = list(string) }
 variable "business_unit" { type = string }
-variable "location" { type = string default = "eastus" }
+variable "location" {
+  type    = string
+  default = "eastus"
+}
 
 # Sizing
-variable "eventhub_sku" { type = string default = "Basic" }
-variable "eventhub_capacity" { type = number default = 1 }
-variable "function_sku" { type = string default = "Y1" }
-variable "storage_replication" { type = string default = "LRS" }
+variable "eventhub_sku" {
+  type    = string
+  default = "Basic"
+}
+variable "eventhub_capacity" {
+  type    = number
+  default = 1
+}
+variable "function_sku" {
+  type    = string
+  default = "Y1"
+}
+variable "storage_replication" {
+  type    = string
+  default = "LRS"
+}
 
 # Pattern-specific
-variable "partition_count" { type = number default = 4 }
-variable "message_retention" { type = number default = 1 }
-variable "runtime" { type = string default = "python" }
-variable "enable_mongodb" { type = bool default = true }
-variable "enable_diagnostics" { type = bool default = false }
-variable "log_analytics_workspace_id" { type = string default = "" }
+variable "partition_count" {
+  type    = number
+  default = 4
+}
+variable "message_retention" {
+  type    = number
+  default = 1
+}
+variable "runtime" {
+  type    = string
+  default = "python"
+}
+variable "enable_mongodb" {
+  type    = bool
+  default = true
+}
+variable "enable_diagnostics" {
+  type    = bool
+  default = false
+}
+variable "log_analytics_workspace_id" {
+  type    = string
+  default = ""
+}
 
 # Resource Group
 module "naming" {
