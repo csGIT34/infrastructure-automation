@@ -4,7 +4,8 @@ metadata:
   name: dns
   namespace: dns
   annotations:
-    metallb.universe.tf/loadBalancerIPs: "10.1.1.231"
+    metallb.io/loadBalancerIPs: "10.1.1.231"
+    svccontroller.k3s.cattle.io/lbpool: ""
 spec:
   type: LoadBalancer
   selector:
