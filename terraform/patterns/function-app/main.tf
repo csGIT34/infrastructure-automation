@@ -298,12 +298,12 @@ module "diagnostics" {
 # -----------------------------------------------------------------------------
 module "access_review" {
   source = "../../modules/access-review"
-  count  = var.enable_access_review && length(var.access_reviewers) > 0 ? 1 : 0
+  count  = var.enable_access_review ? 1 : 0
 
-  group_id        = module.security_groups.group_ids["func-admins"]
-  group_name      = module.security_groups.group_names["func-admins"]
-  reviewer_emails = var.access_reviewers
-  frequency       = "quarterly"
+  group_id   = module.security_groups.group_ids["func-admins"]
+  group_name = module.security_groups.group_names["func-admins"]
+  frequency  = "quarterly"
+  start_date = formatdate("YYYY-MM-DD", timestamp())
 }
 
 # -----------------------------------------------------------------------------

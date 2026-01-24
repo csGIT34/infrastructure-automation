@@ -312,12 +312,12 @@ module "private_endpoint" {
 # -----------------------------------------------------------------------------
 module "access_review" {
   source = "../../modules/access-review"
-  count  = var.enable_access_review && length(var.access_reviewers) > 0 ? 1 : 0
+  count  = var.enable_access_review ? 1 : 0
 
-  group_id        = module.security_groups.group_ids["storage-contributors"]
-  group_name      = module.security_groups.group_names["storage-contributors"]
-  reviewer_emails = var.access_reviewers
-  frequency       = "quarterly"
+  group_id   = module.security_groups.group_ids["storage-contributors"]
+  group_name = module.security_groups.group_names["storage-contributors"]
+  frequency  = "quarterly"
+  start_date = formatdate("YYYY-MM-DD", timestamp())
 }
 
 # -----------------------------------------------------------------------------
