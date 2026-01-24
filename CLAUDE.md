@@ -80,7 +80,7 @@ Developer PR (infrastructure.yaml)
 → Validation + Plan Preview (PR comment)
 → Merge to main
 → repository_dispatch to infrastructure-automation repo
-→ Provision workflow runs on self-hosted runner
+→ Provision workflow runs
 → Pattern Resolution → Terraform Apply → Azure Resources
 → Status + Issue created in source repo (success or failure)
 ```
@@ -451,57 +451,6 @@ gh workflow run provision.yaml \
   -f yaml_url=https://raw.githubusercontent.com/owner/repo/abc123/infrastructure.yaml
 ```
 
-### Managing Self-Hosted Runners (ArgoCD)
-
-The GitHub Actions self-hosted runners are managed via ArgoCD. **Do not directly delete pods or modify k8s resources** - always use ArgoCD.
-
-**Key files:**
-- `infrastructure/local-runners/runner-deployment.yaml` - Runner configuration
-- `infrastructure/local-runners/docker/Dockerfile` - Runner image definition
-
-**To update the runner image:**
-
-1. Make changes to `infrastructure/local-runners/docker/Dockerfile`
-2. Push to main - the `build-runner-image.yaml` workflow builds and pushes to Docker Hub
-3. Trigger ArgoCD sync to pull the new image:
-   ```bash
-   # Trigger hard refresh via kubectl
-   kubectl patch application github-runners -n argocd \
-     --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
-
-   # Or trigger a sync
-   kubectl patch application github-runners -n argocd \
-     --type merge -p '{"operation":{"initiatedBy":{"username":"claude"},"sync":{"revision":"HEAD"}}}'
-   ```
-
-4. Verify pods are updated:
-   ```bash
-   kubectl get pods -n github-runners
-   kubectl get application github-runners -n argocd
-   ```
-
-**To update runner configuration:**
-
-1. Edit `infrastructure/local-runners/runner-deployment.yaml`
-2. Commit and push to main
-3. ArgoCD auto-syncs (or trigger manually as above)
-
-**Verify runner packages:**
-```bash
-kubectl exec -n github-runners <pod-name> -c runner -- pip3 list | grep -E "yaml|azure"
-```
-
-**ArgoCD application details:**
-- Application name: `github-runners`
-- Namespace: `argocd`
-- Target namespace: `github-runners`
-- Source: `infrastructure/local-runners/` in this repo
-
-**Image configuration:**
-- Registry: `docker.io/csdock34/actions-runner:latest`
-- `imagePullPolicy: Always` ensures new images are pulled on pod creation
-- Packages included: pyyaml, azure-identity, terraform, azure-cli
-
 ## Project RBAC and Secrets Management
 
 ### Overview
@@ -583,98 +532,6 @@ The GitHub App (`INFRA_APP_ID`) must be installed on **both** infrastructure-aut
 4. Install the app on each consuming repo
 5. Add `INFRA_APP_ID` and `INFRA_APP_PRIVATE_KEY` to both repos' secrets
 
-## Home Lab Networking
-
-The k3s cluster runs on Hyper-V with dual-NIC VMs for home network access.
-
-### Network Architecture
-
-```
-Home Network (10.1.1.0/24)
-├── k3s-master: 10.1.1.60 (eth1)
-├── k3s-worker-1: 10.1.1.61 (eth1)
-├── k3s-worker-2: 10.1.1.62 (eth1)
-├── Traefik Ingress: 10.1.1.230 (MetalLB)
-└── dnsmasq DNS: 10.1.1.231 (MetalLB)
-
-Internal Cluster Network (10.10.10.0/24)
-├── k3s-master: 10.10.10.10 (eth0)
-├── k3s-worker-1: 10.10.10.11 (eth0)
-└── k3s-worker-2: 10.10.10.12 (eth0)
-```
-
-### DNS Resolution
-
-Network-wide DNS via dnsmasq at `10.1.1.231`. Configure router DHCP to use this as primary DNS.
-
-**Current DNS records** (edit `infrastructure/local-runners/dnsmasq/configmap.yaml`):
-- `argocd.lab` → 10.1.1.230 (Traefik)
-- `workout.lab` → 10.1.1.230 (Traefik)
-- `k3s-master.lab` → 10.1.1.60
-
-**Adding DNS records:**
-```yaml
-# In dnsmasq configmap.yaml
-address=/myapp.lab/10.1.1.230
-```
-Then: `kubectl rollout restart deployment dnsmasq -n dns`
-
-### Creating Ingress for Apps
-
-```yaml
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: myapp-route
-  namespace: myapp
-spec:
-  entryPoints:
-    - web
-  routes:
-  - match: Host(`myapp.lab`)
-    kind: Rule
-    services:
-    - name: myapp-service
-      port: 80
-```
-
-### ArgoCD Applications
-
-| App | Namespace | Description |
-|-----|-----------|-------------|
-| `cluster-networking` | metallb-system | MetalLB L2 load balancer |
-| `dnsmasq` | dns | Network DNS server |
-| `github-runners` | github-runners | Self-hosted Actions runners |
-
-### Key Files
-
-- `infrastructure/local-runners/networking/` - MetalLB, CoreDNS config
-- `infrastructure/local-runners/dnsmasq/` - dnsmasq DNS server
-- `infrastructure/local-runners/runner-deployment.yaml` - GitHub runners
-
-### Useful Commands
-
-```bash
-# Check ArgoCD apps
-kubectl get applications -n argocd
-
-# Sync an app
-kubectl patch application <app-name> -n argocd \
-  --type merge -p '{"operation":{"sync":{"revision":"HEAD"}}}'
-
-# Check LoadBalancer IPs
-kubectl get svc -A | grep LoadBalancer
-
-# Test DNS
-nslookup argocd.lab 10.1.1.231
-
-# Restart dnsmasq after config changes
-kubectl rollout restart deployment dnsmasq -n dns
-```
-
 ## Key Documentation
 
 - `infrastructure-platform-guide.md` - Comprehensive platform guide
-- `docs/LOCAL-K8S-SETUP.md` - Local k3s cluster setup for self-hosted runners
-- `infrastructure/local-runners/networking/README.md` - Network architecture details
-- `infrastructure/local-runners/dnsmasq/README.md` - DNS server configuration
