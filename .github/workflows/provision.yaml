@@ -238,7 +238,7 @@ jobs:
           echo "  State Key: ${{ matrix.pattern.state_key }}"
 
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets[format('AZURE_CLIENT_ID_{0}', matrix.pattern.environment)] }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
