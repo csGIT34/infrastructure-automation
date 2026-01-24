@@ -16,6 +16,7 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
             color: #e4e4e7;
+            line-height: 1.5;
         }
 
         .container {
@@ -41,13 +42,13 @@
             font-size: 1rem;
         }
 
-        /* Tabs */
         .tabs {
             display: flex;
             gap: 0.5rem;
             margin-bottom: 1.5rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding-bottom: 0.5rem;
+            flex-wrap: wrap;
         }
 
         .tab-btn {
@@ -60,14 +61,11 @@
             cursor: pointer;
             border-radius: 8px 8px 0 0;
             transition: all 0.2s;
-            width: auto;
         }
 
         .tab-btn:hover {
             color: #fff;
             background: rgba(255, 255, 255, 0.05);
-            transform: none;
-            box-shadow: none;
         }
 
         .tab-btn.active {
@@ -84,18 +82,14 @@
             display: block;
         }
 
-        .main-content {
+        .main-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 2rem;
         }
 
-        .main-content.single-column {
-            grid-template-columns: 1fr;
-        }
-
-        @media (max-width: 900px) {
-            .main-content {
+        @media (max-width: 1024px) {
+            .main-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -146,6 +140,10 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
         }
 
+        input::placeholder, textarea::placeholder {
+            color: #71717a;
+        }
+
         textarea {
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             font-size: 0.8rem;
@@ -153,21 +151,22 @@
             resize: vertical;
         }
 
-        .yaml-editor {
-            min-height: 350px;
+        .yaml-preview {
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
         }
 
         button {
             background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: #fff;
             border: none;
-            padding: 0.875rem 1.5rem;
+            padding: 0.75rem 1.5rem;
             border-radius: 8px;
             font-size: 0.875rem;
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
-            width: 100%;
         }
 
         button:hover {
@@ -183,7 +182,6 @@
 
         .btn-secondary {
             background: rgba(255, 255, 255, 0.1);
-            margin-top: 0.5rem;
         }
 
         .btn-secondary:hover {
@@ -191,1079 +189,3703 @@
             box-shadow: none;
         }
 
+        .btn-success {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
         .btn-small {
             padding: 0.5rem 1rem;
             font-size: 0.8rem;
-            width: auto;
         }
 
-        .status-box {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.8rem;
-            max-height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .status-success { border-left: 3px solid #22c55e; }
-        .status-error { border-left: 3px solid #ef4444; }
-        .status-pending { border-left: 3px solid #f59e0b; }
-        .status-info { border-left: 3px solid #3b82f6; }
-
-        .template-buttons {
+        .btn-row {
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
+        }
+
+        .btn-row button {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        /* Pattern Grid */
+        .pattern-search {
             margin-bottom: 1rem;
         }
 
-        .template-btn {
-            background: rgba(255, 255, 255, 0.1);
+        .pattern-filters {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: rgba(255, 255, 255, 0.05);
             padding: 0.5rem 1rem;
-            font-size: 0.75rem;
-            width: auto;
+            font-size: 0.8rem;
+            border-radius: 20px;
         }
 
-        .info-box {
-            background: rgba(59, 130, 246, 0.1);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            border-radius: 8px;
+        .filter-btn.active {
+            background: rgba(59, 130, 246, 0.3);
+            border-color: #3b82f6;
+        }
+
+        .pattern-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .pattern-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
             padding: 1rem;
-            margin-bottom: 1rem;
-            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pattern-card:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .pattern-card.selected {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: #3b82f6;
+        }
+
+        .pattern-card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .pattern-icon {
+            font-size: 1.25rem;
+        }
+
+        .pattern-name {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .pattern-category {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.65rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .pattern-category.single-resource {
+            background: rgba(59, 130, 246, 0.2);
             color: #93c5fd;
         }
 
+        .pattern-category.composite {
+            background: rgba(168, 85, 247, 0.2);
+            color: #d8b4fe;
+        }
+
+        .pattern-description {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Config Form */
         .config-section {
             margin-bottom: 1.5rem;
             padding-bottom: 1.5rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* Queue Status Cards */
-        .queue-cards {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+        .config-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
         }
 
-        @media (max-width: 700px) {
-            .queue-cards {
+        .config-section h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #93c5fd;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            .form-row {
                 grid-template-columns: 1fr;
             }
         }
 
-        .queue-card {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 12px;
-            padding: 1.25rem;
-            text-align: center;
-        }
-
-        .queue-card h3 {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 0.75rem;
-        }
-
-        .queue-card.dev h3 { color: #22c55e; }
-        .queue-card.staging h3 { color: #f59e0b; }
-        .queue-card.prod h3 { color: #ef4444; }
-
-        .queue-count {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #fff;
-            line-height: 1;
-        }
-
-        .queue-label {
+        .form-help {
             font-size: 0.75rem;
-            color: #a1a1aa;
-            margin-top: 0.5rem;
-        }
-
-        .queue-dead-letter {
-            font-size: 0.7rem;
             color: #71717a;
             margin-top: 0.25rem;
         }
 
-        /* Request Status */
-        .request-card {
+        .required-indicator {
+            color: #ef4444;
+            margin-left: 0.25rem;
+        }
+
+        /* Added Patterns List */
+        .added-patterns {
+            margin-top: 1rem;
+        }
+
+        .added-pattern-card {
             background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .added-pattern-info {
+            flex: 1;
+        }
+
+        .added-pattern-name {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .added-pattern-config {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+        }
+
+        .action-badge {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 0.5rem;
+        }
+
+        .action-badge.create {
+            background: rgba(34, 197, 94, 0.2);
+            color: #86efac;
+        }
+
+        .action-badge.destroy {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+        }
+
+        .added-pattern-actions {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .added-pattern-actions button {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        /* Cost Display */
+        .cost-display {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .cost-label {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .cost-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #86efac;
+        }
+
+        .cost-period {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+        }
+
+        /* Info Box */
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+            color: #93c5fd;
+        }
+
+        .info-box code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        /* Collapsible Section */
+        .collapsible {
+            margin-bottom: 1rem;
+        }
+
+        .collapsible-header {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .collapsible-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .collapsible-header h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .collapsible-icon {
+            transition: transform 0.2s;
+        }
+
+        .collapsible.open .collapsible-icon {
+            transform: rotate(180deg);
+        }
+
+        .collapsible-content {
+            display: none;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .collapsible.open .collapsible-content {
+            display: block;
+        }
+
+        /* Step List */
+        .step-list {
+            counter-reset: step;
+        }
+
+        .step {
+            position: relative;
+            padding-left: 2.5rem;
+            padding-bottom: 1.5rem;
+        }
+
+        .step::before {
+            counter-increment: step;
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1.75rem;
+            height: 1.75rem;
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #93c5fd;
+        }
+
+        .step h4 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .step p {
+            font-size: 0.85rem;
+            color: #a1a1aa;
+        }
+
+        /* Secrets Table */
+        .secrets-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .secrets-table th,
+        .secrets-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .secrets-table th {
+            color: #a1a1aa;
+            font-weight: 500;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .secrets-table td code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+            color: #93c5fd;
+        }
+
+        /* Pattern Reference */
+        .pattern-detail {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             padding: 1.5rem;
             margin-bottom: 1rem;
         }
 
-        .request-header {
+        .pattern-detail-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 1rem;
         }
 
-        .request-id {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.85rem;
-            color: #fff;
-            word-break: break-all;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 999px;
-            font-size: 0.7rem;
+        .pattern-detail h3 {
+            font-size: 1.1rem;
             font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .status-badge.pending { background: #f59e0b; color: #000; }
-        .status-badge.processing { background: #3b82f6; color: #fff; }
-        .status-badge.completed { background: #22c55e; color: #000; }
-        .status-badge.failed { background: #ef4444; color: #fff; }
-
-        .request-details {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem;
-            font-size: 0.8rem;
-        }
-
-        .request-detail {
-            color: #a1a1aa;
-        }
-
-        .request-detail strong {
             color: #fff;
-            display: block;
-            margin-bottom: 0.25rem;
         }
 
-        .spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s linear infinite;
-            margin-right: 0.5rem;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .refresh-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .auto-refresh {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.8rem;
+        .pattern-detail-description {
             color: #a1a1aa;
-        }
-
-        .auto-refresh input[type="checkbox"] {
-            width: auto;
-        }
-
-        .last-updated {
-            font-size: 0.75rem;
-            color: #71717a;
-        }
-
-        .hidden { display: none; }
-
-        .inline-form {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .inline-form input {
-            flex: 1;
-        }
-
-        .inline-form button {
-            width: auto;
-            white-space: nowrap;
-        }
-
-        /* Export Modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal {
-            background: #1e1e2e;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 2rem;
-            max-width: 600px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal h2 {
-            color: #fff;
-            margin-bottom: 1rem;
-            font-size: 1.25rem;
-        }
-
-        .modal-close {
-            float: right;
-            background: transparent;
-            border: none;
-            color: #a1a1aa;
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 0;
-            width: auto;
-            line-height: 1;
-        }
-
-        .modal-close:hover {
-            color: #fff;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .export-step {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .export-step h3 {
-            color: #3b82f6;
             font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .pattern-detail-section {
+            margin-top: 1rem;
+        }
+
+        .pattern-detail-section h4 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #93c5fd;
             margin-bottom: 0.5rem;
         }
 
-        .export-step p {
-            color: #a1a1aa;
+        .pattern-detail-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .pattern-detail-section li {
             font-size: 0.85rem;
-            margin-bottom: 0.75rem;
+            color: #a1a1aa;
+            padding: 0.25rem 0;
+            padding-left: 1rem;
+            position: relative;
         }
 
-        .export-step code {
-            background: rgba(0, 0, 0, 0.4);
-            padding: 0.2rem 0.4rem;
-            border-radius: 4px;
+        .pattern-detail-section li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #3b82f6;
+        }
+
+        .sizing-table {
+            width: 100%;
+            border-collapse: collapse;
             font-size: 0.8rem;
-            color: #93c5fd;
-        }
-
-        .btn-export {
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
             margin-top: 0.5rem;
         }
 
-        .btn-export:hover {
-            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+        .sizing-table th,
+        .sizing-table td {
+            padding: 0.5rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .button-row {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
+        .sizing-table th {
+            background: rgba(0, 0, 0, 0.3);
+            color: #a1a1aa;
+            font-weight: 500;
         }
 
-        .button-row button {
-            flex: 1;
-            min-width: 150px;
+        .sizing-table td {
+            color: #86efac;
         }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .hidden { display: none !important; }
+
+        /* Icon mappings */
+        .icon-key::before { content: "🔐"; }
+        .icon-database::before { content: "🗄️"; }
+        .icon-folder::before { content: "📁"; }
+        .icon-zap::before { content: "⚡"; }
+        .icon-globe::before { content: "🌐"; }
+        .icon-activity::before { content: "📊"; }
+        .icon-box::before { content: "📦"; }
+        .icon-server::before { content: "🖥️"; }
+        .icon-layers::before { content: "🔷"; }
+        .icon-layout::before { content: "🖼️"; }
+        .icon-cpu::before { content: "⚙️"; }
+        .icon-git-branch::before { content: "🔀"; }
+        .icon-package::before { content: "📦"; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Infrastructure Self-Service Portal</h1>
-            <p>Submit and monitor infrastructure requests</p>
+            <p>Generate infrastructure.yaml for your projects</p>
         </header>
 
         <div class="tabs">
-            <button class="tab-btn active" onclick="showTab('submit')">Submit Request</button>
-            <button class="tab-btn" onclick="showTab('status')">Queue Status</button>
-            <button class="tab-btn" onclick="showTab('lookup')">Request Lookup</button>
+            <button class="tab-btn active" onclick="showTab('builder')">Pattern Builder</button>
+            <button class="tab-btn" onclick="showTab('setup')">Setup Guide</button>
+            <button class="tab-btn" onclick="showTab('reference')">Pattern Reference</button>
         </div>
 
-        <!-- Submit Request Tab -->
-        <div id="tab-submit" class="tab-content active">
-            <div class="main-content">
+        <!-- Pattern Builder Tab -->
+        <div id="tab-builder" class="tab-content active">
+            <div class="main-grid">
                 <div class="panel">
-                    <h2>Request Configuration</h2>
+                    <h2>1. Shared Metadata</h2>
 
                     <div class="config-section">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Project Name <span class="required-indicator">*</span></label>
+                                <input type="text" id="meta-project" placeholder="myapp" oninput="updatePreview()">
+                                <div class="form-help">Lowercase, no spaces (e.g., myapp, api-service)</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Environment <span class="required-indicator">*</span></label>
+                                <select id="meta-environment" onchange="updatePreview()">
+                                    <option value="dev">Development</option>
+                                    <option value="staging">Staging</option>
+                                    <option value="prod">Production</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Business Unit <span class="required-indicator">*</span></label>
+                                <input type="text" id="meta-business-unit" placeholder="engineering" oninput="updatePreview()">
+                            </div>
+                            <div class="form-group">
+                                <label>Location</label>
+                                <select id="meta-location" onchange="updatePreview()">
+                                    <option value="eastus">East US</option>
+                                    <option value="eastus2">East US 2</option>
+                                    <option value="westus2">West US 2</option>
+                                    <option value="centralus">Central US</option>
+                                    <option value="northeurope">North Europe</option>
+                                    <option value="westeurope">West Europe</option>
+                                </select>
+                            </div>
+                        </div>
                         <div class="form-group">
-                            <label for="email">Requester Email</label>
-                            <input type="email" id="email" placeholder="your.email@company.com" value="test@example.com">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="environment">Environment</label>
-                            <select id="environment">
-                                <option value="dev">Development (dev)</option>
-                                <option value="staging">Staging</option>
-                                <option value="prod">Production</option>
-                            </select>
+                            <label>Owners <span class="required-indicator">*</span></label>
+                            <textarea id="meta-owners" rows="2" placeholder="alice@example.com&#10;bob@example.com" oninput="updatePreview()"></textarea>
+                            <div class="form-help">One email per line. These users become group owners in Entra ID.</div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>Quick Templates</label>
-                        <div class="template-buttons">
-                            <button class="template-btn" onclick="loadTemplate('storage')">Storage Account</button>
-                            <button class="template-btn" onclick="loadTemplate('webapp')">Web App Stack</button>
-                            <button class="template-btn" onclick="loadTemplate('database')">Database</button>
-                            <button class="template-btn" onclick="loadTemplate('staticwebapp')">Static Web App</button>
-                            <button class="template-btn" onclick="loadTemplate('full')">Full Stack</button>
+                    <h2>2. Select Pattern</h2>
+
+                    <div class="pattern-search">
+                        <input type="text" id="pattern-search" placeholder="Search patterns..." oninput="filterPatterns()">
+                    </div>
+
+                    <div class="pattern-filters">
+                        <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+                        <button class="filter-btn" onclick="setFilter('single-resource', this)">Single Resource</button>
+                        <button class="filter-btn" onclick="setFilter('composite', this)">Composite</button>
+                    </div>
+
+                    <div class="pattern-grid" id="pattern-grid">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div id="pattern-config-section" class="hidden">
+                        <h2 style="margin-top: 1.5rem;">3. Configure <span id="selected-pattern-name"></span></h2>
+
+                        <div id="pattern-config-form">
+                            <!-- Dynamic form fields -->
+                        </div>
+
+                        <div class="btn-row" style="margin-top: 1rem;">
+                            <button class="btn-success" onclick="addPatternToRequest()">Add to Request</button>
+                            <button class="btn-secondary" onclick="clearPatternSelection()">Cancel</button>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="yaml">YAML Configuration</label>
-                        <textarea id="yaml" class="yaml-editor" placeholder="Enter your infrastructure YAML here..."></textarea>
-                    </div>
+                    <div class="added-patterns" id="added-patterns-section">
+                        <h2 style="margin-top: 1.5rem;">Added Patterns <span id="pattern-count">(0)</span></h2>
+                        <div id="added-patterns-list">
+                            <div class="info-box">No patterns added yet. Select a pattern above to add it to your request.</div>
+                        </div>
 
-                    <div class="button-row">
-                        <button id="submitBtn" onclick="submitRequest()">Submit Request</button>
-                        <button class="btn-export" onclick="showExportModal()">Export for GitOps</button>
+                        <div class="cost-display" id="cost-display" style="display: none;">
+                            <div class="cost-label">Estimated Monthly Cost</div>
+                            <div class="cost-value">$<span id="total-cost">0</span></div>
+                            <div class="cost-period">USD/month (create patterns only)</div>
+                        </div>
                     </div>
-                    <button class="btn-secondary" onclick="validateYaml()">Validate YAML</button>
                 </div>
 
                 <div class="panel">
-                    <h2>Connection Settings</h2>
+                    <h2>YAML Preview</h2>
 
                     <div class="info-box">
-                        <strong>How it works:</strong><br>
-                        1. Configure your infrastructure using YAML<br>
-                        2. Submit the request to the queue<br>
-                        3. GitHub Actions processes the request<br>
-                        4. Terraform provisions your resources
+                        This is your <code>infrastructure.yaml</code> file. Download it and commit to your repository.
                     </div>
 
-                    <div class="form-group">
-                        <label for="servicebusNs">Service Bus Namespace</label>
-                        <input type="text" id="servicebusNs" value="sb-infra-api-rrkkz6a8">
+                    <textarea id="yaml-preview" class="yaml-preview" readonly placeholder="Add patterns to generate YAML..."></textarea>
+
+                    <div class="btn-row" style="margin-top: 1rem;">
+                        <button class="btn-success" onclick="downloadYaml()" id="download-btn" disabled>Download infrastructure.yaml</button>
+                        <button class="btn-secondary" onclick="copyYaml()">Copy to Clipboard</button>
                     </div>
 
-                    <div class="form-group">
-                        <label for="sasKey">SAS Key (RootManageSharedAccessKey)</label>
-                        <input type="password" id="sasKey" placeholder="Enter your SAS key">
-                    </div>
-
-                    <div class="status-panel">
-                        <label>Response</label>
-                        <div id="statusBox" class="status-box">Ready to submit requests.
-
-Tip: Get your SAS key with:
-
-az servicebus namespace authorization-rule keys list \
-  --namespace-name sb-infra-api-rrkkz6a8 \
-  --resource-group rg-infrastructure-api \
-  --name RootManageSharedAccessKey \
-  --query primaryKey -o tsv</div>
+                    <div class="btn-row" style="margin-top: 0.5rem;">
+                        <button class="btn-secondary" onclick="downloadWorkflow()">Download Workflow Template</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Queue Status Tab -->
-        <div id="tab-status" class="tab-content">
+        <!-- Setup Guide Tab -->
+        <div id="tab-setup" class="tab-content">
+            <div class="main-grid">
+                <div class="panel">
+                    <h2>Quick Start Guide</h2>
+
+                    <div class="step-list">
+                        <div class="step">
+                            <h4>Generate Your Configuration</h4>
+                            <p>Use the Pattern Builder tab to create your <code>infrastructure.yaml</code> file. Select one or more patterns and configure them.</p>
+                        </div>
+                        <div class="step">
+                            <h4>Download the Workflow</h4>
+                            <p>Download the GitHub Actions workflow template. Save it as <code>.github/workflows/infrastructure.yaml</code> in your repository.</p>
+                            <button class="btn-small btn-secondary" style="margin-top: 0.5rem;" onclick="downloadWorkflow()">Download Workflow</button>
+                        </div>
+                        <div class="step">
+                            <h4>Configure Repository Secrets</h4>
+                            <p>Add the required secrets to your repository (Settings → Secrets and variables → Actions).</p>
+                        </div>
+                        <div class="step">
+                            <h4>Commit and Create PR</h4>
+                            <p>Commit your <code>infrastructure.yaml</code> file and create a pull request. The workflow will validate your configuration and post a plan preview.</p>
+                        </div>
+                        <div class="step">
+                            <h4>Merge to Deploy</h4>
+                            <p>After reviewing the plan, merge your PR. Your infrastructure will be automatically provisioned.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>Required Secrets</h2>
+
+                    <div class="info-box">
+                        Contact your platform team to obtain these secrets. They are required for the workflow to communicate with the infrastructure automation system.
+                    </div>
+
+                    <table class="secrets-table">
+                        <thead>
+                            <tr>
+                                <th>Secret Name</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>INFRA_APP_ID</code></td>
+                                <td>GitHub App ID for cross-repo dispatch</td>
+                            </tr>
+                            <tr>
+                                <td><code>INFRA_APP_PRIVATE_KEY</code></td>
+                                <td>GitHub App private key (PEM format)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="collapsible" style="margin-top: 1.5rem;">
+                        <div class="collapsible-header" onclick="toggleCollapsible(this.parentElement)">
+                            <h3>GitHub App Setup</h3>
+                            <span class="collapsible-icon">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 1rem;">
+                                A GitHub App is required to trigger the provisioning workflow and report status back to your repository.
+                            </p>
+                            <ol style="color: #a1a1aa; font-size: 0.85rem; padding-left: 1.5rem;">
+                                <li>Ask your platform team to install the Infrastructure App on your repository</li>
+                                <li>The app needs these permissions: <code>contents: read</code>, <code>statuses: write</code>, <code>issues: write</code></li>
+                                <li>The secrets will be provided after installation</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="collapsible">
+                        <div class="collapsible-header" onclick="toggleCollapsible(this.parentElement)">
+                            <h3>What Happens After Merge?</h3>
+                            <span class="collapsible-icon">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <ol style="color: #a1a1aa; font-size: 0.85rem; padding-left: 1.5rem;">
+                                <li>Workflow triggers a <code>repository_dispatch</code> event</li>
+                                <li>The infrastructure-automation repo receives the event</li>
+                                <li>Your pattern configuration is resolved to Terraform variables</li>
+                                <li>Terraform provisions your resources in Azure</li>
+                                <li>A commit status is posted (success/failure)</li>
+                                <li>An issue is created with resource details or error info</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="collapsible">
+                        <div class="collapsible-header" onclick="toggleCollapsible(this.parentElement)">
+                            <h3>Multi-Pattern Requests</h3>
+                            <span class="collapsible-icon">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 1rem;">
+                                You can provision multiple patterns in a single request using multi-document YAML (separated by <code>---</code>).
+                            </p>
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Actions:</strong></p>
+                            <ul style="color: #a1a1aa; font-size: 0.85rem; padding-left: 1.5rem;">
+                                <li><code>action: create</code> (default) - Provision new resources</li>
+                                <li><code>action: destroy</code> - Tear down existing resources</li>
+                            </ul>
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-top: 0.5rem;">
+                                <strong>Execution order:</strong> All <code>destroy</code> actions run first, then <code>create</code> actions.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pattern Reference Tab -->
+        <div id="tab-reference" class="tab-content">
             <div class="panel">
-                <div class="refresh-row">
-                    <h2 style="margin-bottom: 0;">Queue Status</h2>
-                    <div style="display: flex; align-items: center; gap: 1rem;">
-                        <div class="auto-refresh">
-                            <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
-                            <label for="autoRefresh" style="margin: 0;">Auto-refresh (30s)</label>
-                        </div>
-                        <button class="btn-small btn-secondary" onclick="refreshQueueStatus()">Refresh Now</button>
-                    </div>
+                <h2>Available Patterns</h2>
+                <div class="info-box">
+                    <span id="pattern-total-count">14</span> patterns available. Click on a pattern to see full details.
                 </div>
-
-                <div class="queue-cards">
-                    <div class="queue-card dev">
-                        <h3>Development</h3>
-                        <div class="queue-count" id="dev-count">-</div>
-                        <div class="queue-label">active messages</div>
-                        <div class="queue-dead-letter" id="dev-dead-letter">Dead letter: -</div>
-                    </div>
-                    <div class="queue-card staging">
-                        <h3>Staging</h3>
-                        <div class="queue-count" id="staging-count">-</div>
-                        <div class="queue-label">active messages</div>
-                        <div class="queue-dead-letter" id="staging-dead-letter">Dead letter: -</div>
-                    </div>
-                    <div class="queue-card prod">
-                        <h3>Production</h3>
-                        <div class="queue-count" id="prod-count">-</div>
-                        <div class="queue-label">active messages</div>
-                        <div class="queue-dead-letter" id="prod-dead-letter">Dead letter: -</div>
-                    </div>
+                <div id="pattern-reference-list">
+                    <!-- Populated by JS -->
                 </div>
-
-                <div class="last-updated" id="queue-last-updated">Last updated: Never</div>
-
-                <div class="info-box" style="margin-top: 1rem;">
-                    <strong>Note:</strong> Queue status is fetched via the backend API.
-                    The queue consumer workflow checks these queues every minute and triggers provisioning workers.
-                </div>
-            </div>
-        </div>
-
-        <!-- Request Lookup Tab -->
-        <div id="tab-lookup" class="tab-content">
-            <div class="panel">
-                <h2>Request Lookup</h2>
-
-                <div class="form-group">
-                    <label for="lookupRequestId">Request ID</label>
-                    <div class="inline-form">
-                        <input type="text" id="lookupRequestId" placeholder="Enter request ID (e.g., req-1704567890123-abc123def)">
-                        <button onclick="lookupRequest()">Lookup</button>
-                    </div>
-                </div>
-
-                <div id="lookupResult" class="hidden">
-                    <div class="request-card">
-                        <div class="request-header">
-                            <div>
-                                <div class="request-id" id="result-id">-</div>
-                            </div>
-                            <span class="status-badge" id="result-status">-</span>
-                        </div>
-                        <div class="request-details">
-                            <div class="request-detail">
-                                <strong>Project</strong>
-                                <span id="result-project">-</span>
-                            </div>
-                            <div class="request-detail">
-                                <strong>Environment</strong>
-                                <span id="result-environment">-</span>
-                            </div>
-                            <div class="request-detail">
-                                <strong>Requester</strong>
-                                <span id="result-requester">-</span>
-                            </div>
-                            <div class="request-detail">
-                                <strong>Business Unit</strong>
-                                <span id="result-business-unit">-</span>
-                            </div>
-                            <div class="request-detail">
-                                <strong>Created</strong>
-                                <span id="result-created">-</span>
-                            </div>
-                            <div class="request-detail">
-                                <strong>Updated</strong>
-                                <span id="result-updated">-</span>
-                            </div>
-                            <div class="request-detail" id="result-github-row" style="grid-column: span 2;">
-                                <strong>GitHub Run</strong>
-                                <a id="result-github-link" href="#" target="_blank" style="color: #93c5fd;">-</a>
-                            </div>
-                            <div class="request-detail" id="result-error-row" class="hidden" style="grid-column: span 2;">
-                                <strong>Error</strong>
-                                <span id="result-error" style="color: #ef4444;">-</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="lookupStatus" class="status-box status-info" style="margin-top: 1rem;">
-Enter a request ID to look up its provisioning status.
-
-Request IDs are returned when you submit a request and look like:
-req-1704567890123-abc123def</div>
-
-                <h2 style="margin-top: 2rem;">Recent Requests</h2>
-                <button class="btn-secondary" onclick="loadRecentRequests()" style="margin-bottom: 1rem;">Load Recent Requests</button>
-                <div id="recentRequests"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Export Modal -->
-    <div id="exportModal" class="modal-overlay" onclick="if(event.target === this) closeExportModal()">
-        <div class="modal">
-            <button class="modal-close" onclick="closeExportModal()">&times;</button>
-            <h2>Export for GitOps</h2>
-
-            <p style="color: #a1a1aa; margin-bottom: 1.5rem;">
-                Set up infrastructure-as-code in your repository. Changes to your infrastructure.yaml
-                will automatically provision resources when merged to main.
-            </p>
-
-            <div class="export-step">
-                <h3>Step 1: Download Infrastructure Config</h3>
-                <p>Save this file to your repository root as <code>infrastructure.yaml</code></p>
-                <button class="btn-small" onclick="downloadInfrastructureYaml()">Download infrastructure.yaml</button>
-            </div>
-
-            <div class="export-step">
-                <h3>Step 2: Add GitHub Workflow</h3>
-                <p>Download the workflow file to <code>.github/workflows/infrastructure.yaml</code></p>
-                <button class="btn-small" onclick="downloadWorkflowYaml()">Download Workflow</button>
-                <p style="margin-top: 0.5rem; font-size: 0.75rem;">
-                    Or run: <code>mkdir -p .github/workflows && curl -o .github/workflows/infrastructure.yaml https://raw.githubusercontent.com/csGIT34/infrastructure-automation/main/templates/infrastructure-workflow.yaml</code>
-                </p>
-            </div>
-
-            <div class="export-step">
-                <h3>Step 3: Configure Repository Secrets</h3>
-                <p>Add these secrets in your repo's Settings > Secrets > Actions:</p>
-                <ul style="color: #a1a1aa; font-size: 0.85rem; margin-left: 1rem;">
-                    <li><code>INFRA_SERVICE_BUS_SAS_KEY</code> - Service Bus key</li>
-                    <li><code>INFRA_APP_ID</code> - GitHub App ID</li>
-                    <li><code>INFRA_APP_PRIVATE_KEY</code> - GitHub App private key</li>
-                </ul>
-                <p style="margin-top: 0.5rem; font-size: 0.75rem; color: #71717a;">
-                    Contact your platform team for these credentials.
-                </p>
-            </div>
-
-            <div class="export-step">
-                <h3>Step 4: Create a Pull Request</h3>
-                <p>
-                    Commit your changes, push to a branch, and open a PR.
-                    The workflow will validate your config and post a plan preview as a comment.
-                </p>
-            </div>
-
-            <div class="info-box" style="margin-top: 1rem;">
-                <strong>What happens next?</strong><br>
-                When you merge the PR, your infrastructure will be automatically provisioned.
-                Track status at the <a href="https://wonderful-field-088efae10.1.azurestaticapps.net" target="_blank" style="color: #93c5fd;">Infrastructure Portal</a>.
             </div>
         </div>
     </div>
 
     <script>
-        let autoRefreshInterval = null;
+        // PATTERNS_DATA_PLACEHOLDER
+        const PATTERNS_DATA = {
+  "patterns": {
+    "aks-namespace": {
+      "name": "aks-namespace",
+      "description": "Kubernetes namespace in a shared AKS cluster with resource quotas and RBAC.
+Includes security groups for viewers, editors, and admins with automatic
+Azure Kubernetes Service RBAC role assignments.
+",
+      "category": "single-resource",
+      "components": [
+        "aks-namespace",
+        "security-groups",
+        "rbac-assignments",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Team workload isolation",
+        "Microservice deployments",
+        "Development sandboxes",
+        "CI/CD deployment targets"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "pod_limit": 20,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "pod_limit": 20,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "pod_limit": 50,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "pod_limit": 50,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "pod_limit": 50,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "pod_limit": 100,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "pod_limit": 100,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "cpu_limit": "16",
+            "memory_limit": "32Gi",
+            "pod_limit": 200,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "cpu_limit": "32",
+            "memory_limit": "64Gi",
+            "pod_limit": 500,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name",
+          "aks_cluster_name",
+          "aks_resource_group"
+        ],
+        "optional": [
+          {
+            "cpu_limit": {
+              "type": "string",
+              "description": "CPU quota for namespace (e.g., \"4\" for 4 cores)"
+            }
+          },
+          {
+            "memory_limit": {
+              "type": "string",
+              "description": "Memory quota for namespace (e.g., \"8Gi\")"
+            }
+          },
+          {
+            "pod_limit": {
+              "type": "number",
+              "description": "Maximum number of pods allowed"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 0,
+          "staging": 0,
+          "prod": 50
+        },
+        "medium": {
+          "dev": 0,
+          "staging": 25,
+          "prod": 100
+        },
+        "large": {
+          "dev": 25,
+          "staging": 100,
+          "prod": 250
+        }
+      },
+      "example": {
+        "version": "1",
+        "metadata": {
+          "project": "myapp",
+          "environment": "dev",
+          "business_unit": "engineering",
+          "owners": [
+            "alice@example.com"
+          ],
+          "location": "eastus"
+        },
+        "pattern": "aks-namespace",
+        "config": {
+          "name": "api-backend",
+          "size": "small",
+          "aks_cluster_name": "aks-shared-dev",
+          "aks_resource_group": "rg-aks-shared"
+        }
+      },
+      "icon": "box",
+      "category_display": "Single Resource"
+    },
+    "eventhub": {
+      "name": "eventhub",
+      "description": "Azure Event Hubs namespace for high-throughput event streaming.
+Includes Key Vault for connection strings and security groups
+for sender/receiver access with RBAC.
+",
+      "category": "single-resource",
+      "components": [
+        "eventhub",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Real-time event streaming",
+        "Log aggregation",
+        "IoT data ingestion",
+        "Application telemetry",
+        "Event-driven architectures"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku": "Basic",
+            "capacity": 1,
+            "partition_count": 2,
+            "message_retention": 1,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "Basic",
+            "capacity": 1,
+            "partition_count": 4,
+            "message_retention": 1,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku": "Standard",
+            "capacity": 1,
+            "partition_count": 4,
+            "message_retention": 7,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku": "Standard",
+            "capacity": 1,
+            "partition_count": 4,
+            "message_retention": 1,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "Standard",
+            "capacity": 2,
+            "partition_count": 8,
+            "message_retention": 4,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku": "Standard",
+            "capacity": 4,
+            "partition_count": 16,
+            "message_retention": 7,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku": "Standard",
+            "capacity": 2,
+            "partition_count": 8,
+            "message_retention": 4,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "Standard",
+            "capacity": 4,
+            "partition_count": 16,
+            "message_retention": 7,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "sku": "Standard",
+            "capacity": 8,
+            "partition_count": 32,
+            "message_retention": 7,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "partition_count": {
+              "type": "number",
+              "default": 2,
+              "description": "Number of partitions per Event Hub"
+            }
+          },
+          {
+            "message_retention": {
+              "type": "number",
+              "default": 1,
+              "description": "Message retention in days (1-7 for Standard, 1 for Basic)"
+            }
+          },
+          {
+            "enable_private_endpoint": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable private endpoint connectivity"
+            }
+          },
+          {
+            "subnet_id": {
+              "type": "string",
+              "description": "Subnet ID for private endpoint"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 11,
+          "staging": 22,
+          "prod": 45
+        },
+        "medium": {
+          "dev": 22,
+          "staging": 88,
+          "prod": 175
+        },
+        "large": {
+          "dev": 88,
+          "staging": 175,
+          "prod": 350
+        }
+      },
+      "example": {
+        "version": "1",
+        "metadata": {
+          "project": "myapp",
+          "environment": "dev",
+          "business_unit": "engineering",
+          "owners": [
+            "alice@example.com"
+          ],
+          "location": "eastus"
+        },
+        "pattern": "eventhub",
+        "config": {
+          "name": "events",
+          "size": "small",
+          "partition_count": 4
+        }
+      },
+      "icon": "activity",
+      "category_display": "Single Resource"
+    },
+    "function-app": {
+      "name": "function-app",
+      "description": "Azure Functions serverless compute with managed identity and Key Vault integration.
+Automatically creates storage account and app service plan.
+",
+      "category": "single-resource",
+      "components": [
+        "function-app",
+        "storage-account (backend)",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "REST APIs",
+        "Event-driven processing",
+        "Scheduled tasks",
+        "Webhooks",
+        "Microservice backends"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku": "Y1",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "sku": "Y1",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "B1",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku": "Y1",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "sku": "B1",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "S1",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku": "B1",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "sku": "S1",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "P1v2",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "runtime": {
+              "type": "string",
+              "default": "python",
+              "enum": [
+                "python",
+                "node",
+                "dotnet",
+                "java",
+                "powershell"
+              ]
+            }
+          },
+          {
+            "runtime_version": {
+              "type": "string"
+            }
+          },
+          {
+            "os_type": {
+              "type": "string",
+              "default": "Linux",
+              "enum": [
+                "Linux",
+                "Windows"
+              ]
+            }
+          },
+          {
+            "app_settings": {
+              "type": "object",
+              "description": "Additional app settings"
+            }
+          },
+          {
+            "cors_origins": {
+              "type": "array",
+              "items": "string"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 0,
+          "staging": 10,
+          "prod": 55
+        },
+        "medium": {
+          "dev": 0,
+          "staging": 55,
+          "prod": 73
+        },
+        "large": {
+          "dev": 55,
+          "staging": 73,
+          "prod": 146
+        }
+      },
+      "icon": "zap",
+      "category_display": "Single Resource"
+    },
+    "keyvault": {
+      "name": "keyvault",
+      "description": "Azure Key Vault for secure secrets, keys, and certificates management.
+Includes security groups, RBAC assignments, and optional access reviews.
+",
+      "category": "single-resource",
+      "components": [
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "access-review (prod only)",
+        "diagnostic-settings (staging/prod)",
+        "private-endpoint (optional)"
+      ],
+      "use_cases": [
+        "Application secrets storage",
+        "API keys and tokens",
+        "Database connection strings",
+        "Certificates and encryption keys"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku": "standard",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku": "premium",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku": "standard",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku": "premium",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku": "standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "premium",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "sku": "premium",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "enable_access_review": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable quarterly access reviews for privileged groups"
+            }
+          },
+          {
+            "access_reviewers": {
+              "type": "array",
+              "items": "string",
+              "description": "Email addresses of access reviewers (required for prod)"
+            }
+          },
+          {
+            "enable_private_endpoint": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable private endpoint connectivity"
+            }
+          },
+          {
+            "subnet_id": {
+              "type": "string",
+              "description": "Subnet ID for private endpoint (required if enable_private_endpoint)"
+            }
+          }
+        ]
+      },
+      "excludable": [
+        {
+          "diagnostics": {
+            "description": "Disable diagnostic logs to Log Analytics",
+            "cost_impact": "~$20/month"
+          }
+        },
+        {
+          "access_review": {
+            "description": "Disable quarterly access reviews",
+            "requires_justification": true,
+            "prod_only": true
+          }
+        }
+      ],
+      "estimated_costs": {
+        "small": {
+          "dev": 0.03,
+          "staging": 20,
+          "prod": 50
+        },
+        "medium": {
+          "dev": 0.03,
+          "staging": 30,
+          "prod": 75
+        },
+        "large": {
+          "dev": 20,
+          "staging": 75,
+          "prod": 150
+        }
+      },
+      "example": {
+        "version": "1",
+        "metadata": {
+          "project": "myapp",
+          "environment": "dev",
+          "business_unit": "engineering",
+          "owners": [
+            "alice@example.com"
+          ]
+        },
+        "pattern": "keyvault",
+        "config": {
+          "name": "secrets",
+          "size": "small"
+        }
+      },
+      "icon": "key",
+      "category_display": "Single Resource"
+    },
+    "linux-vm": {
+      "name": "linux-vm",
+      "description": "Azure Linux Virtual Machine with managed identity and SSH key management.
+SSH keys are automatically generated and stored in Key Vault.
+Includes security groups for operators and admins with RBAC.
+",
+      "category": "single-resource",
+      "components": [
+        "linux-vm",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Development workstations",
+        "Build agents",
+        "Custom workloads",
+        "Legacy application hosting",
+        "Bastion hosts"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "vm_size": "Standard_B1s",
+            "os_disk_size_gb": 30,
+            "os_disk_type": "Standard_LRS",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "vm_size": "Standard_B1ms",
+            "os_disk_size_gb": 64,
+            "os_disk_type": "Standard_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "vm_size": "Standard_B2s",
+            "os_disk_size_gb": 128,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "vm_size": "Standard_B2s",
+            "os_disk_size_gb": 64,
+            "os_disk_type": "Standard_LRS",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "vm_size": "Standard_D2s_v3",
+            "os_disk_size_gb": 128,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "vm_size": "Standard_D4s_v3",
+            "os_disk_size_gb": 256,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "vm_size": "Standard_D2s_v3",
+            "os_disk_size_gb": 128,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "vm_size": "Standard_D4s_v3",
+            "os_disk_size_gb": 256,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "vm_size": "Standard_D8s_v3",
+            "os_disk_size_gb": 512,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name",
+          "subnet_id"
+        ],
+        "optional": [
+          {
+            "admin_username": {
+              "type": "string",
+              "default": "azureuser",
+              "description": "SSH admin username"
+            }
+          },
+          {
+            "image_publisher": {
+              "type": "string",
+              "default": "Canonical",
+              "description": "VM image publisher"
+            }
+          },
+          {
+            "image_offer": {
+              "type": "string",
+              "default": "0001-com-ubuntu-server-jammy",
+              "description": "VM image offer"
+            }
+          },
+          {
+            "image_sku": {
+              "type": "string",
+              "default": "22_04-lts",
+              "enum": [
+                "20_04-lts",
+                "22_04-lts",
+                "24_04-lts"
+              ],
+              "description": "Ubuntu version"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 8,
+          "staging": 18,
+          "prod": 50
+        },
+        "medium": {
+          "dev": 30,
+          "staging": 100,
+          "prod": 200
+        },
+        "large": {
+          "dev": 100,
+          "staging": 200,
+          "prod": 400
+        }
+      },
+      "example": {
+        "version": "1",
+        "metadata": {
+          "project": "myapp",
+          "environment": "dev",
+          "business_unit": "engineering",
+          "owners": [
+            "alice@example.com"
+          ],
+          "location": "eastus"
+        },
+        "pattern": "linux-vm",
+        "config": {
+          "name": "buildagent",
+          "size": "small",
+          "subnet_id": "/subscriptions/.../subnets/default",
+          "admin_username": "azureuser"
+        }
+      },
+      "icon": "server",
+      "category_display": "Single Resource"
+    },
+    "mongodb": {
+      "name": "mongodb",
+      "description": "Azure Cosmos DB with MongoDB API for document database workloads.
+Connection strings stored in Key Vault with security group-based access.
+Supports automatic failover and configurable consistency levels.
+",
+      "category": "single-resource",
+      "components": [
+        "mongodb",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Document databases",
+        "Content management systems",
+        "User profile storage",
+        "Catalog data",
+        "Mobile app backends"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "throughput": 400,
+            "max_throughput": 1000,
+            "enable_automatic_failover": false,
+            "consistency_level": "Session",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "throughput": 400,
+            "max_throughput": 4000,
+            "enable_automatic_failover": false,
+            "consistency_level": "Session",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "throughput": 1000,
+            "max_throughput": 10000,
+            "enable_automatic_failover": true,
+            "consistency_level": "Strong",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "throughput": 1000,
+            "max_throughput": 4000,
+            "enable_automatic_failover": false,
+            "consistency_level": "Session",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "throughput": 2000,
+            "max_throughput": 10000,
+            "enable_automatic_failover": true,
+            "consistency_level": "BoundedStaleness",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "throughput": 4000,
+            "max_throughput": 20000,
+            "enable_automatic_failover": true,
+            "consistency_level": "Strong",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "throughput": 4000,
+            "max_throughput": 10000,
+            "enable_automatic_failover": true,
+            "consistency_level": "BoundedStaleness",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "throughput": 10000,
+            "max_throughput": 50000,
+            "enable_automatic_failover": true,
+            "consistency_level": "Strong",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "throughput": 20000,
+            "max_throughput": 100000,
+            "enable_automatic_failover": true,
+            "consistency_level": "Strong",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "consistency_level": {
+              "type": "string",
+              "default": "Session",
+              "enum": [
+                "Eventual",
+                "Session",
+                "BoundedStaleness",
+                "Strong"
+              ],
+              "description": "Consistency level for reads"
+            }
+          },
+          {
+            "enable_automatic_failover": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable automatic failover to secondary region"
+            }
+          },
+          {
+            "enable_private_endpoint": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable private endpoint connectivity"
+            }
+          },
+          {
+            "subnet_id": {
+              "type": "string",
+              "description": "Subnet ID for private endpoint"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 25,
+          "staging": 50,
+          "prod": 150
+        },
+        "medium": {
+          "dev": 60,
+          "staging": 150,
+          "prod": 300
+        },
+        "large": {
+          "dev": 150,
+          "staging": 400,
+          "prod": 800
+        }
+      },
+      "example": {
+        "version": "1",
+        "metadata": {
+          "project": "myapp",
+          "environment": "dev",
+          "business_unit": "engineering",
+          "owners": [
+            "alice@example.com"
+          ],
+          "location": "eastus"
+        },
+        "pattern": "mongodb",
+        "config": {
+          "name": "appdata",
+          "size": "small",
+          "consistency_level": "Session"
+        }
+      },
+      "icon": "database",
+      "category_display": "Single Resource"
+    },
+    "postgresql": {
+      "name": "postgresql",
+      "description": "Azure Database for PostgreSQL Flexible Server with automatic secret management.
+Connection strings stored in Key Vault with security group-based access.
+",
+      "category": "single-resource",
+      "components": [
+        "postgresql",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "private-endpoint (optional)",
+        "network-rules (optional)"
+      ],
+      "use_cases": [
+        "Application databases",
+        "Analytics data stores",
+        "Multi-tenant applications",
+        "Microservice backends"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku": "B_Standard_B1ms",
+            "storage_mb": 32768,
+            "backup_retention_days": 7,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "sku": "B_Standard_B1ms",
+            "storage_mb": 32768,
+            "backup_retention_days": 14,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "GP_Standard_D2s_v3",
+            "storage_mb": 65536,
+            "backup_retention_days": 35,
+            "geo_redundant_backup": true,
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku": "B_Standard_B2s",
+            "storage_mb": 32768,
+            "backup_retention_days": 7,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "sku": "GP_Standard_D2s_v3",
+            "storage_mb": 65536,
+            "backup_retention_days": 21,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "GP_Standard_D4s_v3",
+            "storage_mb": 131072,
+            "backup_retention_days": 35,
+            "geo_redundant_backup": true,
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku": "GP_Standard_D2s_v3",
+            "storage_mb": 65536,
+            "backup_retention_days": 7,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "sku": "GP_Standard_D4s_v3",
+            "storage_mb": 131072,
+            "backup_retention_days": 35,
+            "geo_redundant_backup": true,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "GP_Standard_D8s_v3",
+            "storage_mb": 262144,
+            "backup_retention_days": 35,
+            "geo_redundant_backup": true,
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "version": {
+              "type": "string",
+              "default": "14",
+              "enum": [
+                "12",
+                "13",
+                "14",
+                "15",
+                "16"
+              ],
+              "description": "PostgreSQL version"
+            }
+          },
+          {
+            "allowed_ips": {
+              "type": "array",
+              "items": "string",
+              "description": "IP addresses allowed through firewall"
+            }
+          },
+          {
+            "enable_private_endpoint": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "subnet_id": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 25,
+          "staging": 50,
+          "prod": 200
+        },
+        "medium": {
+          "dev": 50,
+          "staging": 200,
+          "prod": 400
+        },
+        "large": {
+          "dev": 200,
+          "staging": 400,
+          "prod": 800
+        }
+      },
+      "example": {
+        "version": "1",
+        "metadata": {
+          "project": "myapp",
+          "environment": "dev",
+          "business_unit": "engineering",
+          "owners": [
+            "alice@example.com"
+          ]
+        },
+        "pattern": "postgresql",
+        "config": {
+          "name": "appdb",
+          "size": "small",
+          "version": "14"
+        }
+      },
+      "icon": "database",
+      "category_display": "Single Resource"
+    },
+    "sql-database": {
+      "name": "sql-database",
+      "description": "Azure SQL Database (managed) with automatic credential management.
+Connection strings stored in Key Vault with security group-based access.
+Supports zone redundancy for high availability.
+",
+      "category": "single-resource",
+      "components": [
+        "sql-database",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "network-rules (optional)",
+        "diagnostic-settings (staging/prod)",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Relational data storage",
+        "Transaction processing",
+        "Reporting databases",
+        "Enterprise applications",
+        ".NET application backends"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku_name": "Basic",
+            "max_size_gb": 2,
+            "zone_redundant": false,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_name": "S0",
+            "max_size_gb": 10,
+            "zone_redundant": false,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku_name": "S1",
+            "max_size_gb": 50,
+            "zone_redundant": true,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku_name": "S0",
+            "max_size_gb": 10,
+            "zone_redundant": false,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_name": "S1",
+            "max_size_gb": 50,
+            "zone_redundant": false,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku_name": "S2",
+            "max_size_gb": 100,
+            "zone_redundant": true,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku_name": "S1",
+            "max_size_gb": 50,
+            "zone_redundant": false,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_name": "S2",
+            "max_size_gb": 100,
+            "zone_redundant": true,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "sku_name": "S3",
+            "max_size_gb": 250,
+            "zone_redundant": true,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "allowed_ips": {
+              "type": "array",
+              "items": "string",
+              "description": "IP addresses allowed through firewall"
+            }
+          },
+          {
+            "enable_private_endpoint": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable private endpoint connectivity"
+            }
+          },
+          {
+            "subnet_id": {
+              "type": "string",
+              "description": "Subnet ID for private endpoint"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 5,
+          "staging": 25,
+          "prod": 75
+        },
+        "medium": {
+          "dev": 25,
+          "staging": 75,
+          "prod": 150
+        },
+        "large": {
+          "dev": 75,
+          "staging": 150,
+          "prod": 300
+        }
+      },
+      "example": {
+        "version": "1",
+        "metadata": {
+          "project": "myapp",
+          "environment": "dev",
+          "business_unit": "engineering",
+          "owners": [
+            "alice@example.com"
+          ],
+          "location": "eastus"
+        },
+        "pattern": "sql-database",
+        "config": {
+          "name": "maindb",
+          "size": "small"
+        }
+      },
+      "icon": "database",
+      "category_display": "Single Resource"
+    },
+    "static-site": {
+      "name": "static-site",
+      "description": "Azure Static Web Apps for hosting single-page applications and static sites.
+Includes built-in CI/CD, global CDN, and free SSL certificates.
+Security groups for developers and admins.
+",
+      "category": "single-resource",
+      "components": [
+        "static-web-app",
+        "security-groups",
+        "rbac-assignments",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Single-page applications (React, Vue, Angular)",
+        "JAMstack sites",
+        "Documentation sites",
+        "Marketing landing pages",
+        "Portfolio websites"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku_tier": "Free",
+            "sku_size": "Free",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_tier": "Free",
+            "sku_size": "Free",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku_tier": "Free",
+            "sku_size": "Free",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "repository_url": {
+              "type": "string",
+              "description": "GitHub repository URL for automatic deployments"
+            }
+          },
+          {
+            "branch": {
+              "type": "string",
+              "default": "main",
+              "description": "Branch to deploy from"
+            }
+          },
+          {
+            "app_location": {
+              "type": "string",
+              "default": "/",
+              "description": "Location of app source code relative to repo root"
+            }
+          },
+          {
+            "api_location": {
+              "type": "string",
+              "default": "",
+              "description": "Location of Azure Functions API (if any)"
+            }
+          },
+          {
+            "output_location": {
+              "type": "string",
+              "default": "build",
+              "description": "Build output directory"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 0,
+          "staging": 0,
+          "prod": 9
+        },
+        "medium": {
+          "dev": 0,
+          "staging": 9,
+          "prod": 9
+        },
+        "large": {
+          "dev": 9,
+          "staging": 9,
+          "prod": 9
+        }
+      },
+      "example": {
+        "version": "1",
+        "metadata": {
+          "project": "myapp",
+          "environment": "dev",
+          "business_unit": "engineering",
+          "owners": [
+            "alice@example.com"
+          ],
+          "location": "eastus2"
+        },
+        "pattern": "static-site",
+        "config": {
+          "name": "frontend",
+          "size": "small",
+          "app_location": "/src",
+          "output_location": "dist"
+        }
+      },
+      "icon": "globe",
+      "category_display": "Single Resource"
+    },
+    "storage": {
+      "name": "storage",
+      "description": "Azure Storage Account with blob containers, security group access,
+and optional private endpoint.
+",
+      "category": "single-resource",
+      "components": [
+        "storage-account",
+        "blob-containers",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "private-endpoint (optional)",
+        "network-rules (optional)"
+      ],
+      "use_cases": [
+        "Application file storage",
+        "Static asset hosting",
+        "Data lake staging",
+        "Backup storage",
+        "Log archival"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "account_tier": "Standard",
+            "replication_type": "LRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "account_tier": "Standard",
+            "replication_type": "LRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "account_tier": "Standard",
+            "replication_type": "GRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "account_tier": "Standard",
+            "replication_type": "LRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "account_tier": "Standard",
+            "replication_type": "GRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "account_tier": "Standard",
+            "replication_type": "RAGRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "account_tier": "Standard",
+            "replication_type": "GRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "account_tier": "Standard",
+            "replication_type": "RAGRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "account_tier": "Premium",
+            "replication_type": "ZRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "containers": {
+              "type": "array",
+              "items": "string",
+              "description": "List of blob containers to create"
+            }
+          },
+          {
+            "enable_private_endpoint": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "subnet_id": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 2,
+          "staging": 5,
+          "prod": 25
+        },
+        "medium": {
+          "dev": 5,
+          "staging": 25,
+          "prod": 50
+        },
+        "large": {
+          "dev": 25,
+          "staging": 50,
+          "prod": 100
+        }
+      },
+      "icon": "folder",
+      "category_display": "Single Resource"
+    },
+    "api-backend": {
+      "name": "api-backend",
+      "description": "Function App API backend with database (PostgreSQL, SQL, or MongoDB) and
+Key Vault integration. For microservice backends and REST APIs.
+",
+      "category": "composite",
+      "components": [
+        "function-app",
+        "postgresql/azure_sql/mongodb (selectable)",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "Microservice APIs",
+        "REST API backends",
+        "GraphQL servers",
+        "BFF (Backend for Frontend)"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "function_sku": "FC1",
+            "db_sku": "Free",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "function_sku": "Y1",
+            "db_sku": "Basic",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "function_sku": "B1",
+            "db_sku": "S0",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "function_sku": "Y1",
+            "db_sku": "Basic",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "function_sku": "B1",
+            "db_sku": "S1",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "function_sku": "S1",
+            "db_sku": "S2",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "function_sku": "B1",
+            "db_sku": "S0",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "function_sku": "S1",
+            "db_sku": "S2",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "function_sku": "P1v2",
+            "db_sku": "S3",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "database_type": {
+              "type": "string",
+              "default": "azure_sql",
+              "enum": [
+                "azure_sql",
+                "postgresql",
+                "mongodb",
+                "none"
+              ]
+            }
+          },
+          {
+            "runtime": {
+              "type": "string",
+              "default": "python",
+              "enum": [
+                "python",
+                "node",
+                "dotnet",
+                "java"
+              ]
+            }
+          },
+          {
+            "runtime_version": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 30,
+          "staging": 65,
+          "prod": 260
+        },
+        "medium": {
+          "dev": 55,
+          "staging": 260,
+          "prod": 475
+        },
+        "large": {
+          "dev": 260,
+          "staging": 475,
+          "prod": 950
+        }
+      },
+      "icon": "cpu",
+      "category_display": "Composite"
+    },
+    "data-pipeline": {
+      "name": "data-pipeline",
+      "description": "Complete data pipeline with Event Hub ingestion, Function App processing,
+Data Lake storage, and optional Cosmos DB for processed data.
+",
+      "category": "composite",
+      "components": [
+        "eventhub (ingestion)",
+        "function-app (processor)",
+        "storage-account (data lake)",
+        "mongodb (processed data, optional)",
+        "keyvault (secrets)",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "IoT data ingestion",
+        "Event streaming",
+        "Log aggregation",
+        "Real-time analytics",
+        "ETL pipelines"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "eventhub_sku": "Basic",
+            "eventhub_capacity": 1,
+            "function_sku": "Y1",
+            "storage_replication": "LRS",
+            "partition_count": 2,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "eventhub_sku": "Basic",
+            "eventhub_capacity": 1,
+            "function_sku": "Y1",
+            "storage_replication": "LRS",
+            "partition_count": 4,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 2,
+            "function_sku": "B1",
+            "storage_replication": "GRS",
+            "partition_count": 8,
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "eventhub_sku": "Basic",
+            "eventhub_capacity": 1,
+            "function_sku": "Y1",
+            "storage_replication": "LRS",
+            "partition_count": 4,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 2,
+            "function_sku": "B1",
+            "storage_replication": "GRS",
+            "partition_count": 8,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 4,
+            "function_sku": "S1",
+            "storage_replication": "RAGRS",
+            "partition_count": 16,
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 2,
+            "function_sku": "B1",
+            "storage_replication": "GRS",
+            "partition_count": 8,
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 4,
+            "function_sku": "S1",
+            "storage_replication": "RAGRS",
+            "partition_count": 16,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 8,
+            "function_sku": "P1v2",
+            "storage_replication": "RAGRS",
+            "partition_count": 32,
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "runtime": {
+              "type": "string",
+              "default": "python"
+            }
+          },
+          {
+            "enable_mongodb": {
+              "type": "boolean",
+              "default": true,
+              "description": "Include Cosmos DB for processed data"
+            }
+          },
+          {
+            "message_retention": {
+              "type": "number",
+              "default": 1,
+              "description": "Event Hub message retention in days"
+            }
+          }
+        ]
+      },
+      "excludable": [
+        {
+          "mongodb": {
+            "description": "Deploy without Cosmos DB (storage only)",
+            "cost_impact": "~$25-100/month"
+          }
+        }
+      ],
+      "estimated_costs": {
+        "small": {
+          "dev": 30,
+          "staging": 80,
+          "prod": 250
+        },
+        "medium": {
+          "dev": 60,
+          "staging": 250,
+          "prod": 500
+        },
+        "large": {
+          "dev": 250,
+          "staging": 500,
+          "prod": 1000
+        }
+      },
+      "icon": "git-branch",
+      "category_display": "Composite"
+    },
+    "microservice": {
+      "name": "microservice",
+      "description": "AKS namespace with Event Hub and Storage for event-driven microservices.
+Includes RBAC for namespace access and Key Vault for secrets.
+",
+      "category": "composite",
+      "components": [
+        "aks-namespace",
+        "eventhub (optional)",
+        "storage-account (optional)",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments"
+      ],
+      "use_cases": [
+        "Kubernetes microservices",
+        "Event-driven services",
+        "Container workloads",
+        "Distributed systems"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "eventhub_sku": "Basic",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "eventhub_sku": "Basic",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "eventhub_sku": "Basic",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "cpu_limit": "16",
+            "memory_limit": "32Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name",
+          "aks_cluster_name",
+          "aks_resource_group"
+        ],
+        "optional": [
+          {
+            "enable_eventhub": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "enable_storage": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 15,
+          "staging": 45,
+          "prod": 120
+        },
+        "medium": {
+          "dev": 45,
+          "staging": 120,
+          "prod": 250
+        },
+        "large": {
+          "dev": 120,
+          "staging": 250,
+          "prod": 500
+        }
+      },
+      "icon": "layers",
+      "category_display": "Composite"
+    },
+    "web-app": {
+      "name": "web-app",
+      "description": "Full-stack web application pattern with static frontend, serverless API backend,
+and database. Includes managed identity, Key Vault integration, and security groups.
+",
+      "category": "composite",
+      "components": [
+        "static-web-app (frontend)",
+        "function-app (API backend)",
+        "postgresql/azure_sql (database, optional)",
+        "keyvault (shared secrets)",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "Single-page applications (SPAs)",
+        "JAMstack applications",
+        "Admin dashboards",
+        "Customer portals",
+        "Internal tools"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "swa_sku_tier": "Free",
+            "function_sku": "Y1",
+            "db_sku": "B_Standard_B1ms",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "swa_sku_tier": "Free",
+            "function_sku": "Y1",
+            "db_sku": "B_Standard_B1ms",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "B1",
+            "db_sku": "GP_Standard_D2s_v3",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "swa_sku_tier": "Free",
+            "function_sku": "Y1",
+            "db_sku": "B_Standard_B2s",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "B1",
+            "db_sku": "GP_Standard_D2s_v3",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "S1",
+            "db_sku": "GP_Standard_D4s_v3",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "B1",
+            "db_sku": "GP_Standard_D2s_v3",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "S1",
+            "db_sku": "GP_Standard_D4s_v3",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "P1v2",
+            "db_sku": "GP_Standard_D8s_v3",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "database_type": {
+              "type": "string",
+              "default": "postgresql",
+              "enum": [
+                "postgresql",
+                "azure_sql",
+                "none"
+              ],
+              "description": "Database type (or none for frontend-only)"
+            }
+          },
+          {
+            "runtime": {
+              "type": "string",
+              "default": "python",
+              "enum": [
+                "python",
+                "node",
+                "dotnet",
+                "java"
+              ],
+              "description": "API backend runtime"
+            }
+          },
+          {
+            "runtime_version": {
+              "type": "string",
+              "description": "Runtime version (e.g., 3.11 for Python)"
+            }
+          }
+        ]
+      },
+      "excludable": [
+        {
+          "database": {
+            "description": "Deploy without database (frontend + API only)",
+            "cost_impact": "~$25-400/month depending on size"
+          }
+        },
+        {
+          "diagnostics": {
+            "description": "Disable diagnostic logs",
+            "cost_impact": "~$30/month"
+          }
+        }
+      ],
+      "estimated_costs": {
+        "small": {
+          "dev": 35,
+          "staging": 80,
+          "prod": 300
+        },
+        "medium": {
+          "dev": 60,
+          "staging": 250,
+          "prod": 550
+        },
+        "large": {
+          "dev": 250,
+          "staging": 550,
+          "prod": 1100
+        }
+      },
+      "example": {
+        "version": "1",
+        "metadata": {
+          "project": "customer-portal",
+          "environment": "dev",
+          "business_unit": "product",
+          "owners": [
+            "alice@example.com",
+            "bob@example.com"
+          ]
+        },
+        "pattern": "web-app",
+        "config": {
+          "name": "portal",
+          "size": "small",
+          "database_type": "postgresql",
+          "runtime": "python"
+        }
+      },
+      "icon": "layout",
+      "category_display": "Composite"
+    }
+  },
+  "sizing_defaults": {
+    "version": "1",
+    "environment_defaults": {
+      "dev": "small",
+      "staging": "medium",
+      "prod": "medium"
+    },
+    "cost_limits": {
+      "dev": 500,
+      "staging": 2000,
+      "prod": 10000
+    },
+    "conditional_features": {
+      "enable_diagnostics": {
+        "dev": false,
+        "staging": true,
+        "prod": true
+      },
+      "enable_access_review": {
+        "dev": true,
+        "staging": true,
+        "prod": true
+      },
+      "geo_redundant_backup": {
+        "dev": false,
+        "staging": false,
+        "prod": true
+      },
+      "purge_protection": {
+        "dev": false,
+        "staging": false,
+        "prod": false
+      }
+    },
+    "common_skus": {
+      "function_app": {
+        "small": "Y1",
+        "medium": "B1",
+        "large": "S1"
+      },
+      "app_service": {
+        "small": "B1",
+        "medium": "S1",
+        "large": "P1v2"
+      },
+      "postgresql": {
+        "small": "B_Standard_B1ms",
+        "medium": "GP_Standard_D2s_v3",
+        "large": "GP_Standard_D4s_v3"
+      },
+      "azure_sql": {
+        "small": "Basic",
+        "medium": "S1",
+        "large": "S2"
+      },
+      "storage": {
+        "small": {
+          "tier": "Standard",
+          "replication": "LRS"
+        },
+        "medium": {
+          "tier": "Standard",
+          "replication": "GRS"
+        },
+        "large": {
+          "tier": "Standard",
+          "replication": "RAGRS"
+        }
+      },
+      "keyvault": {
+        "small": "standard",
+        "medium": "standard",
+        "large": "premium"
+      },
+      "eventhub": {
+        "small": "Basic",
+        "medium": "Standard",
+        "large": "Standard"
+      },
+      "linux_vm": {
+        "small": "Standard_B1s",
+        "medium": "Standard_B2s",
+        "large": "Standard_D2s_v3"
+      },
+      "aks_namespace": {
+        "small": {
+          "cpu_limit": "2",
+          "memory_limit": "4Gi",
+          "pod_limit": 20
+        },
+        "medium": {
+          "cpu_limit": "4",
+          "memory_limit": "8Gi",
+          "pod_limit": 50
+        },
+        "large": {
+          "cpu_limit": "8",
+          "memory_limit": "16Gi",
+          "pod_limit": 100
+        }
+      }
+    },
+    "retention": {
+      "soft_delete": {
+        "dev": 7,
+        "staging": 30,
+        "prod": 90
+      },
+      "backup": {
+        "dev": 7,
+        "staging": 14,
+        "prod": 35
+      },
+      "logs": {
+        "dev": 7,
+        "staging": 30,
+        "prod": 90
+      }
+    }
+  },
+  "metadata": {
+    "pattern_count": 14,
+    "generated_at": "2026-01-24T22:32:32.617386+00:00",
+    "categories": {
+      "single-resource": 10,
+      "composite": 4
+    }
+  },
+  "locations": [
+    {
+      "value": "eastus",
+      "label": "East US"
+    },
+    {
+      "value": "eastus2",
+      "label": "East US 2"
+    },
+    {
+      "value": "westus",
+      "label": "West US"
+    },
+    {
+      "value": "westus2",
+      "label": "West US 2"
+    },
+    {
+      "value": "centralus",
+      "label": "Central US"
+    },
+    {
+      "value": "northeurope",
+      "label": "North Europe"
+    },
+    {
+      "value": "westeurope",
+      "label": "West Europe"
+    },
+    {
+      "value": "uksouth",
+      "label": "UK South"
+    },
+    {
+      "value": "southeastasia",
+      "label": "Southeast Asia"
+    },
+    {
+      "value": "australiaeast",
+      "label": "Australia East"
+    }
+  ],
+  "environments": [
+    {
+      "value": "dev",
+      "label": "Development"
+    },
+    {
+      "value": "staging",
+      "label": "Staging"
+    },
+    {
+      "value": "prod",
+      "label": "Production"
+    }
+  ]
+};
 
-        // API Configuration
-        const API_BASE_URL = 'https://func-infra-api-rrkkz6a8.azurewebsites.net';
-
-        const templates = {
-            storage: `metadata:
-  project_name: myproject
-  environment: dev
-  business_unit: engineering
-  cost_center: CC-ENG-001
-  owner_email: team@company.com
-  location: centralus
-
-resources:
-  - type: storage_account
-    name: data
-    config:
-      tier: Standard
-      replication: LRS
-      versioning: true
-      containers:
-        - name: uploads
-          access_type: private`,
-
-            webapp: `metadata:
-  project_name: mywebapp
-  environment: dev
-  business_unit: engineering
-  cost_center: CC-ENG-001
-  owner_email: team@company.com
-  location: centralus
-
-resources:
-  - type: storage_account
-    name: static
-    config:
-      tier: Standard
-      replication: LRS
-      containers:
-        - name: assets
-          access_type: blob
-
-  - type: keyvault
-    name: secrets
-    config:
-      sku: standard
-      rbac_enabled: true`,
-
-            database: `metadata:
-  project_name: myapp
-  environment: dev
-  business_unit: engineering
-  cost_center: CC-ENG-001
-  owner_email: team@company.com
-  location: centralus
-
-resources:
-  - type: postgresql
-    name: maindb
-    config:
-      version: "14"
-      sku: B_Standard_B1ms
-      storage_mb: 32768
-      backup_retention_days: 7`,
-
-            staticwebapp: `metadata:
-  project_name: mysite
-  environment: dev
-  business_unit: engineering
-  cost_center: CC-ENG-001
-  owner_email: team@company.com
-  location: centralus
-
-resources:
-  - type: static_web_app
-    name: frontend
-    config:
-      sku_tier: Free
-      sku_size: Free`,
-
-            full: `metadata:
-  project_name: fullstack
-  environment: dev
-  business_unit: engineering
-  cost_center: CC-ENG-001
-  owner_email: team@company.com
-  location: centralus
-  tags:
-    Application: MyFullStackApp
-    Team: Platform
-
-resources:
-  - type: postgresql
-    name: db
-    config:
-      version: "14"
-      sku: B_Standard_B1ms
-      storage_mb: 32768
-
-  - type: keyvault
-    name: kv
-    config:
-      sku: standard
-      rbac_enabled: true
-
-  - type: storage_account
-    name: st
-    config:
-      tier: Standard
-      replication: LRS
-      containers:
-        - name: uploads
-          access_type: private
-        - name: backups
-          access_type: private`
+        // Application State
+        const state = {
+            metadata: {
+                project: '',
+                environment: 'dev',
+                business_unit: '',
+                owners: [],
+                location: 'eastus'
+            },
+            currentPattern: null,
+            currentConfig: {},
+            currentAction: 'create',
+            addedPatterns: [],
+            editingIndex: -1
         };
 
+        // Tab Navigation
         function showTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(`tab-${tabName}`).classList.add('active');
             event.target.classList.add('active');
 
-            if (tabName === 'status') {
-                refreshQueueStatus();
+            if (tabName === 'reference') {
+                renderPatternReference();
             }
         }
 
-        function loadTemplate(name) {
-            document.getElementById('yaml').value = templates[name];
-            updateEnvironmentFromYaml();
+        // Initialize Pattern Grid
+        function initPatternGrid() {
+            const grid = document.getElementById('pattern-grid');
+            grid.innerHTML = '';
+
+            Object.entries(PATTERNS_DATA.patterns).forEach(([name, pattern]) => {
+                const card = document.createElement('div');
+                card.className = 'pattern-card';
+                card.dataset.pattern = name;
+                card.dataset.category = pattern.category || 'single-resource';
+                card.onclick = () => selectPattern(name);
+
+                const categoryClass = (pattern.category || 'single-resource').replace('-', '-');
+                card.innerHTML = `
+                    <div class="pattern-card-header">
+                        <span class="pattern-icon icon-${pattern.icon || 'package'}"></span>
+                        <span class="pattern-name">${name}</span>
+                    </div>
+                    <span class="pattern-category ${categoryClass}">${pattern.category_display || 'Single Resource'}</span>
+                    <div class="pattern-description">${(pattern.description || '').split('\n')[0]}</div>
+                `;
+                grid.appendChild(card);
+            });
+
+            document.getElementById('pattern-total-count').textContent = Object.keys(PATTERNS_DATA.patterns).length;
         }
 
-        function updateEnvironmentFromYaml() {
-            const yaml = document.getElementById('yaml').value;
-            const match = yaml.match(/environment:\s*(\w+)/);
-            if (match) {
-                document.getElementById('environment').value = match[1];
-            }
+        // Filter Patterns
+        function filterPatterns() {
+            const search = document.getElementById('pattern-search').value.toLowerCase();
+            const cards = document.querySelectorAll('.pattern-card');
+
+            cards.forEach(card => {
+                const name = card.dataset.pattern.toLowerCase();
+                const pattern = PATTERNS_DATA.patterns[card.dataset.pattern];
+                const description = (pattern.description || '').toLowerCase();
+                const useCases = (pattern.use_cases || []).join(' ').toLowerCase();
+
+                const matches = name.includes(search) || description.includes(search) || useCases.includes(search);
+                card.classList.toggle('hidden', !matches);
+            });
         }
 
-        function validateYaml() {
-            const yaml = document.getElementById('yaml').value;
-            const statusBox = document.getElementById('statusBox');
+        function setFilter(category, btn) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
 
-            const lines = yaml.split('\n');
-            let hasMetadata = false, hasResources = false, hasProjectName = false;
-            let hasEnvironment = false, hasCostCenter = false, hasOwnerEmail = false, hasBusinessUnit = false;
-
-            for (const line of lines) {
-                if (line.match(/^metadata:/)) hasMetadata = true;
-                if (line.match(/^resources:/)) hasResources = true;
-                if (line.match(/project_name:/)) hasProjectName = true;
-                if (line.match(/environment:/)) hasEnvironment = true;
-                if (line.match(/cost_center:/)) hasCostCenter = true;
-                if (line.match(/owner_email:/)) hasOwnerEmail = true;
-                if (line.match(/business_unit:/)) hasBusinessUnit = true;
-            }
-
-            const errors = [];
-            if (!hasMetadata) errors.push('Missing "metadata:" section');
-            if (!hasResources) errors.push('Missing "resources:" section');
-            if (!hasProjectName) errors.push('Missing "project_name" in metadata');
-            if (!hasEnvironment) errors.push('Missing "environment" in metadata');
-            if (!hasBusinessUnit) errors.push('Missing "business_unit" in metadata');
-            if (!hasCostCenter) errors.push('Missing "cost_center" in metadata');
-            if (!hasOwnerEmail) errors.push('Missing "owner_email" in metadata');
-
-            if (errors.length > 0) {
-                statusBox.className = 'status-box status-error';
-                statusBox.textContent = 'Validation Errors:\n\n' + errors.join('\n');
-            } else {
-                statusBox.className = 'status-box status-success';
-                statusBox.textContent = 'YAML validation passed!\n\nAll required fields present.';
-            }
-        }
-
-        async function generateSasToken(namespace, sasKey, resource) {
-            const uri = `https://${namespace}.servicebus.windows.net/${resource}`.toLowerCase();
-            const expiry = Math.floor(Date.now() / 1000) + 3600;
-
-            const encoder = new TextEncoder();
-            const encodedUri = encodeURIComponent(uri);
-            const stringToSign = `${encodedUri}\n${expiry}`;
-
-            const key = await crypto.subtle.importKey(
-                'raw', encoder.encode(sasKey),
-                { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-            );
-            const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(stringToSign));
-            const base64Signature = btoa(String.fromCharCode(...new Uint8Array(signature)));
-            const encodedSignature = encodeURIComponent(base64Signature);
-            return `SharedAccessSignature sr=${encodedUri}&sig=${encodedSignature}&se=${expiry}&skn=RootManageSharedAccessKey`;
-        }
-
-        async function submitRequest() {
-            const submitBtn = document.getElementById('submitBtn');
-            const statusBox = document.getElementById('statusBox');
-            const yaml = document.getElementById('yaml').value;
-            const email = document.getElementById('email').value;
-            const environment = document.getElementById('environment').value;
-            const namespace = document.getElementById('servicebusNs').value;
-            const sasKey = document.getElementById('sasKey').value;
-
-            if (!yaml.trim()) {
-                statusBox.className = 'status-box status-error';
-                statusBox.textContent = 'Error: Please enter YAML configuration';
-                return;
-            }
-
-            if (!sasKey.trim()) {
-                statusBox.className = 'status-box status-error';
-                statusBox.textContent = 'Error: Please enter SAS key';
-                return;
-            }
-
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner"></span>Submitting...';
-            statusBox.className = 'status-box status-pending';
-            statusBox.textContent = 'Submitting request...';
-
-            try {
-                const queueName = `infrastructure-requests-${environment}`;
-                const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                const sasToken = await generateSasToken(namespace, sasKey, queueName);
-
-                let updatedYaml = yaml;
-                if (yaml.includes('environment:')) {
-                    updatedYaml = yaml.replace(/environment:\s*\w+/, `environment: ${environment}`);
-                }
-
-                const body = JSON.stringify({
-                    request_id: requestId,
-                    yaml_content: updatedYaml,
-                    requester_email: email,
-                    metadata: { environment, submitted_at: new Date().toISOString() }
-                });
-
-                const response = await fetch(`https://${namespace}.servicebus.windows.net/${queueName}/messages`, {
-                    method: 'POST',
-                    headers: { 'Authorization': sasToken, 'Content-Type': 'application/json' },
-                    body: body
-                });
-
-                if (response.ok || response.status === 201) {
-                    statusBox.className = 'status-box status-success';
-                    statusBox.textContent = `Request Submitted Successfully!
-
-Request ID: ${requestId}
-Queue: ${queueName}
-Environment: ${environment}
-Time: ${new Date().toLocaleString()}
-
-Copy the Request ID to track status in the "Request Lookup" tab.`;
+            const cards = document.querySelectorAll('.pattern-card');
+            cards.forEach(card => {
+                if (category === 'all') {
+                    card.classList.remove('hidden');
                 } else {
-                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                    card.classList.toggle('hidden', card.dataset.category !== category);
                 }
-            } catch (error) {
-                statusBox.className = 'status-box status-error';
-                statusBox.textContent = `Error: ${error.message}`;
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = 'Submit Request';
-            }
+            });
         }
 
-        async function refreshQueueStatus() {
-            const queues = ['dev', 'staging', 'prod'];
+        // Select Pattern
+        function selectPattern(name) {
+            document.querySelectorAll('.pattern-card').forEach(c => c.classList.remove('selected'));
+            document.querySelector(`[data-pattern="${name}"]`).classList.add('selected');
 
-            // Set loading state
-            for (const env of queues) {
-                document.getElementById(`${env}-count`).textContent = '...';
+            state.currentPattern = name;
+            state.currentConfig = { size: 'small' };
+            state.currentAction = 'create';
+
+            document.getElementById('selected-pattern-name').textContent = name;
+            document.getElementById('pattern-config-section').classList.remove('hidden');
+
+            renderConfigForm(name);
+        }
+
+        function clearPatternSelection() {
+            document.querySelectorAll('.pattern-card').forEach(c => c.classList.remove('selected'));
+            state.currentPattern = null;
+            state.currentConfig = {};
+            state.editingIndex = -1;
+            document.getElementById('pattern-config-section').classList.add('hidden');
+        }
+
+        // Render Config Form
+        function renderConfigForm(patternName) {
+            const pattern = PATTERNS_DATA.patterns[patternName];
+            const form = document.getElementById('pattern-config-form');
+            const env = document.getElementById('meta-environment').value;
+
+            let html = `
+                <div class="config-section">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Action</label>
+                            <select id="config-action" onchange="state.currentAction = this.value">
+                                <option value="create">Create (provision)</option>
+                                <option value="destroy">Destroy (tear down)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Size</label>
+                            <select id="config-size" onchange="updateConfigFromSize()">
+                                <option value="small">Small</option>
+                                <option value="medium">Medium</option>
+                                <option value="large">Large</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Required fields
+            if (pattern.config && pattern.config.required) {
+                html += `<div class="config-section"><h3>Required Configuration</h3>`;
+                pattern.config.required.forEach(field => {
+                    html += renderField(field, true);
+                });
+                html += `</div>`;
             }
 
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/queue-status`);
+            // Optional fields
+            if (pattern.config && pattern.config.optional && pattern.config.optional.length > 0) {
+                html += `<div class="config-section"><h3>Optional Configuration</h3>`;
+                pattern.config.optional.forEach(opt => {
+                    const fieldName = typeof opt === 'string' ? opt : Object.keys(opt)[0];
+                    const fieldDef = typeof opt === 'string' ? {} : opt[fieldName];
+                    html += renderField(fieldName, false, fieldDef);
+                });
+                html += `</div>`;
+            }
 
-                if (response.ok) {
-                    const data = await response.json();
+            // Cost estimate
+            if (pattern.estimated_costs) {
+                const size = 'small';
+                const cost = pattern.estimated_costs[size] && pattern.estimated_costs[size][env];
+                html += `
+                    <div class="cost-display">
+                        <div class="cost-label">Estimated Cost (${size}/${env})</div>
+                        <div class="cost-value">$<span id="pattern-cost">${cost || 0}</span></div>
+                        <div class="cost-period">USD/month</div>
+                    </div>
+                `;
+            }
 
-                    for (const env of queues) {
-                        if (data[env]) {
-                            if (data[env].error) {
-                                document.getElementById(`${env}-count`).textContent = '!';
-                                document.getElementById(`${env}-dead-letter`).textContent = `Error: ${data[env].error}`;
-                            } else {
-                                document.getElementById(`${env}-count`).textContent = data[env].active || 0;
-                                document.getElementById(`${env}-dead-letter`).textContent = `Dead letter: ${data[env].dead_letter || 0}`;
-                            }
+            form.innerHTML = html;
+
+            // Set default values
+            if (state.editingIndex >= 0) {
+                const editing = state.addedPatterns[state.editingIndex];
+                document.getElementById('config-action').value = editing.action;
+                document.getElementById('config-size').value = editing.config.size || 'small';
+                state.currentAction = editing.action;
+                state.currentConfig = { ...editing.config };
+
+                // Fill in other fields
+                Object.entries(editing.config).forEach(([key, value]) => {
+                    const input = document.getElementById(`config-${key}`);
+                    if (input) {
+                        if (input.type === 'checkbox') {
+                            input.checked = value;
+                        } else if (Array.isArray(value)) {
+                            input.value = value.join('\n');
+                        } else {
+                            input.value = value;
                         }
                     }
-                    document.getElementById('queue-last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-            } catch (e) {
-                for (const env of queues) {
-                    document.getElementById(`${env}-count`).textContent = '?';
-                }
-                document.getElementById('queue-last-updated').textContent = `Error: ${e.message}`;
+                });
             }
         }
 
-        function toggleAutoRefresh() {
-            const checkbox = document.getElementById('autoRefresh');
-            if (checkbox.checked) {
-                refreshQueueStatus();
-                autoRefreshInterval = setInterval(refreshQueueStatus, 30000);
+        function renderField(name, required, def = {}) {
+            const label = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const type = def.type || 'string';
+            const defaultVal = def.default !== undefined ? def.default : '';
+            const description = def.description || '';
+
+            let inputHtml = '';
+
+            if (def.enum) {
+                inputHtml = `<select id="config-${name}" onchange="updateConfig('${name}', this.value)">
+                    ${def.enum.map(v => `<option value="${v}" ${v === defaultVal ? 'selected' : ''}>${v}</option>`).join('')}
+                </select>`;
+            } else if (type === 'boolean') {
+                inputHtml = `<input type="checkbox" id="config-${name}" ${defaultVal ? 'checked' : ''} onchange="updateConfig('${name}', this.checked)" style="width: auto;">`;
+            } else if (type === 'array') {
+                inputHtml = `<textarea id="config-${name}" rows="2" placeholder="One item per line" oninput="updateConfig('${name}', this.value.split('\\n').filter(x=>x))"></textarea>`;
+            } else if (type === 'number') {
+                inputHtml = `<input type="number" id="config-${name}" value="${defaultVal}" placeholder="${defaultVal}" oninput="updateConfig('${name}', this.value)">`;
             } else {
-                clearInterval(autoRefreshInterval);
-                autoRefreshInterval = null;
+                inputHtml = `<input type="text" id="config-${name}" value="${defaultVal}" placeholder="${description || name}" oninput="updateConfig('${name}', this.value)">`;
+            }
+
+            return `
+                <div class="form-group">
+                    <label>${label}${required ? '<span class="required-indicator">*</span>' : ''}</label>
+                    ${inputHtml}
+                    ${description ? `<div class="form-help">${description}</div>` : ''}
+                </div>
+            `;
+        }
+
+        function updateConfig(field, value) {
+            if (value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
+                delete state.currentConfig[field];
+            } else {
+                state.currentConfig[field] = value;
             }
         }
 
-        async function lookupRequest() {
-            const requestId = document.getElementById('lookupRequestId').value.trim();
-            const lookupStatus = document.getElementById('lookupStatus');
-            const lookupResult = document.getElementById('lookupResult');
+        function updateConfigFromSize() {
+            const size = document.getElementById('config-size').value;
+            const env = document.getElementById('meta-environment').value;
+            state.currentConfig.size = size;
 
-            if (!requestId) {
-                lookupStatus.className = 'status-box status-error';
-                lookupStatus.textContent = 'Please enter a request ID';
-                lookupResult.classList.add('hidden');
+            // Update cost display
+            const pattern = PATTERNS_DATA.patterns[state.currentPattern];
+            if (pattern.estimated_costs) {
+                const cost = pattern.estimated_costs[size] && pattern.estimated_costs[size][env];
+                const costEl = document.getElementById('pattern-cost');
+                if (costEl) costEl.textContent = cost || 0;
+            }
+        }
+
+        // Add Pattern to Request
+        function addPatternToRequest() {
+            const metadata = getMetadata();
+
+            // Validate metadata
+            if (!metadata.project || !metadata.business_unit || metadata.owners.length === 0) {
+                alert('Please fill in all required metadata fields (Project, Business Unit, Owners)');
                 return;
             }
 
-            lookupStatus.className = 'status-box status-pending';
-            lookupStatus.textContent = 'Looking up request...';
+            // Get required fields
+            const pattern = PATTERNS_DATA.patterns[state.currentPattern];
+            const config = { ...state.currentConfig };
 
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/request/${encodeURIComponent(requestId)}`);
-
-                if (response.status === 404) {
-                    lookupStatus.className = 'status-box status-error';
-                    lookupStatus.textContent = 'Request not found. The request ID may be incorrect or the request has not been processed yet.';
-                    lookupResult.classList.add('hidden');
-                    return;
+            // Check required config fields
+            if (pattern.config && pattern.config.required) {
+                for (const field of pattern.config.required) {
+                    const input = document.getElementById(`config-${field}`);
+                    if (input && !input.value) {
+                        alert(`Please fill in required field: ${field}`);
+                        input.focus();
+                        return;
+                    }
+                    if (input) {
+                        config[field] = input.value;
+                    }
                 }
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const doc = await response.json();
-                displayRequestResult(doc);
-                lookupStatus.className = 'status-box status-success';
-                lookupStatus.textContent = 'Request found!';
-                lookupResult.classList.remove('hidden');
-            } catch (error) {
-                lookupStatus.className = 'status-box status-error';
-                lookupStatus.textContent = `Error: ${error.message}`;
-                lookupResult.classList.add('hidden');
             }
+
+            // Ensure size is set
+            config.size = document.getElementById('config-size').value || 'small';
+
+            const patternEntry = {
+                pattern: state.currentPattern,
+                action: state.currentAction,
+                config: config
+            };
+
+            if (state.editingIndex >= 0) {
+                state.addedPatterns[state.editingIndex] = patternEntry;
+                state.editingIndex = -1;
+            } else {
+                state.addedPatterns.push(patternEntry);
+            }
+
+            clearPatternSelection();
+            renderAddedPatterns();
+            updatePreview();
         }
 
-        function displayRequestResult(doc) {
-            document.getElementById('result-id').textContent = doc.id || doc.requestId;
-            document.getElementById('result-project').textContent = doc.project_name || '-';
-            document.getElementById('result-environment').textContent = doc.environment || '-';
-            document.getElementById('result-requester').textContent = doc.requester_email || '-';
-            document.getElementById('result-business-unit').textContent = doc.business_unit || '-';
-            document.getElementById('result-created').textContent = doc.created_at ? new Date(doc.created_at).toLocaleString() : '-';
-            document.getElementById('result-updated').textContent = doc.updated_at ? new Date(doc.updated_at).toLocaleString() : '-';
-
-            const statusBadge = document.getElementById('result-status');
-            statusBadge.textContent = doc.status || 'unknown';
-            statusBadge.className = `status-badge ${doc.status || ''}`;
-
-            const githubRow = document.getElementById('result-github-row');
-            const githubLink = document.getElementById('result-github-link');
-            if (doc.github_run_url) {
-                githubRow.style.display = 'block';
-                githubLink.href = doc.github_run_url;
-                githubLink.textContent = doc.github_run_url;
-            } else {
-                githubRow.style.display = 'none';
-            }
-
-            const errorRow = document.getElementById('result-error-row');
-            const errorSpan = document.getElementById('result-error');
-            if (doc.error_message) {
-                errorRow.style.display = 'block';
-                errorSpan.textContent = doc.error_message;
-            } else {
-                errorRow.style.display = 'none';
-            }
+        function editPattern(index) {
+            const entry = state.addedPatterns[index];
+            state.editingIndex = index;
+            selectPattern(entry.pattern);
         }
 
-        async function loadRecentRequests() {
-            const container = document.getElementById('recentRequests');
-            container.innerHTML = '<div class="status-box status-pending">Loading...</div>';
+        function removePattern(index) {
+            state.addedPatterns.splice(index, 1);
+            renderAddedPatterns();
+            updatePreview();
+        }
 
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/requests/recent`);
+        function renderAddedPatterns() {
+            const list = document.getElementById('added-patterns-list');
+            const count = document.getElementById('pattern-count');
 
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            count.textContent = `(${state.addedPatterns.length})`;
 
-                const data = await response.json();
-                if (data && data.length > 0) {
-                    container.innerHTML = data.map(doc => `
-                        <div class="request-card" style="cursor: pointer;" onclick="document.getElementById('lookupRequestId').value='${doc.id}'; lookupRequest();">
-                            <div class="request-header">
-                                <div class="request-id">${doc.id}</div>
-                                <span class="status-badge ${doc.status}">${doc.status}</span>
-                            </div>
-                            <div style="font-size: 0.8rem; color: #a1a1aa;">
-                                ${doc.project_name || '-'} | ${doc.environment || '-'} | ${doc.updated_at ? new Date(doc.updated_at).toLocaleString() : '-'}
-                            </div>
+            if (state.addedPatterns.length === 0) {
+                list.innerHTML = '<div class="info-box">No patterns added yet. Select a pattern above to add it to your request.</div>';
+                document.getElementById('cost-display').style.display = 'none';
+                document.getElementById('download-btn').disabled = true;
+                return;
+            }
+
+            list.innerHTML = state.addedPatterns.map((entry, idx) => {
+                const pattern = PATTERNS_DATA.patterns[entry.pattern];
+                const configSummary = Object.entries(entry.config)
+                    .filter(([k, v]) => k !== 'size' && v)
+                    .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.length + ' items' : v}`)
+                    .join(', ');
+
+                return `
+                    <div class="added-pattern-card">
+                        <div class="added-pattern-info">
+                            <span class="pattern-icon icon-${pattern.icon || 'package'}"></span>
+                            <span class="added-pattern-name">${entry.pattern}</span>
+                            <span class="action-badge ${entry.action}">${entry.action}</span>
+                            <div class="added-pattern-config">Size: ${entry.config.size || 'small'}${configSummary ? ', ' + configSummary : ''}</div>
                         </div>
-                    `).join('');
-                } else {
-                    container.innerHTML = '<div class="status-box">No requests found</div>';
+                        <div class="added-pattern-actions">
+                            <button class="btn-small btn-secondary" onclick="editPattern(${idx})">Edit</button>
+                            <button class="btn-small btn-danger" onclick="removePattern(${idx})">Remove</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Calculate total cost
+            const env = document.getElementById('meta-environment').value;
+            let totalCost = 0;
+            state.addedPatterns.forEach(entry => {
+                if (entry.action === 'create') {
+                    const pattern = PATTERNS_DATA.patterns[entry.pattern];
+                    if (pattern.estimated_costs) {
+                        const size = entry.config.size || 'small';
+                        totalCost += pattern.estimated_costs[size]?.[env] || 0;
+                    }
                 }
-            } catch (error) {
-                container.innerHTML = `<div class="status-box status-error">Error: ${error.message}</div>`;
-            }
+            });
+
+            document.getElementById('total-cost').textContent = totalCost;
+            document.getElementById('cost-display').style.display = 'block';
+            document.getElementById('download-btn').disabled = false;
         }
 
-        // Export Modal Functions
-        function showExportModal() {
-            const yaml = document.getElementById('yaml').value;
-            if (!yaml.trim()) {
-                alert('Please enter a YAML configuration first');
+        // Get Metadata from Form
+        function getMetadata() {
+            const owners = document.getElementById('meta-owners').value
+                .split('\n')
+                .map(o => o.trim())
+                .filter(o => o);
+
+            return {
+                project: document.getElementById('meta-project').value.trim(),
+                environment: document.getElementById('meta-environment').value,
+                business_unit: document.getElementById('meta-business-unit').value.trim(),
+                owners: owners,
+                location: document.getElementById('meta-location').value
+            };
+        }
+
+        // Generate YAML
+        function generateYaml() {
+            const metadata = getMetadata();
+
+            if (state.addedPatterns.length === 0) {
+                return '';
+            }
+
+            const docs = state.addedPatterns.map(entry => {
+                const lines = [
+                    'version: "1"',
+                    `action: ${entry.action}`,
+                    'metadata:',
+                    `  project: ${metadata.project}`,
+                    `  environment: ${metadata.environment}`,
+                    `  business_unit: ${metadata.business_unit}`,
+                    '  owners:'
+                ];
+
+                metadata.owners.forEach(owner => {
+                    lines.push(`    - ${owner}`);
+                });
+
+                lines.push(`  location: ${metadata.location}`);
+                lines.push('');
+                lines.push(`pattern: ${entry.pattern}`);
+                lines.push('config:');
+
+                Object.entries(entry.config).forEach(([key, value]) => {
+                    if (value !== undefined && value !== null && value !== '') {
+                        if (Array.isArray(value)) {
+                            if (value.length > 0) {
+                                lines.push(`  ${key}:`);
+                                value.forEach(v => lines.push(`    - ${v}`));
+                            }
+                        } else if (typeof value === 'boolean') {
+                            lines.push(`  ${key}: ${value}`);
+                        } else {
+                            lines.push(`  ${key}: ${value}`);
+                        }
+                    }
+                });
+
+                return lines.join('\n');
+            });
+
+            return docs.join('\n\n---\n');
+        }
+
+        function updatePreview() {
+            const yaml = generateYaml();
+            document.getElementById('yaml-preview').value = yaml;
+        }
+
+        // Download Functions
+        function downloadYaml() {
+            const yaml = generateYaml();
+            if (!yaml) {
+                alert('No patterns configured. Add at least one pattern.');
                 return;
             }
-            document.getElementById('exportModal').classList.add('active');
-        }
 
-        function closeExportModal() {
-            document.getElementById('exportModal').classList.remove('active');
-        }
-
-        function downloadInfrastructureYaml() {
-            const yaml = document.getElementById('yaml').value;
-            if (!yaml.trim()) {
-                alert('No YAML configuration to export');
-                return;
-            }
-
-            // Add header comment
             const header = `# Infrastructure Configuration
 # Managed by GitOps - changes trigger automatic provisioning
-# Documentation: https://github.com/csGIT34/infrastructure-automation
+# Generated: ${new Date().toISOString()}
 
 `;
-            const content = header + yaml;
-
-            const blob = new Blob([content], { type: 'text/yaml' });
+            const blob = new Blob([header + yaml], { type: 'text/yaml' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = 'infrastructure.yaml';
-            document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
 
-        async function downloadWorkflowYaml() {
+        function copyYaml() {
+            const yaml = document.getElementById('yaml-preview').value;
+            navigator.clipboard.writeText(yaml).then(() => {
+                alert('YAML copied to clipboard!');
+            });
+        }
+
+        async function downloadWorkflow() {
             try {
                 const response = await fetch('https://raw.githubusercontent.com/csGIT34/infrastructure-automation/main/templates/infrastructure-workflow.yaml');
-                if (!response.ok) throw new Error('Failed to fetch workflow template');
-
+                if (!response.ok) throw new Error('Failed to fetch');
                 const content = await response.text();
+
                 const blob = new Blob([content], { type: 'text/yaml' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                // Use a descriptive name - user should rename/move to .github/workflows/
                 a.download = 'infrastructure-workflow.yaml';
-                document.body.appendChild(a);
                 a.click();
-                document.body.removeChild(a);
                 URL.revokeObjectURL(url);
 
-                // Show reminder about where to place the file
-                alert('Downloaded! Move this file to:\n.github/workflows/infrastructure.yaml\n\nin your repository.');
-            } catch (error) {
-                alert('Error downloading workflow: ' + error.message + '\n\nPlease use the curl command shown below the button.');
+                alert('Downloaded! Save as .github/workflows/infrastructure.yaml in your repository.');
+            } catch (e) {
+                alert('Could not download workflow. Please copy it manually from the infrastructure-automation repository.');
             }
         }
 
-        // Close modal on Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeExportModal();
-        });
+        // Collapsible
+        function toggleCollapsible(el) {
+            el.classList.toggle('open');
+        }
+
+        // Pattern Reference
+        function renderPatternReference() {
+            const container = document.getElementById('pattern-reference-list');
+            container.innerHTML = '';
+
+            Object.entries(PATTERNS_DATA.patterns).forEach(([name, pattern]) => {
+                const env = 'dev';
+                const costHtml = pattern.estimated_costs ? `
+                    <div class="pattern-detail-section">
+                        <h4>Estimated Monthly Cost</h4>
+                        <table class="sizing-table">
+                            <tr>
+                                <th>Size</th>
+                                <th>Dev</th>
+                                <th>Staging</th>
+                                <th>Prod</th>
+                            </tr>
+                            ${['small', 'medium', 'large'].map(size => `
+                                <tr>
+                                    <td>${size}</td>
+                                    <td>$${pattern.estimated_costs[size]?.dev || 0}</td>
+                                    <td>$${pattern.estimated_costs[size]?.staging || 0}</td>
+                                    <td>$${pattern.estimated_costs[size]?.prod || 0}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    </div>
+                ` : '';
+
+                const categoryClass = (pattern.category || 'single-resource');
+
+                const html = `
+                    <div class="pattern-detail">
+                        <div class="pattern-detail-header">
+                            <div>
+                                <span class="pattern-icon icon-${pattern.icon || 'package'}" style="font-size: 1.5rem; margin-right: 0.5rem;"></span>
+                                <h3 style="display: inline;">${name}</h3>
+                                <span class="pattern-category ${categoryClass}" style="margin-left: 0.5rem;">${pattern.category_display || 'Single Resource'}</span>
+                            </div>
+                        </div>
+                        <div class="pattern-detail-description">${(pattern.description || '').replace(/\n/g, '<br>')}</div>
+
+                        <div class="pattern-detail-section">
+                            <h4>Components</h4>
+                            <ul>
+                                ${(pattern.components || []).map(c => `<li>${c}</li>`).join('')}
+                            </ul>
+                        </div>
+
+                        <div class="pattern-detail-section">
+                            <h4>Use Cases</h4>
+                            <ul>
+                                ${(pattern.use_cases || []).map(u => `<li>${u}</li>`).join('')}
+                            </ul>
+                        </div>
+
+                        <div class="pattern-detail-section">
+                            <h4>Configuration</h4>
+                            <p style="font-size: 0.85rem; color: #a1a1aa;">
+                                <strong>Required:</strong> ${(pattern.config?.required || []).join(', ') || 'None'}<br>
+                                <strong>Optional:</strong> ${(pattern.config?.optional || []).map(o => typeof o === 'string' ? o : Object.keys(o)[0]).join(', ') || 'None'}
+                            </p>
+                        </div>
+
+                        ${costHtml}
+                    </div>
+                `;
+                container.innerHTML += html;
+            });
+        }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            loadTemplate('storage');
+            initPatternGrid();
+            updatePreview();
         });
-
-        document.getElementById('yaml').addEventListener('blur', updateEnvironmentFromYaml);
     </script>
 </body>
 </html>

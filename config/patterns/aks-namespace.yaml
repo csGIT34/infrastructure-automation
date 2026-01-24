@@ -1,0 +1,131 @@
+# Pattern: aks-namespace
+# Kubernetes namespace in shared AKS cluster with RBAC and quotas
+
+name: aks-namespace
+description: |
+  Kubernetes namespace in a shared AKS cluster with resource quotas and RBAC.
+  Includes security groups for viewers, editors, and admins with automatic
+  Azure Kubernetes Service RBAC role assignments.
+
+category: single-resource
+components:
+  - aks-namespace
+  - security-groups
+  - rbac-assignments
+  - access-review (prod only)
+
+use_cases:
+  - Team workload isolation
+  - Microservice deployments
+  - Development sandboxes
+  - CI/CD deployment targets
+
+# T-shirt sizing matrix
+sizing:
+  small:
+    dev:
+      cpu_limit: "2"
+      memory_limit: "4Gi"
+      pod_limit: 20
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      cpu_limit: "2"
+      memory_limit: "4Gi"
+      pod_limit: 20
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      cpu_limit: "4"
+      memory_limit: "8Gi"
+      pod_limit: 50
+      enable_diagnostics: true
+      enable_access_review: true
+
+  medium:
+    dev:
+      cpu_limit: "4"
+      memory_limit: "8Gi"
+      pod_limit: 50
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      cpu_limit: "4"
+      memory_limit: "8Gi"
+      pod_limit: 50
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      cpu_limit: "8"
+      memory_limit: "16Gi"
+      pod_limit: 100
+      enable_diagnostics: true
+      enable_access_review: true
+
+  large:
+    dev:
+      cpu_limit: "8"
+      memory_limit: "16Gi"
+      pod_limit: 100
+      enable_diagnostics: true
+      enable_access_review: false
+    staging:
+      cpu_limit: "16"
+      memory_limit: "32Gi"
+      pod_limit: 200
+      enable_diagnostics: true
+      enable_access_review: true
+    prod:
+      cpu_limit: "32"
+      memory_limit: "64Gi"
+      pod_limit: 500
+      enable_diagnostics: true
+      enable_access_review: true
+
+# Configuration schema
+config:
+  required:
+    - name
+    - aks_cluster_name
+    - aks_resource_group
+  optional:
+    - cpu_limit:
+        type: string
+        description: CPU quota for namespace (e.g., "4" for 4 cores)
+    - memory_limit:
+        type: string
+        description: Memory quota for namespace (e.g., "8Gi")
+    - pod_limit:
+        type: number
+        description: Maximum number of pods allowed
+
+# Estimated costs (USD/month) - namespace itself is free, cost is cluster overhead
+estimated_costs:
+  small:
+    dev: 0
+    staging: 0
+    prod: 50
+  medium:
+    dev: 0
+    staging: 25
+    prod: 100
+  large:
+    dev: 25
+    staging: 100
+    prod: 250
+
+example:
+  version: "1"
+  metadata:
+    project: myapp
+    environment: dev
+    business_unit: engineering
+    owners:
+      - alice@example.com
+    location: eastus
+  pattern: aks-namespace
+  config:
+    name: api-backend
+    size: small
+    aks_cluster_name: aks-shared-dev
+    aks_resource_group: rg-aks-shared

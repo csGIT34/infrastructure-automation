@@ -1,0 +1,146 @@
+# Pattern: eventhub
+# Azure Event Hubs for event streaming and messaging
+
+name: eventhub
+description: |
+  Azure Event Hubs namespace for high-throughput event streaming.
+  Includes Key Vault for connection strings and security groups
+  for sender/receiver access with RBAC.
+
+category: single-resource
+components:
+  - eventhub
+  - keyvault
+  - security-groups
+  - rbac-assignments
+  - diagnostic-settings (staging/prod)
+  - access-review (prod only)
+
+use_cases:
+  - Real-time event streaming
+  - Log aggregation
+  - IoT data ingestion
+  - Application telemetry
+  - Event-driven architectures
+
+# T-shirt sizing matrix
+sizing:
+  small:
+    dev:
+      sku: Basic
+      capacity: 1
+      partition_count: 2
+      message_retention: 1
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      sku: Basic
+      capacity: 1
+      partition_count: 4
+      message_retention: 1
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      sku: Standard
+      capacity: 1
+      partition_count: 4
+      message_retention: 7
+      enable_diagnostics: true
+      enable_access_review: true
+
+  medium:
+    dev:
+      sku: Standard
+      capacity: 1
+      partition_count: 4
+      message_retention: 1
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      sku: Standard
+      capacity: 2
+      partition_count: 8
+      message_retention: 4
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      sku: Standard
+      capacity: 4
+      partition_count: 16
+      message_retention: 7
+      enable_diagnostics: true
+      enable_access_review: true
+
+  large:
+    dev:
+      sku: Standard
+      capacity: 2
+      partition_count: 8
+      message_retention: 4
+      enable_diagnostics: true
+      enable_access_review: false
+    staging:
+      sku: Standard
+      capacity: 4
+      partition_count: 16
+      message_retention: 7
+      enable_diagnostics: true
+      enable_access_review: true
+    prod:
+      sku: Standard
+      capacity: 8
+      partition_count: 32
+      message_retention: 7
+      enable_diagnostics: true
+      enable_access_review: true
+
+# Configuration schema
+config:
+  required:
+    - name
+  optional:
+    - partition_count:
+        type: number
+        default: 2
+        description: Number of partitions per Event Hub
+    - message_retention:
+        type: number
+        default: 1
+        description: Message retention in days (1-7 for Standard, 1 for Basic)
+    - enable_private_endpoint:
+        type: boolean
+        default: false
+        description: Enable private endpoint connectivity
+    - subnet_id:
+        type: string
+        description: Subnet ID for private endpoint
+
+# Estimated costs (USD/month)
+estimated_costs:
+  small:
+    dev: 11
+    staging: 22
+    prod: 45
+  medium:
+    dev: 22
+    staging: 88
+    prod: 175
+  large:
+    dev: 88
+    staging: 175
+    prod: 350
+
+example:
+  version: "1"
+  metadata:
+    project: myapp
+    environment: dev
+    business_unit: engineering
+    owners:
+      - alice@example.com
+    location: eastus
+  pattern: eventhub
+  config:
+    name: events
+    size: small
+    partition_count: 4

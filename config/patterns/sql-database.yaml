@@ -1,0 +1,133 @@
+# Pattern: sql-database
+# Azure SQL Database with RBAC and secrets management
+
+name: sql-database
+description: |
+  Azure SQL Database (managed) with automatic credential management.
+  Connection strings stored in Key Vault with security group-based access.
+  Supports zone redundancy for high availability.
+
+category: single-resource
+components:
+  - sql-database
+  - keyvault
+  - security-groups
+  - rbac-assignments
+  - network-rules (optional)
+  - diagnostic-settings (staging/prod)
+  - access-review (prod only)
+
+use_cases:
+  - Relational data storage
+  - Transaction processing
+  - Reporting databases
+  - Enterprise applications
+  - .NET application backends
+
+# T-shirt sizing matrix
+sizing:
+  small:
+    dev:
+      sku_name: Basic
+      max_size_gb: 2
+      zone_redundant: false
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      sku_name: S0
+      max_size_gb: 10
+      zone_redundant: false
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      sku_name: S1
+      max_size_gb: 50
+      zone_redundant: true
+      enable_diagnostics: true
+      enable_access_review: true
+
+  medium:
+    dev:
+      sku_name: S0
+      max_size_gb: 10
+      zone_redundant: false
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      sku_name: S1
+      max_size_gb: 50
+      zone_redundant: false
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      sku_name: S2
+      max_size_gb: 100
+      zone_redundant: true
+      enable_diagnostics: true
+      enable_access_review: true
+
+  large:
+    dev:
+      sku_name: S1
+      max_size_gb: 50
+      zone_redundant: false
+      enable_diagnostics: true
+      enable_access_review: false
+    staging:
+      sku_name: S2
+      max_size_gb: 100
+      zone_redundant: true
+      enable_diagnostics: true
+      enable_access_review: true
+    prod:
+      sku_name: S3
+      max_size_gb: 250
+      zone_redundant: true
+      enable_diagnostics: true
+      enable_access_review: true
+
+# Configuration schema
+config:
+  required:
+    - name
+  optional:
+    - allowed_ips:
+        type: array
+        items: string
+        description: IP addresses allowed through firewall
+    - enable_private_endpoint:
+        type: boolean
+        default: false
+        description: Enable private endpoint connectivity
+    - subnet_id:
+        type: string
+        description: Subnet ID for private endpoint
+
+# Estimated costs (USD/month)
+estimated_costs:
+  small:
+    dev: 5
+    staging: 25
+    prod: 75
+  medium:
+    dev: 25
+    staging: 75
+    prod: 150
+  large:
+    dev: 75
+    staging: 150
+    prod: 300
+
+example:
+  version: "1"
+  metadata:
+    project: myapp
+    environment: dev
+    business_unit: engineering
+    owners:
+      - alice@example.com
+    location: eastus
+  pattern: sql-database
+  config:
+    name: maindb
+    size: small

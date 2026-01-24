@@ -58,15 +58,37 @@ locals {
     service_plan     = "asp"
   }
 
+  # Environment abbreviations for constrained resources
+  env_abbrev = {
+    dev     = "d"
+    staging = "s"
+    prod    = "p"
+  }
+
   # Standard name pattern: {prefix}-{project}-{name}-{env}
   standard_name = "${lookup(local.prefixes, var.resource_type, var.resource_type)}-${var.project}-${var.name}-${var.environment}"
 
   # Storage accounts: no hyphens, max 24 chars, lowercase only
-  storage_name = lower(substr(replace("${var.project}${var.name}${var.environment}", "-", ""), 0, 24))
+  # Format: st{project}{name}{env_abbrev} - use abbreviation to save chars
+  # Clean project and name by removing hyphens
+  storage_project = lower(replace(var.project, "-", ""))
+  storage_suffix  = lower(replace(var.name, "-", ""))
+  storage_env     = lookup(local.env_abbrev, var.environment, substr(var.environment, 0, 1))
+  # Prefix (2) + env (1) = 3 reserved chars, leaving 21 for project+name
+  # Split roughly: 14 for project, 7 for name (adjustable)
+  storage_project_max = min(length(local.storage_project), 14)
+  storage_suffix_max  = min(length(local.storage_suffix), 21 - local.storage_project_max)
+  storage_name = lower(join("", [
+    "st",
+    substr(local.storage_project, 0, local.storage_project_max),
+    substr(local.storage_suffix, 0, local.storage_suffix_max),
+    local.storage_env
+  ]))
 
   # Key Vault: max 24 chars, alphanumeric and hyphens only, must end with letter/digit
-  # Use shorter format: kv-{project}-{env} to avoid truncation issues
-  keyvault_base = "kv-${var.project}-${var.environment}"
+  # Format: kv-{project}-{name}-{env_abbrev}
+  keyvault_env  = lookup(local.env_abbrev, var.environment, substr(var.environment, 0, 1))
+  keyvault_base = "kv-${var.project}-${var.name}-${local.keyvault_env}"
   keyvault_name = substr(local.keyvault_base, 0, 24)
 
   # Select appropriate name based on resource type

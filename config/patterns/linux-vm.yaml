@@ -1,0 +1,141 @@
+# Pattern: linux-vm
+# Azure Linux Virtual Machine with managed identity
+
+name: linux-vm
+description: |
+  Azure Linux Virtual Machine with managed identity and SSH key management.
+  SSH keys are automatically generated and stored in Key Vault.
+  Includes security groups for operators and admins with RBAC.
+
+category: single-resource
+components:
+  - linux-vm
+  - keyvault
+  - security-groups
+  - rbac-assignments
+  - diagnostic-settings (staging/prod)
+  - access-review (prod only)
+
+use_cases:
+  - Development workstations
+  - Build agents
+  - Custom workloads
+  - Legacy application hosting
+  - Bastion hosts
+
+# T-shirt sizing matrix
+sizing:
+  small:
+    dev:
+      vm_size: Standard_B1s
+      os_disk_size_gb: 30
+      os_disk_type: Standard_LRS
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      vm_size: Standard_B1ms
+      os_disk_size_gb: 64
+      os_disk_type: Standard_LRS
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      vm_size: Standard_B2s
+      os_disk_size_gb: 128
+      os_disk_type: Premium_LRS
+      enable_diagnostics: true
+      enable_access_review: true
+
+  medium:
+    dev:
+      vm_size: Standard_B2s
+      os_disk_size_gb: 64
+      os_disk_type: Standard_LRS
+      enable_diagnostics: false
+      enable_access_review: false
+    staging:
+      vm_size: Standard_D2s_v3
+      os_disk_size_gb: 128
+      os_disk_type: Premium_LRS
+      enable_diagnostics: true
+      enable_access_review: false
+    prod:
+      vm_size: Standard_D4s_v3
+      os_disk_size_gb: 256
+      os_disk_type: Premium_LRS
+      enable_diagnostics: true
+      enable_access_review: true
+
+  large:
+    dev:
+      vm_size: Standard_D2s_v3
+      os_disk_size_gb: 128
+      os_disk_type: Premium_LRS
+      enable_diagnostics: true
+      enable_access_review: false
+    staging:
+      vm_size: Standard_D4s_v3
+      os_disk_size_gb: 256
+      os_disk_type: Premium_LRS
+      enable_diagnostics: true
+      enable_access_review: true
+    prod:
+      vm_size: Standard_D8s_v3
+      os_disk_size_gb: 512
+      os_disk_type: Premium_LRS
+      enable_diagnostics: true
+      enable_access_review: true
+
+# Configuration schema
+config:
+  required:
+    - name
+    - subnet_id
+  optional:
+    - admin_username:
+        type: string
+        default: azureuser
+        description: SSH admin username
+    - image_publisher:
+        type: string
+        default: Canonical
+        description: VM image publisher
+    - image_offer:
+        type: string
+        default: 0001-com-ubuntu-server-jammy
+        description: VM image offer
+    - image_sku:
+        type: string
+        default: 22_04-lts
+        enum: ["20_04-lts", "22_04-lts", "24_04-lts"]
+        description: Ubuntu version
+
+# Estimated costs (USD/month)
+estimated_costs:
+  small:
+    dev: 8
+    staging: 18
+    prod: 50
+  medium:
+    dev: 30
+    staging: 100
+    prod: 200
+  large:
+    dev: 100
+    staging: 200
+    prod: 400
+
+example:
+  version: "1"
+  metadata:
+    project: myapp
+    environment: dev
+    business_unit: engineering
+    owners:
+      - alice@example.com
+    location: eastus
+  pattern: linux-vm
+  config:
+    name: buildagent
+    size: small
+    subnet_id: /subscriptions/.../subnets/default
+    admin_username: azureuser

@@ -27,8 +27,8 @@ resource "azurerm_storage_account" "main" {
     account_tier                    = lookup(var.config, "tier", "Standard")
     account_replication_type        = lookup(var.config, "replication", "LRS")
 
-    enable_https_traffic_only = true
-    min_tls_version           = "TLS1_2"
+    https_traffic_only_enabled = true
+    min_tls_version            = "TLS1_2"
 
     blob_properties {
         versioning_enabled = lookup(var.config, "versioning", false)
