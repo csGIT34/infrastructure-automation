@@ -65,7 +65,9 @@ locals {
   storage_name = lower(substr(replace("${var.project}${var.name}${var.environment}", "-", ""), 0, 24))
 
   # Key Vault: max 24 chars, alphanumeric and hyphens only
-  keyvault_name = substr("kv-${var.project}-${var.name}-${var.environment}", 0, 24)
+  # Include pattern_name when provided to avoid conflicts across patterns
+  keyvault_base = var.pattern_name != "" ? "kv-${var.project}-${var.pattern_name}" : "kv-${var.project}-${var.name}"
+  keyvault_name = substr("${local.keyvault_base}-${var.environment}", 0, 24)
 
   # Select appropriate name based on resource type
   resource_name = var.resource_type == "storage_account" ? local.storage_name : (

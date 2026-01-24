@@ -209,7 +209,7 @@ jobs:
     strategy:
       matrix:
         pattern: ${{ fromJson(needs.resolve-patterns.outputs.patterns_json) }}
-      max-parallel: 1  # Sequential execution for proper ordering
+      # Parallel execution - patterns are independent with isolated state
       fail-fast: false  # Continue on failure to process remaining patterns
 
     outputs:
