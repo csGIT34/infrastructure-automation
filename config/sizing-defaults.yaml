@@ -27,9 +27,10 @@ conditional_features:
     prod: true
 
   # Access reviews (requires Azure AD P2)
+  # Now uses group owners + manager as reviewers (two-stage)
   enable_access_review:
-    dev: false
-    staging: false
+    dev: true
+    staging: true
     prod: true
 
   # Geo-redundant backups
