@@ -99,6 +99,12 @@ variable "enable_access_review" {
   default     = false
 }
 
+variable "geo_redundant_backup" {
+  description = "Enable geo-redundant backup (not applicable to Key Vault, ignored)"
+  type        = bool
+  default     = false
+}
+
 variable "enable_private_endpoint" {
   description = "Enable private endpoint"
   type        = bool
