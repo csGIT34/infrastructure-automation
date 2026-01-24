@@ -24,8 +24,14 @@ python3 scripts/resolve-pattern.py examples/keyvault-pattern.yaml --output json
 
 ### Pattern Validation
 ```bash
-# Validate a pattern request
+# Validate a pattern request (single document)
 python3 scripts/resolve-pattern.py examples/keyvault-pattern.yaml --validate
+
+# Validate multi-document YAML
+python3 scripts/resolve-pattern.py examples/multi-pattern.yaml --validate
+
+# Resolve multi-document YAML to JSON (for provisioning workflow)
+python3 scripts/resolve-pattern.py examples/multi-pattern.yaml --output multi-json
 
 # Sync workflow template with patterns
 ./scripts/sync-workflow-template.sh
@@ -110,7 +116,8 @@ The provision workflow reports back to the source repository:
    - Validates pattern name and config
    - Resolves t-shirt sizing based on environment
    - Evaluates conditional features (prod-only, etc.)
-   - Outputs Terraform tfvars
+   - Supports multi-document YAML with `--output multi-json`
+   - Outputs Terraform tfvars (single doc) or JSON array (multi-doc)
 
 4. **Per-Pattern Terraform** (`terraform/patterns/`) - Each pattern has its own isolated Terraform config that composes modules
 
@@ -177,6 +184,68 @@ config:
   name: secrets
   size: small  # Optional, defaults based on environment
 ```
+
+### Multi-Pattern Requests
+
+Multiple patterns can be provisioned in a single `infrastructure.yaml` using YAML multi-document format (documents separated by `---`). This is useful for:
+- Provisioning related resources together
+- Replacing old resources with new ones (destroy + create)
+- Batch infrastructure changes
+
+**Action Field:**
+- `action: create` (default) - Provision new resources
+- `action: destroy` - Tear down existing resources
+
+**Execution Order:**
+1. All **destroy** actions run first (to free up resources/names)
+2. All **create** actions run after
+3. Processing continues on failure (reports all results)
+
+**Example (`examples/multi-pattern.yaml`):**
+```yaml
+# Document 0: Destroy old database
+---
+version: "1"
+action: destroy
+metadata:
+  project: myapp
+  environment: dev
+  business_unit: engineering
+  owners: [alice@company.com]
+pattern: postgresql
+config:
+  name: olddb
+
+# Document 1: Create new Key Vault
+---
+version: "1"
+action: create  # Optional, 'create' is default
+metadata:
+  project: myapp
+  environment: dev
+  business_unit: engineering
+  owners: [alice@company.com]
+pattern: keyvault
+config:
+  name: secrets
+
+# Document 2: Create new storage
+---
+version: "1"
+metadata:
+  project: myapp
+  environment: dev
+  business_unit: engineering
+  owners: [alice@company.com]
+pattern: storage
+config:
+  name: data
+```
+
+**Backward Compatibility:**
+- Single-document files work unchanged
+- Missing `action` field defaults to `create`
+- No version bump needed
 
 ### Available Patterns
 

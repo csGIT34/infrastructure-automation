@@ -6,11 +6,17 @@
 #   INFRA_APP_PRIVATE_KEY - GitHub App private key (PEM format)
 #
 # Supports pattern-based requests with t-shirt sizing (small/medium/large)
+# Supports multi-document YAML with action field (create/destroy)
 #
 # Usage:
-# 1. Create infrastructure.yaml in your repo root
+# 1. Create infrastructure.yaml in your repo root (single or multi-document)
 # 2. Create a PR to see the plan preview
 # 3. Merge to main to provision resources
+#
+# Multi-document format:
+#   Use YAML document separators (---) to define multiple patterns
+#   Each document can have action: create (default) or action: destroy
+#   Destroy actions are executed first, then create actions
 
 name: Infrastructure GitOps
 
@@ -66,73 +72,117 @@ jobs:
 
           try:
               with open(infra_file, 'r') as f:
-                  config = yaml.safe_load(f)
+                  # Support multi-document YAML
+                  documents = list(yaml.safe_load_all(f))
+                  documents = [d for d in documents if d is not None]
           except yaml.YAMLError as e:
               print(f"::error::Invalid YAML syntax: {e}")
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                   f.write("result=failed\n")
               sys.exit(1)
 
-          errors = []
+          if not documents:
+              print("::error::No valid documents found in YAML")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("result=failed\n")
+              sys.exit(1)
 
-          # Only pattern-based requests are supported
-          if 'pattern' not in config:
-              errors.append("Missing 'pattern' field. Only pattern-based requests are supported.")
+          valid_patterns = [
+              'keyvault', 'postgresql', 'mongodb', 'storage', 'function-app',
+              'sql-database', 'eventhub', 'aks-namespace', 'linux-vm', 'static-site',
+              'web-app', 'api-backend', 'microservice', 'data-pipeline'
+          ]
 
-          # Validate metadata
-          if 'metadata' not in config:
-              errors.append("Missing 'metadata' section")
-          else:
-              metadata = config['metadata']
-              required_meta = ['project', 'environment', 'business_unit', 'owners']
-              for field in required_meta:
-                  if field not in metadata:
-                      errors.append(f"Missing metadata.{field}")
+          def validate_document(doc, index):
+              """Validate a single document and return errors."""
+              errors = []
+              action = doc.get('action', 'create')
 
-              # owners must be a list
-              if 'owners' in metadata and not isinstance(metadata['owners'], list):
-                  errors.append("metadata.owners must be a list of email addresses")
+              # Validate action field
+              if action not in ['create', 'destroy']:
+                  errors.append(f"Doc {index}: Invalid action '{action}'. Must be 'create' or 'destroy'")
 
-              # Validate environment
-              env = metadata.get('environment', '')
-              if env not in ['dev', 'staging', 'prod']:
-                  errors.append(f"Invalid environment: {env}. Must be dev, staging, or prod")
+              # Only pattern-based requests are supported
+              if 'pattern' not in doc:
+                  errors.append(f"Doc {index}: Missing 'pattern' field. Only pattern-based requests are supported.")
 
-          # Validate pattern
-          if 'pattern' in config:
-              valid_patterns = [
-                  'keyvault', 'postgresql', 'mongodb', 'storage', 'function-app',
-                  'sql-database', 'eventhub', 'aks-namespace', 'linux-vm', 'static-site',
-                  'web-app', 'api-backend', 'microservice', 'data-pipeline'
-              ]
-              pattern = config.get('pattern', '')
-              if pattern not in valid_patterns:
-                  errors.append(f"Invalid pattern: {pattern}. Valid patterns: {', '.join(valid_patterns)}")
-
-              # Validate config section
-              if 'config' not in config:
-                  errors.append("Missing 'config' section for pattern request")
+              # Validate metadata
+              if 'metadata' not in doc:
+                  errors.append(f"Doc {index}: Missing 'metadata' section")
               else:
-                  cfg = config['config']
-                  if 'name' not in cfg:
-                      errors.append("Missing config.name")
-                  if 'size' in cfg and cfg['size'] not in ['small', 'medium', 'large']:
-                      errors.append(f"Invalid size: {cfg['size']}. Must be small, medium, or large")
+                  metadata = doc['metadata']
+                  required_meta = ['project', 'environment', 'business_unit', 'owners']
+                  for field in required_meta:
+                      if field not in metadata:
+                          errors.append(f"Doc {index}: Missing metadata.{field}")
 
-          if errors:
+                  # owners must be a list
+                  if 'owners' in metadata and not isinstance(metadata['owners'], list):
+                      errors.append(f"Doc {index}: metadata.owners must be a list of email addresses")
+
+                  # Validate environment
+                  env = metadata.get('environment', '')
+                  if env not in ['dev', 'staging', 'prod']:
+                      errors.append(f"Doc {index}: Invalid environment: {env}. Must be dev, staging, or prod")
+
+              # Validate pattern
+              if 'pattern' in doc:
+                  pattern = doc.get('pattern', '')
+                  if pattern not in valid_patterns:
+                      errors.append(f"Doc {index}: Invalid pattern: {pattern}. Valid patterns: {', '.join(valid_patterns)}")
+
+                  # Validate config section
+                  if 'config' not in doc:
+                      errors.append(f"Doc {index}: Missing 'config' section for pattern request")
+                  else:
+                      cfg = doc['config']
+                      if 'name' not in cfg:
+                          errors.append(f"Doc {index}: Missing config.name")
+                      if 'size' in cfg and cfg['size'] not in ['small', 'medium', 'large']:
+                          errors.append(f"Doc {index}: Invalid size: {cfg['size']}. Must be small, medium, or large")
+
+              return errors, action
+
+          # Validate all documents
+          all_errors = []
+          create_count = 0
+          destroy_count = 0
+          environments = set()
+
+          for i, doc in enumerate(documents):
+              errors, action = validate_document(doc, i)
+              all_errors.extend(errors)
+              if not errors:
+                  if action == 'create':
+                      create_count += 1
+                  else:
+                      destroy_count += 1
+                  environments.add(doc.get('metadata', {}).get('environment', 'dev'))
+
+          if all_errors:
               print("::error::Validation failed")
-              for err in errors:
+              for err in all_errors:
                   print(f"  - {err}")
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                   f.write("result=failed\n")
-                  f.write(f"errors={json.dumps(errors)}\n")
+                  f.write(f"errors={json.dumps(all_errors)}\n")
               sys.exit(1)
 
-          environment = config.get('metadata', {}).get('environment', 'dev')
-          print(f"Validation passed! Pattern: {config['pattern']}, Environment: {environment}")
+          # Get primary environment (first document's environment)
+          environment = documents[0].get('metadata', {}).get('environment', 'dev')
+
+          print(f"Validation passed!")
+          print(f"  Documents: {len(documents)}")
+          print(f"  Create: {create_count}, Destroy: {destroy_count}")
+          if destroy_count > 0:
+              print(f"  ⚠️  Warning: {destroy_count} pattern(s) will be DESTROYED")
+
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write("result=passed\n")
               f.write(f"environment={environment}\n")
+              f.write(f"document_count={len(documents)}\n")
+              f.write(f"create_count={create_count}\n")
+              f.write(f"destroy_count={destroy_count}\n")
           EOF
 
       - name: Generate Plan Preview
@@ -144,38 +194,10 @@ jobs:
           import os
 
           with open("infrastructure.yaml", 'r') as f:
-              config = yaml.safe_load(f)
+              # Support multi-document YAML
+              documents = list(yaml.safe_load_all(f))
+              documents = [d for d in documents if d is not None]
 
-          metadata = config.get('metadata', {})
-          project = metadata.get('project', 'unknown')
-          env = metadata.get('environment', 'dev')
-          pattern = config.get('pattern', '')
-          cfg = config.get('config', {})
-          size = cfg.get('size', 'small')
-
-          # Generate markdown preview
-          preview = "## Infrastructure Plan Preview\n\n"
-          preview += "### Pattern Request\n"
-          preview += "| Property | Value |\n"
-          preview += "|----------|-------|\n"
-          preview += f"| Pattern | `{pattern}` |\n"
-          preview += f"| Project | `{project}` |\n"
-          preview += f"| Environment | `{env}` |\n"
-          preview += f"| Size | `{size}` |\n"
-          preview += f"| Business Unit | `{metadata.get('business_unit', 'N/A')}` |\n"
-          preview += f"| Owners | `{', '.join(metadata.get('owners', []))}` |\n"
-          preview += f"| Location | `{metadata.get('location', 'eastus')}` |\n\n"
-
-          # Pattern-specific config
-          preview += "### Configuration\n"
-          preview += "| Setting | Value |\n"
-          preview += "|---------|-------|\n"
-          for key, value in cfg.items():
-              preview += f"| {key} | `{value}` |\n"
-          preview += "\n"
-
-          # What will be created
-          preview += "### What Will Be Created\n"
           pattern_components = {
               'keyvault': ['Key Vault', 'Security Groups', 'RBAC Assignments'],
               'postgresql': ['PostgreSQL Server', 'Database', 'Key Vault', 'Security Groups'],
@@ -192,28 +214,118 @@ jobs:
               'microservice': ['AKS Namespace', 'Event Hub', 'Storage', 'Key Vault', 'Security Groups'],
               'data-pipeline': ['Event Hub', 'Function App', 'Data Lake Storage', 'MongoDB', 'Key Vault', 'Security Groups']
           }
-          components = pattern_components.get(pattern, ['Unknown components'])
-          for component in components:
-              preview += f"- {component}\n"
-          preview += "\n"
 
-          # Environment features
-          preview += "### Environment Features\n"
-          if env == 'prod':
-              preview += "- Diagnostic logging enabled\n"
-              preview += "- Access reviews enabled\n"
-              preview += "- Geo-redundant backup (if applicable)\n"
-              preview += "- Purge protection enabled\n"
-          elif env == 'staging':
-              preview += "- Diagnostic logging enabled\n"
-              preview += "- Standard backup retention\n"
-          else:
-              preview += "- Development configuration\n"
-              preview += "- Minimal backup retention\n"
-          preview += "\n"
+          # Separate documents by action
+          destroy_docs = [(i, d) for i, d in enumerate(documents) if d.get('action') == 'destroy']
+          create_docs = [(i, d) for i, d in enumerate(documents) if d.get('action', 'create') == 'create']
 
-          preview += f"### Resource Group\n"
-          preview += f"`rg-{project}-{env}`\n\n"
+          # Generate markdown preview
+          preview = "## Infrastructure Plan Preview\n\n"
+
+          # Show summary for multi-document
+          if len(documents) > 1:
+              preview += f"### Summary\n"
+              preview += f"- **Total Documents:** {len(documents)}\n"
+              preview += f"- **Create:** {len(create_docs)} pattern(s)\n"
+              preview += f"- **Destroy:** {len(destroy_docs)} pattern(s)\n\n"
+
+              if destroy_docs:
+                  preview += "> ⚠️ **WARNING:** This request includes DESTROY actions. "
+                  preview += "Resources will be permanently deleted.\n\n"
+
+              preview += "### Execution Order\n"
+              preview += "| Order | Doc | Action | Pattern | Name |\n"
+              preview += "|-------|-----|--------|---------|------|\n"
+              order = 1
+              # Destroy first
+              for i, doc in destroy_docs:
+                  name = doc.get('config', {}).get('name', 'N/A')
+                  preview += f"| {order} | {i} | 🗑️ DESTROY | `{doc.get('pattern', 'N/A')}` | `{name}` |\n"
+                  order += 1
+              # Then create
+              for i, doc in create_docs:
+                  name = doc.get('config', {}).get('name', 'N/A')
+                  preview += f"| {order} | {i} | ✨ CREATE | `{doc.get('pattern', 'N/A')}` | `{name}` |\n"
+                  order += 1
+              preview += "\n---\n\n"
+
+          # Process destroy docs first in preview
+          for section_name, section_docs, icon in [
+              ("🗑️ Destroy Actions", destroy_docs, "🗑️"),
+              ("✨ Create Actions", create_docs, "✨") if len(documents) > 1 else ("Pattern Request", create_docs, "")
+          ]:
+              if not section_docs:
+                  continue
+
+              if len(documents) > 1:
+                  preview += f"## {section_name}\n\n"
+
+              for doc_idx, doc in section_docs:
+                  metadata = doc.get('metadata', {})
+                  project = metadata.get('project', 'unknown')
+                  env = metadata.get('environment', 'dev')
+                  pattern = doc.get('pattern', '')
+                  cfg = doc.get('config', {})
+                  size = cfg.get('size', 'small')
+                  action = doc.get('action', 'create')
+
+                  if len(documents) > 1:
+                      preview += f"### Document {doc_idx}: {pattern}\n\n"
+
+                  if action == 'destroy':
+                      preview += "> ⚠️ **This pattern will be DESTROYED**\n\n"
+
+                  preview += "| Property | Value |\n"
+                  preview += "|----------|-------|\n"
+                  if icon:
+                      preview += f"| Action | {icon} `{action.upper()}` |\n"
+                  preview += f"| Pattern | `{pattern}` |\n"
+                  preview += f"| Project | `{project}` |\n"
+                  preview += f"| Environment | `{env}` |\n"
+                  preview += f"| Size | `{size}` |\n"
+                  preview += f"| Business Unit | `{metadata.get('business_unit', 'N/A')}` |\n"
+                  preview += f"| Owners | `{', '.join(metadata.get('owners', []))}` |\n"
+                  preview += f"| Location | `{metadata.get('location', 'eastus')}` |\n\n"
+
+                  # Pattern-specific config
+                  preview += "#### Configuration\n"
+                  preview += "| Setting | Value |\n"
+                  preview += "|---------|-------|\n"
+                  for key, value in cfg.items():
+                      preview += f"| {key} | `{value}` |\n"
+                  preview += "\n"
+
+                  # What will be created/destroyed
+                  action_verb = "Destroyed" if action == 'destroy' else "Created"
+                  preview += f"#### What Will Be {action_verb}\n"
+                  components = pattern_components.get(pattern, ['Unknown components'])
+                  for component in components:
+                      prefix = "❌" if action == 'destroy' else "✅"
+                      preview += f"- {prefix} {component}\n"
+                  preview += "\n"
+
+                  # Environment features (only for create)
+                  if action == 'create':
+                      preview += "#### Environment Features\n"
+                      if env == 'prod':
+                          preview += "- Diagnostic logging enabled\n"
+                          preview += "- Access reviews enabled\n"
+                          preview += "- Geo-redundant backup (if applicable)\n"
+                          preview += "- Purge protection enabled\n"
+                      elif env == 'staging':
+                          preview += "- Diagnostic logging enabled\n"
+                          preview += "- Standard backup retention\n"
+                      else:
+                          preview += "- Development configuration\n"
+                          preview += "- Minimal backup retention\n"
+                      preview += "\n"
+
+                  preview += f"#### Resource Group\n"
+                  preview += f"`rg-{project}-{env}`\n\n"
+
+                  if len(documents) > 1:
+                      preview += "---\n\n"
+
           preview += "---\n"
           preview += "**On merge to main**, these changes will be automatically provisioned.\n"
 

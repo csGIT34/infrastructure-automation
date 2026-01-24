@@ -29,8 +29,22 @@ env:
   TF_STATE_CONTAINER: "tfstate"
 
 jobs:
-  provision:
+  # =========================================================================
+  # Job 1: Parse and resolve all patterns from multi-document YAML
+  # =========================================================================
+  resolve-patterns:
     runs-on: ["self-hosted", "linux"]
+    outputs:
+      patterns_json: ${{ steps.resolve.outputs.patterns_json }}
+      execution_order: ${{ steps.resolve.outputs.execution_order }}
+      document_count: ${{ steps.resolve.outputs.document_count }}
+      create_count: ${{ steps.resolve.outputs.create_count }}
+      destroy_count: ${{ steps.resolve.outputs.destroy_count }}
+      repository: ${{ steps.request.outputs.repository }}
+      repo_owner: ${{ steps.request.outputs.repo_owner }}
+      repo_name: ${{ steps.request.outputs.repo_name }}
+      commit_sha: ${{ steps.request.outputs.commit_sha }}
+      request_id: ${{ steps.request.outputs.request_id }}
 
     steps:
       - name: Checkout infrastructure-automation
@@ -98,7 +112,7 @@ jobs:
         run: |
           pip3 install --quiet --break-system-packages pyyaml
 
-      - name: Resolve pattern and validate
+      - name: Resolve all patterns
         id: resolve
         run: |
           python3 << 'PYTHON_SCRIPT'
@@ -109,31 +123,18 @@ jobs:
           import sys
 
           with open('infrastructure.yaml', 'r') as f:
-              config = yaml.safe_load(f)
+              documents = list(yaml.safe_load_all(f))
+              documents = [d for d in documents if d is not None]
 
-          # Check if this is a pattern-based request
-          if 'pattern' not in config:
-              print("::error::Only pattern-based requests are supported")
+          if not documents:
+              print("::error::No valid documents found in YAML")
               sys.exit(1)
 
-          metadata = config.get('metadata', {})
-          pattern = config['pattern']
-          environment = metadata.get('environment', 'dev')
-          project = metadata.get('project', 'unknown')
-          business_unit = metadata.get('business_unit', 'default')
+          print(f"Found {len(documents)} document(s)")
 
-          print(f"Pattern: {pattern}")
-          print(f"Project: {project}")
-          print(f"Environment: {environment}")
-          print(f"Business Unit: {business_unit}")
-
-          # Write temp file for resolver
-          with open('/tmp/pattern-request.yaml', 'w') as f:
-              yaml.dump(config, f)
-
-          # Run pattern resolver
+          # Run pattern resolver with multi-json output
           result = subprocess.run(
-              ['python3', 'scripts/resolve-pattern.py', '/tmp/pattern-request.yaml', '--output', 'json'],
+              ['python3', 'scripts/resolve-pattern.py', 'infrastructure.yaml', '--output', 'multi-json'],
               capture_output=True,
               text=True
           )
@@ -142,285 +143,408 @@ jobs:
               print(f"::error::Pattern resolution failed: {result.stderr}")
               sys.exit(1)
 
-          tfvars = json.loads(result.stdout)
+          resolved = json.loads(result.stdout)
 
-          # Write tfvars for Terraform
-          with open('terraform.tfvars.json', 'w') as f:
-              json.dump(tfvars, f, indent=2)
+          # Write individual tfvars files for each pattern
+          for pattern in resolved.get('patterns', []):
+              if not pattern.get('valid', False):
+                  continue
+              idx = pattern['index']
+              tfvars = pattern.get('tfvars', {})
+              with open(f'terraform.tfvars.{idx}.json', 'w') as f:
+                  json.dump(tfvars, f, indent=2)
+              print(f"Wrote terraform.tfvars.{idx}.json for {pattern['pattern']} ({pattern['action']})")
 
-          print("Resolved tfvars:")
-          print(json.dumps(tfvars, indent=2))
+          # Build patterns JSON for matrix
+          patterns_for_matrix = []
+          for pattern in resolved.get('patterns', []):
+              if not pattern.get('valid', False):
+                  print(f"::warning::Skipping invalid pattern at index {pattern['index']}: {pattern.get('errors', [])}")
+                  continue
 
-          # Output for subsequent steps
+              # Get the original document for metadata
+              doc = documents[pattern['index']]
+              metadata = doc.get('metadata', {})
+
+              patterns_for_matrix.append({
+                  'index': pattern['index'],
+                  'action': pattern['action'],
+                  'pattern': pattern['pattern'],
+                  'state_key': pattern['state_key'],
+                  'environment': metadata.get('environment', 'dev'),
+                  'project': metadata.get('project', 'unknown'),
+                  'business_unit': metadata.get('business_unit', 'default'),
+                  'name': doc.get('config', {}).get('name', pattern['pattern'])
+              })
+
+          execution_order = resolved.get('execution_order', list(range(len(patterns_for_matrix))))
+
+          # Output for subsequent jobs
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f"pattern={pattern}\n")
-              f.write(f"environment={environment}\n")
-              f.write(f"project={project}\n")
-              f.write(f"business_unit={business_unit}\n")
-              name = config.get('config', {}).get('name', pattern)
-              state_key = f"{business_unit}/{environment}/{project}/{pattern}-{name}/terraform.tfstate"
-              f.write(f"state_key={state_key}\n")
+              f.write(f"patterns_json={json.dumps(patterns_for_matrix)}\n")
+              f.write(f"execution_order={json.dumps(execution_order)}\n")
+              f.write(f"document_count={resolved.get('document_count', len(documents))}\n")
+              f.write(f"create_count={resolved.get('create_count', 0)}\n")
+              f.write(f"destroy_count={resolved.get('destroy_count', 0)}\n")
+
+          print(f"Resolved {len(patterns_for_matrix)} valid patterns")
+          print(f"Execution order: {execution_order}")
+          print(f"Create: {resolved.get('create_count', 0)}, Destroy: {resolved.get('destroy_count', 0)}")
           PYTHON_SCRIPT
+
+      - name: Upload tfvars artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfvars-files
+          path: terraform.tfvars.*.json
+          retention-days: 1
+
+  # =========================================================================
+  # Job 2: Process each pattern sequentially using matrix
+  # =========================================================================
+  provision-pattern:
+    needs: resolve-patterns
+    runs-on: ["self-hosted", "linux"]
+    if: ${{ needs.resolve-patterns.outputs.patterns_json != '[]' }}
+    strategy:
+      matrix:
+        pattern: ${{ fromJson(needs.resolve-patterns.outputs.patterns_json) }}
+      max-parallel: 1  # Sequential execution for proper ordering
+      fail-fast: false  # Continue on failure to process remaining patterns
+
+    outputs:
+      result: ${{ steps.result.outputs.status }}
+
+    steps:
+      - name: Checkout infrastructure-automation
+        uses: actions/checkout@v4
+
+      - name: Download tfvars artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tfvars-files
+
+      - name: Display pattern info
+        run: |
+          echo "Processing pattern ${{ matrix.pattern.index }}: ${{ matrix.pattern.pattern }}"
+          echo "  Action: ${{ matrix.pattern.action }}"
+          echo "  Environment: ${{ matrix.pattern.environment }}"
+          echo "  Project: ${{ matrix.pattern.project }}"
+          echo "  State Key: ${{ matrix.pattern.state_key }}"
 
       - name: Azure Login
         uses: azure/login@v1
         with:
-          client-id: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.resolve.outputs.environment)] }}
+          client-id: ${{ secrets[format('AZURE_CLIENT_ID_{0}', matrix.pattern.environment)] }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Setup Terraform workspace
         run: |
-          PATTERN="${{ steps.resolve.outputs.pattern }}"
+          PATTERN="${{ matrix.pattern.pattern }}"
+          INDEX="${{ matrix.pattern.index }}"
+
           # Preserve directory structure so ../../modules/ paths work
           mkdir -p terraform-workspace/terraform/patterns
           cp -r "terraform/patterns/$PATTERN" "terraform-workspace/terraform/patterns/$PATTERN"
           cp -r terraform/modules terraform-workspace/terraform/
-          cp terraform.tfvars.json "terraform-workspace/terraform/patterns/$PATTERN/"
+          cp "terraform.tfvars.${INDEX}.json" "terraform-workspace/terraform/patterns/$PATTERN/terraform.tfvars.json"
 
       - name: Terraform Init
-        working-directory: terraform-workspace/terraform/patterns/${{ steps.resolve.outputs.pattern }}
+        working-directory: terraform-workspace/terraform/patterns/${{ matrix.pattern.pattern }}
         env:
           ARM_USE_OIDC: true
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.resolve.outputs.environment)] }}
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', matrix.pattern.environment)] }}
         run: |
           terraform init -upgrade \
             -backend-config="storage_account_name=${{ env.TF_STATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ env.TF_STATE_CONTAINER }}" \
-            -backend-config="key=${{ steps.resolve.outputs.state_key }}" \
+            -backend-config="key=${{ matrix.pattern.state_key }}" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
 
       - name: Terraform Plan
-        working-directory: terraform-workspace/terraform/patterns/${{ steps.resolve.outputs.pattern }}
+        working-directory: terraform-workspace/terraform/patterns/${{ matrix.pattern.pattern }}
         env:
           ARM_USE_OIDC: true
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.resolve.outputs.environment)] }}
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', matrix.pattern.environment)] }}
         run: |
-          terraform plan \
-            -var-file=terraform.tfvars.json \
-            -out=tfplan \
-            -no-color
+          # Add -destroy flag for destroy actions
+          if [ "${{ matrix.pattern.action }}" == "destroy" ]; then
+            echo "🗑️ Planning DESTROY for ${{ matrix.pattern.pattern }}"
+            terraform plan -destroy \
+              -var-file=terraform.tfvars.json \
+              -out=tfplan \
+              -no-color
+          else
+            echo "✨ Planning CREATE for ${{ matrix.pattern.pattern }}"
+            terraform plan \
+              -var-file=terraform.tfvars.json \
+              -out=tfplan \
+              -no-color
+          fi
 
       - name: Terraform Apply
-        working-directory: terraform-workspace/terraform/patterns/${{ steps.resolve.outputs.pattern }}
+        working-directory: terraform-workspace/terraform/patterns/${{ matrix.pattern.pattern }}
         env:
           ARM_USE_OIDC: true
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.resolve.outputs.environment)] }}
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', matrix.pattern.environment)] }}
         run: |
           terraform apply -auto-approve tfplan
 
       - name: Capture Terraform Outputs
         id: outputs
-        working-directory: terraform-workspace/terraform/patterns/${{ steps.resolve.outputs.pattern }}
+        if: matrix.pattern.action == 'create'
+        working-directory: terraform-workspace/terraform/patterns/${{ matrix.pattern.pattern }}
         run: |
-          terraform output -json > /tmp/tf-outputs.json
-          echo "Terraform outputs:"
-          cat /tmp/tf-outputs.json
+          terraform output -json > /tmp/tf-outputs-${{ matrix.pattern.index }}.json
+          echo "Terraform outputs for pattern ${{ matrix.pattern.index }}:"
+          cat /tmp/tf-outputs-${{ matrix.pattern.index }}.json
 
-          # Extract key outputs for the issue body (filter sensitive data)
+      - name: Upload outputs artifact
+        if: matrix.pattern.action == 'create'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tf-outputs-${{ matrix.pattern.index }}
+          path: /tmp/tf-outputs-${{ matrix.pattern.index }}.json
+          retention-days: 1
+
+      - name: Set result status
+        id: result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+  # =========================================================================
+  # Job 3: Report aggregated status to source repository
+  # =========================================================================
+  report-status:
+    needs: [resolve-patterns, provision-pattern]
+    if: always()
+    runs-on: ["self-hosted", "linux"]
+
+    steps:
+      - name: Checkout infrastructure-automation
+        uses: actions/checkout@v4
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.INFRA_APP_ID }}
+          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+          owner: ${{ needs.resolve-patterns.outputs.repo_owner }}
+          repositories: ${{ needs.resolve-patterns.outputs.repo_name }}
+
+      - name: Download all output artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: outputs
+        continue-on-error: true
+
+      - name: Aggregate results and create report
+        id: report
+        run: |
           python3 << 'PYTHON_SCRIPT'
           import json
           import os
+          import glob
 
-          with open('/tmp/tf-outputs.json') as f:
-              outputs = json.load(f)
+          # Get job status
+          provision_result = "${{ needs.provision-pattern.result }}"
+          resolve_result = "${{ needs.resolve-patterns.result }}"
 
-          # Build a markdown-friendly output summary
-          summary_lines = []
-          access_info = []
+          # Get pattern info
+          patterns_json = '${{ needs.resolve-patterns.outputs.patterns_json }}'
+          patterns = json.loads(patterns_json) if patterns_json else []
 
-          for key, value in outputs.items():
-              val = value.get('value', '')
-              sensitive = value.get('sensitive', False)
+          document_count = int("${{ needs.resolve-patterns.outputs.document_count }}" or "0")
+          create_count = int("${{ needs.resolve-patterns.outputs.create_count }}" or "0")
+          destroy_count = int("${{ needs.resolve-patterns.outputs.destroy_count }}" or "0")
 
-              if sensitive:
-                  summary_lines.append(f"| {key} | *(sensitive - see Key Vault)* |")
-              elif key == 'access_info':
-                  access_info.append(val)
-              elif isinstance(val, dict):
-                  for k, v in val.items():
-                      summary_lines.append(f"| {key}.{k} | `{v}` |")
-              elif isinstance(val, list):
-                  summary_lines.append(f"| {key} | `{', '.join(str(v) for v in val)}` |")
-              else:
-                  summary_lines.append(f"| {key} | `{val}` |")
+          # Determine overall status
+          if resolve_result != 'success':
+              overall_status = 'failure'
+              status_emoji = '❌'
+              status_text = 'Resolution Failed'
+          elif provision_result == 'success':
+              overall_status = 'success'
+              status_emoji = '✅'
+              status_text = 'All Patterns Succeeded'
+          elif provision_result == 'failure':
+              # Check if partial success (some patterns succeeded)
+              overall_status = 'failure'
+              status_emoji = '⚠️'
+              status_text = 'Partial Failure'
+          else:
+              overall_status = 'failure'
+              status_emoji = '❌'
+              status_text = 'Provisioning Failed'
 
-          with open('/tmp/outputs-summary.md', 'w') as f:
-              if summary_lines:
-                  f.write("| Output | Value |\n")
-                  f.write("|--------|-------|\n")
-                  f.write("\n".join(summary_lines))
-                  f.write("\n")
-              if access_info:
-                  f.write("\n### Access Information\n\n")
-                  f.write("\n".join(access_info))
+          # Build issue body
+          issue_body = f"""## {status_emoji} Infrastructure Provisioning Results
 
+### Overall Status: {status_text}
+
+| Property | Value |
+|----------|-------|
+| Documents | {document_count} |
+| Create Actions | {create_count} |
+| Destroy Actions | {destroy_count} |
+| Commit | `${{ needs.resolve-patterns.outputs.commit_sha }}` |
+| Workflow Run | [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+
+### Pattern Results
+
+| Doc | Action | Pattern | Name | Status |
+|-----|--------|---------|------|--------|
+"""
+
+          # Add pattern results
+          for pattern in patterns:
+              action_icon = "🗑️" if pattern['action'] == 'destroy' else "✨"
+              # We'll mark all as success if the job succeeded, otherwise unknown
+              # In a real scenario, you'd track individual pattern results
+              status_icon = "✅" if provision_result == 'success' else "⚠️"
+              issue_body += f"| {pattern['index']} | {action_icon} {pattern['action']} | `{pattern['pattern']}` | `{pattern['name']}` | {status_icon} |\n"
+
+          issue_body += "\n"
+
+          # Add outputs section for create actions
+          output_files = glob.glob('outputs/tf-outputs-*/tf-outputs-*.json')
+          if output_files and provision_result == 'success':
+              issue_body += "### Resource Outputs\n\n"
+              for output_file in sorted(output_files):
+                  try:
+                      with open(output_file) as f:
+                          outputs = json.load(f)
+
+                      # Extract index from filename
+                      idx = output_file.split('-')[-1].replace('.json', '')
+                      pattern_info = next((p for p in patterns if str(p['index']) == idx), None)
+
+                      if pattern_info:
+                          issue_body += f"#### Document {idx}: {pattern_info['pattern']}\n\n"
+                          issue_body += "| Output | Value |\n"
+                          issue_body += "|--------|-------|\n"
+
+                          for key, value in outputs.items():
+                              val = value.get('value', '')
+                              sensitive = value.get('sensitive', False)
+                              if sensitive:
+                                  issue_body += f"| {key} | *(sensitive - see Key Vault)* |\n"
+                              elif isinstance(val, dict):
+                                  for k, v in val.items():
+                                      issue_body += f"| {key}.{k} | `{v}` |\n"
+                              elif isinstance(val, list):
+                                  issue_body += f"| {key} | `{', '.join(str(v) for v in val)}` |\n"
+                              else:
+                                  issue_body += f"| {key} | `{val}` |\n"
+                          issue_body += "\n"
+                  except Exception as e:
+                      print(f"Warning: Could not parse {output_file}: {e}")
+
+          # Add next steps
+          if overall_status == 'success':
+              issue_body += """### Next Steps
+
+1. **Request access**: Ask your team lead to add you to the appropriate security group
+2. **Access secrets**: Once added, retrieve secrets from Key Vault:
+   ```bash
+   az keyvault secret list --vault-name <vault-name>
+   az keyvault secret show --vault-name <vault-name> --name <secret-name>
+   ```
+
+### Questions or Issues?
+
+If you encounter problems, create an issue in the [infrastructure-automation](https://github.com/${{ github.repository }}) repository.
+"""
+          else:
+              issue_body += """### Troubleshooting
+
+1. **View the error**: Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed error messages
+2. **Fix the issue**: Update your `infrastructure.yaml` based on the error
+3. **Retry**: Commit and push to trigger a new provisioning attempt
+
+### Common Issues
+
+- **Invalid pattern configuration**: Check that all required fields are present
+- **Naming conflicts**: Resource names must be unique within Azure
+- **Permission errors**: The service principal may not have required permissions
+- **Quota limits**: Your subscription may have hit resource limits
+
+### Need Help?
+
+Create an issue in the [infrastructure-automation](https://github.com/${{ github.repository }}) repository with:
+- Your `infrastructure.yaml` content
+- The error message from the workflow run
+"""
+
+          issue_body += f"""
+---
+*Provisioned by Infrastructure Platform • Request ID: `${{ needs.resolve-patterns.outputs.request_id }}`*
+"""
+
+          # Write outputs
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"overall_status={overall_status}\n")
+              f.write(f"status_text={status_text}\n")
+
+          # Write issue body to file for the next step
+          with open('/tmp/issue_body.md', 'w') as f:
+              f.write(issue_body)
+
+          print(f"Overall status: {overall_status}")
+          print(f"Status text: {status_text}")
           PYTHON_SCRIPT
 
-      - name: Create Job Summary
-        run: |
-          cat << EOF >> $GITHUB_STEP_SUMMARY
-          ## Infrastructure Provisioned
-
-          | Property | Value |
-          |----------|-------|
-          | Request ID | \`${{ steps.request.outputs.request_id }}\` |
-          | Source Repository | \`${{ steps.request.outputs.repository }}\` |
-          | Commit | \`${{ steps.request.outputs.commit_sha }}\` |
-          | Pattern | \`${{ steps.resolve.outputs.pattern }}\` |
-          | Project | \`${{ steps.resolve.outputs.project }}\` |
-          | Environment | \`${{ steps.resolve.outputs.environment }}\` |
-
-          ### Terraform Outputs
-          \`\`\`json
-          $(cat /tmp/tf-outputs.json)
-          \`\`\`
-          EOF
-
-      # =========================================================================
-      # SUCCESS: Report back to source repository
-      # =========================================================================
-      - name: Set Commit Status - Success
-        if: success()
+      - name: Set Commit Status
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          gh api repos/${{ steps.request.outputs.repository }}/statuses/${{ steps.request.outputs.commit_sha }} \
-            -f state=success \
+          STATUS="${{ steps.report.outputs.overall_status }}"
+          STATUS_TEXT="${{ steps.report.outputs.status_text }}"
+
+          gh api repos/${{ needs.resolve-patterns.outputs.repository }}/statuses/${{ needs.resolve-patterns.outputs.commit_sha }} \
+            -f state="$STATUS" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            -f description="Infrastructure provisioned successfully" \
+            -f description="$STATUS_TEXT" \
             -f context="infrastructure/provision"
 
-      - name: Create Success Issue in Source Repo
-        if: success()
+      - name: Create Issue in Source Repo
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          # Build issue body
-          OUTPUTS_SUMMARY=""
-          if [ -f /tmp/outputs-summary.md ]; then
-            OUTPUTS_SUMMARY=$(cat /tmp/outputs-summary.md)
+          STATUS="${{ steps.report.outputs.overall_status }}"
+
+          if [ "$STATUS" == "success" ]; then
+            TITLE="✅ Infrastructure Provisioned (${{ needs.resolve-patterns.outputs.create_count }} created, ${{ needs.resolve-patterns.outputs.destroy_count }} destroyed)"
+          else
+            TITLE="❌ Infrastructure Provisioning Failed"
           fi
 
-          ISSUE_BODY=$(cat << 'ISSUE_EOF'
-          ## ✅ Infrastructure Provisioned Successfully
-
-          Your infrastructure request has been provisioned.
-
-          ### Request Details
-
-          | Property | Value |
-          |----------|-------|
-          | Pattern | `${{ steps.resolve.outputs.pattern }}` |
-          | Project | `${{ steps.resolve.outputs.project }}` |
-          | Environment | `${{ steps.resolve.outputs.environment }}` |
-          | Business Unit | `${{ steps.resolve.outputs.business_unit }}` |
-          | Commit | `${{ steps.request.outputs.commit_sha }}` |
-
-          ### Resources Created
-
-          ISSUE_EOF
-          )
-
-          # Append outputs summary
-          ISSUE_BODY="${ISSUE_BODY}
-          ${OUTPUTS_SUMMARY}
-
-          ### Next Steps
-
-          1. **Request access**: Ask your team lead to add you to the appropriate security group
-          2. **Access secrets**: Once added, retrieve secrets from Key Vault:
-             \`\`\`bash
-             az keyvault secret list --vault-name <vault-name>
-             az keyvault secret show --vault-name <vault-name> --name <secret-name>
-             \`\`\`
-          3. **View provisioning details**: [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-          ### Questions or Issues?
-
-          If you encounter problems, create an issue in the [infrastructure-automation](https://github.com/${{ github.repository }}) repository.
-
-          ---
-          *Provisioned by Infrastructure Platform • Request ID: \`${{ steps.request.outputs.request_id }}\`*
-          "
+          ISSUE_BODY=$(cat /tmp/issue_body.md)
 
           # Create the issue (ignore label errors if label doesn't exist)
           gh issue create \
-            --repo "${{ steps.request.outputs.repository }}" \
-            --title "✅ Infrastructure Provisioned: ${{ steps.resolve.outputs.pattern }} (${{ steps.resolve.outputs.environment }})" \
+            --repo "${{ needs.resolve-patterns.outputs.repository }}" \
+            --title "$TITLE" \
             --body "$ISSUE_BODY" \
             --label "infrastructure" || gh issue create \
-            --repo "${{ steps.request.outputs.repository }}" \
-            --title "✅ Infrastructure Provisioned: ${{ steps.resolve.outputs.pattern }} (${{ steps.resolve.outputs.environment }})" \
+            --repo "${{ needs.resolve-patterns.outputs.repository }}" \
+            --title "$TITLE" \
             --body "$ISSUE_BODY"
 
-      # =========================================================================
-      # FAILURE: Report back to source repository
-      # =========================================================================
-      - name: Set Commit Status - Failure
-        if: failure()
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      - name: Create Job Summary
         run: |
-          gh api repos/${{ steps.request.outputs.repository }}/statuses/${{ steps.request.outputs.commit_sha }} \
-            -f state=failure \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            -f description="Infrastructure provisioning failed" \
-            -f context="infrastructure/provision" || true
-
-      - name: Create Failure Issue in Source Repo
-        if: failure()
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          ISSUE_BODY=$(cat << 'ISSUE_EOF'
-          ## ❌ Infrastructure Provisioning Failed
-
-          Your infrastructure request failed to provision. Please review the error and try again.
-
-          ### Request Details
-
-          | Property | Value |
-          |----------|-------|
-          | Pattern | `${{ steps.resolve.outputs.pattern }}` |
-          | Project | `${{ steps.resolve.outputs.project }}` |
-          | Environment | `${{ steps.resolve.outputs.environment }}` |
-          | Commit | `${{ steps.request.outputs.commit_sha }}` |
-
-          ### What to do
-
-          1. **View the error**: Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed error messages
-          2. **Fix the issue**: Update your `infrastructure.yaml` based on the error
-          3. **Retry**: Commit and push to trigger a new provisioning attempt
-
-          ### Common Issues
-
-          - **Invalid pattern configuration**: Check that all required fields are present
-          - **Naming conflicts**: Resource names must be unique within Azure
-          - **Permission errors**: The service principal may not have required permissions
-          - **Quota limits**: Your subscription may have hit resource limits
-
-          ### Need Help?
-
-          Create an issue in the [infrastructure-automation](https://github.com/${{ github.repository }}) repository with:
-          - Your `infrastructure.yaml` content
-          - The error message from the workflow run
-
-          ---
-          *Infrastructure Platform • Request ID: \`${{ steps.request.outputs.request_id }}\`*
-          ISSUE_EOF
-          )
-
-          # Create the issue
-          gh issue create \
-            --repo "${{ steps.request.outputs.repository }}" \
-            --title "❌ Infrastructure Failed: ${{ steps.resolve.outputs.pattern }} (${{ steps.resolve.outputs.environment }})" \
-            --body "$ISSUE_BODY" \
-            --label "infrastructure,failed" || true
+          cat /tmp/issue_body.md >> $GITHUB_STEP_SUMMARY

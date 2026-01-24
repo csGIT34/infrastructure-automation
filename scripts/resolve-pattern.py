@@ -8,8 +8,10 @@ Resolves a pattern request YAML into Terraform variables:
 3. Evaluates conditional features (prod-only, etc.)
 4. Outputs Terraform tfvars
 
+Supports multi-document YAML files with action field (create/destroy).
+
 Usage:
-    python3 resolve-pattern.py <request.yaml> [--output tfvars|json|env]
+    python3 resolve-pattern.py <request.yaml> [--output tfvars|json|env|multi-json]
     python3 resolve-pattern.py --validate <request.yaml>
 """
 
@@ -18,7 +20,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -63,6 +65,11 @@ class PatternResolver:
         """
         errors = []
         warnings = []
+
+        # Validate action field (optional, defaults to "create")
+        action = request.get("action", "create")
+        if action not in ["create", "destroy"]:
+            errors.append(f"Invalid action: {action}. Must be 'create' or 'destroy'")
 
         # Check required fields
         if "pattern" not in request:
@@ -238,6 +245,102 @@ class PatternResolver:
             }
         return result
 
+    def _compute_state_key(self, request: Dict) -> str:
+        """Compute the Terraform state key for a pattern request."""
+        metadata = request.get("metadata", {})
+        pattern_name = request.get("pattern", "unknown")
+        config = request.get("config", {})
+
+        business_unit = metadata.get("business_unit", "default")
+        environment = metadata.get("environment", "dev")
+        project = metadata.get("project", "unknown")
+        name = config.get("name", pattern_name)
+
+        return f"{business_unit}/{environment}/{project}/{pattern_name}-{name}/terraform.tfstate"
+
+    def resolve_all(self, documents: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        Resolve all pattern documents from a multi-document YAML.
+
+        Args:
+            documents: List of parsed YAML documents
+
+        Returns:
+            List of results with index, action, pattern, tfvars, and state_key
+        """
+        results = []
+        for i, doc in enumerate(documents):
+            if doc is None:
+                continue
+
+            action = doc.get("action", "create")
+            pattern_name = doc.get("pattern", "unknown")
+
+            # Validate the document
+            validation = self.validate_request(doc)
+            if not validation["valid"]:
+                results.append({
+                    "index": i,
+                    "action": action,
+                    "pattern": pattern_name,
+                    "valid": False,
+                    "errors": validation["errors"],
+                    "tfvars": None,
+                    "state_key": None
+                })
+                continue
+
+            # Resolve the pattern
+            try:
+                tfvars = self.resolve(doc)
+                results.append({
+                    "index": i,
+                    "action": action,
+                    "pattern": pattern_name,
+                    "valid": True,
+                    "errors": [],
+                    "tfvars": tfvars,
+                    "state_key": self._compute_state_key(doc)
+                })
+            except ValueError as e:
+                results.append({
+                    "index": i,
+                    "action": action,
+                    "pattern": pattern_name,
+                    "valid": False,
+                    "errors": [str(e)],
+                    "tfvars": None,
+                    "state_key": None
+                })
+
+        return results
+
+    def compute_execution_order(self, results: List[Dict[str, Any]]) -> List[int]:
+        """
+        Compute the execution order for pattern results.
+
+        Destroy actions run first, then create actions.
+
+        Args:
+            results: List of resolved pattern results
+
+        Returns:
+            List of indices in execution order
+        """
+        destroy_indices = []
+        create_indices = []
+
+        for result in results:
+            if not result.get("valid", False):
+                continue
+            if result.get("action") == "destroy":
+                destroy_indices.append(result["index"])
+            else:
+                create_indices.append(result["index"])
+
+        # Destroy first, then create
+        return destroy_indices + create_indices
+
 
 def output_tfvars(tfvars: Dict[str, Any]) -> str:
     """Output Terraform tfvars format."""
@@ -284,9 +387,9 @@ def main():
     )
     parser.add_argument(
         "--output", "-o",
-        choices=["tfvars", "json", "env"],
+        choices=["tfvars", "json", "env", "multi-json"],
         default="tfvars",
-        help="Output format (default: tfvars)"
+        help="Output format (default: tfvars). Use 'multi-json' for multi-document YAML files."
     )
     parser.add_argument(
         "--validate",
@@ -342,7 +445,78 @@ def main():
         return 1
 
     with open(args.request_file) as f:
-        request = yaml.safe_load(f)
+        # Use safe_load_all for multi-document YAML support
+        documents = list(yaml.safe_load_all(f))
+
+    # Filter out None documents (empty documents in multi-doc YAML)
+    documents = [doc for doc in documents if doc is not None]
+
+    if not documents:
+        print("Error: No valid documents found in YAML file", file=sys.stderr)
+        return 1
+
+    # Multi-document mode (multi-json output or multiple documents)
+    is_multi_doc = len(documents) > 1 or args.output == "multi-json"
+
+    if is_multi_doc:
+        # Multi-document processing
+        results = resolver.resolve_all(documents)
+        execution_order = resolver.compute_execution_order(results)
+
+        # Check for any validation errors
+        all_valid = all(r.get("valid", False) for r in results)
+
+        if args.validate:
+            validation_results = []
+            for r in results:
+                validation_results.append({
+                    "index": r["index"],
+                    "action": r["action"],
+                    "pattern": r["pattern"],
+                    "valid": r["valid"],
+                    "errors": r.get("errors", [])
+                })
+            output = {
+                "document_count": len(documents),
+                "all_valid": all_valid,
+                "validations": validation_results,
+                "execution_order": execution_order,
+                "create_count": sum(1 for r in results if r.get("valid") and r.get("action") == "create"),
+                "destroy_count": sum(1 for r in results if r.get("valid") and r.get("action") == "destroy")
+            }
+            print(json.dumps(output, indent=2))
+            return 0 if all_valid else 1
+
+        if args.cost:
+            costs = []
+            for doc in documents:
+                cost = resolver.get_cost_estimate(doc)
+                cost["action"] = doc.get("action", "create")
+                costs.append(cost)
+            print(json.dumps(costs, indent=2))
+            return 0
+
+        # Multi-json output for provisioning workflow
+        output = {
+            "document_count": len(documents),
+            "all_valid": all_valid,
+            "execution_order": execution_order,
+            "patterns": results,
+            "create_count": sum(1 for r in results if r.get("valid") and r.get("action") == "create"),
+            "destroy_count": sum(1 for r in results if r.get("valid") and r.get("action") == "destroy")
+        }
+
+        if not all_valid:
+            invalid_docs = [r for r in results if not r.get("valid")]
+            print(f"Error: {len(invalid_docs)} document(s) failed validation", file=sys.stderr)
+            for r in invalid_docs:
+                print(f"  Document {r['index']}: {r['errors']}", file=sys.stderr)
+
+        print(json.dumps(output, indent=2))
+        return 0 if all_valid else 1
+
+    # Single document mode (backward compatible)
+    request = documents[0]
 
     # Validate mode
     if args.validate:
