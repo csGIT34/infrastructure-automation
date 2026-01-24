@@ -26,7 +26,7 @@ variable "group_name" {
 variable "frequency" {
   description = "Review frequency: quarterly, semi-annual, annual"
   type        = string
-  default     = "quarterly"
+  default     = "annual"
 
   validation {
     condition     = contains(["quarterly", "semi-annual", "annual"], var.frequency)
@@ -54,16 +54,11 @@ variable "default_decision" {
 variable "stage_duration_days" {
   description = "Number of days for each review stage"
   type        = number
-  default     = 7
+  default     = 14
 }
 
 variable "start_date" {
   description = "Start date for the review schedule (YYYY-MM-DD format)"
-  type        = string
-}
-
-variable "reviewer_id" {
-  description = "Object ID of the reviewer user"
   type        = string
 }
 
@@ -84,15 +79,15 @@ locals {
   }
 }
 
-# Two-stage Access Review: Group Owners -> Manager
+# Two-stage Access Review: Group Owners -> Member's Manager
 resource "msgraph_resource" "access_review" {
   url         = "identityGovernance/accessReviews/definitions"
   api_version = "v1.0"
 
   body = {
     displayName             = "Access Review: ${var.group_name}"
-    descriptionForAdmins    = "Scheduled review of ${var.group_name} group membership"
-    descriptionForReviewers = "Please review and justify continued access"
+    descriptionForAdmins    = "Two-stage access review for ${var.group_name}. Stage 1: Group owners. Stage 2: Member's manager."
+    descriptionForReviewers = "Please review the members of ${var.group_name} and approve or deny their continued access."
 
     scope = {
       "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
@@ -100,10 +95,42 @@ resource "msgraph_resource" "access_review" {
       queryType     = "MicrosoftGraph"
     }
 
-    reviewers = [
+    instanceEnumerationScope = {
+      "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
+      query         = "/groups/${var.group_id}"
+      queryType     = "MicrosoftGraph"
+    }
+
+    # Top-level reviewers empty - defined per stage
+    reviewers = []
+
+    stageSettings = [
       {
-        query     = "/users/${var.reviewer_id}"
-        queryType = "MicrosoftGraph"
+        stageId                        = "1"
+        durationInDays                 = var.stage_duration_days
+        recommendationsEnabled         = true
+        decisionsThatWillMoveToNextStage = ["NotReviewed", "Approve"]
+        reviewers = [
+          {
+            "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
+            query         = "./owners"
+            queryType     = "MicrosoftGraph"
+          }
+        ]
+      },
+      {
+        stageId            = "2"
+        dependsOn          = ["1"]
+        durationInDays     = var.stage_duration_days
+        recommendationsEnabled = true
+        reviewers = [
+          {
+            "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
+            query         = "./manager"
+            queryType     = "MicrosoftGraph"
+            queryRoot     = "decisions"
+          }
+        ]
       }
     ]
 
@@ -111,8 +138,9 @@ resource "msgraph_resource" "access_review" {
       mailNotificationsEnabled        = true
       reminderNotificationsEnabled    = true
       justificationRequiredOnApproval = true
-      defaultDecisionEnabled          = false
-      instanceDurationInDays          = var.stage_duration_days
+      defaultDecisionEnabled          = true
+      defaultDecision                 = var.default_decision
+      autoApplyDecisionsEnabled       = var.auto_apply_decisions
       recommendationsEnabled          = true
 
       recurrence = {
@@ -122,7 +150,7 @@ resource "msgraph_resource" "access_review" {
         }
         range = {
           type      = "noEnd"
-          startDate = "${var.start_date}T09:00:00.000Z"
+          startDate = var.start_date
         }
       }
     }

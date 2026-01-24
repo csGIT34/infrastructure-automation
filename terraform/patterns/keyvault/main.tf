@@ -236,20 +236,14 @@ resource "time_static" "access_review_start" {
   count = var.enable_access_review ? 1 : 0
 }
 
-data "azuread_user" "reviewer" {
-  count               = var.enable_access_review ? 1 : 0
-  user_principal_name = var.owners[0]
-}
-
 module "access_review" {
   source = "../../modules/access-review"
   count  = var.enable_access_review ? 1 : 0
 
-  group_id    = module.security_groups.group_ids["secrets-admins"]
-  group_name  = module.security_groups.group_names["secrets-admins"]
-  frequency   = "quarterly"
-  start_date  = formatdate("YYYY-MM-DD", time_static.access_review_start[0].rfc3339)
-  reviewer_id = data.azuread_user.reviewer[0].object_id
+  group_id   = module.security_groups.group_ids["secrets-admins"]
+  group_name = module.security_groups.group_names["secrets-admins"]
+  frequency  = "annual"
+  start_date = formatdate("YYYY-MM-DD", time_static.access_review_start[0].rfc3339)
 }
 
 # -----------------------------------------------------------------------------
