@@ -962,10 +962,7 @@
   "patterns": {
     "aks-namespace": {
       "name": "aks-namespace",
-      "description": "Kubernetes namespace in a shared AKS cluster with resource quotas and RBAC.
-Includes security groups for viewers, editors, and admins with automatic
-Azure Kubernetes Service RBAC role assignments.
-",
+      "description": "Kubernetes namespace in a shared AKS cluster with resource quotas and RBAC.\nIncludes security groups for viewers, editors, and admins with automatic\nAzure Kubernetes Service RBAC role assignments.\n",
       "category": "single-resource",
       "components": [
         "aks-namespace",
@@ -1118,10 +1115,7 @@ Azure Kubernetes Service RBAC role assignments.
     },
     "eventhub": {
       "name": "eventhub",
-      "description": "Azure Event Hubs namespace for high-throughput event streaming.
-Includes Key Vault for connection strings and security groups
-for sender/receiver access with RBAC.
-",
+      "description": "Azure Event Hubs namespace for high-throughput event streaming.\nIncludes Key Vault for connection strings and security groups\nfor sender/receiver access with RBAC.\n",
       "category": "single-resource",
       "components": [
         "eventhub",
@@ -1292,9 +1286,7 @@ for sender/receiver access with RBAC.
     },
     "function-app": {
       "name": "function-app",
-      "description": "Azure Functions serverless compute with managed identity and Key Vault integration.
-Automatically creates storage account and app service plan.
-",
+      "description": "Azure Functions serverless compute with managed identity and Key Vault integration.\nAutomatically creates storage account and app service plan.\n",
       "category": "single-resource",
       "components": [
         "function-app",
@@ -1424,9 +1416,7 @@ Automatically creates storage account and app service plan.
     },
     "keyvault": {
       "name": "keyvault",
-      "description": "Azure Key Vault for secure secrets, keys, and certificates management.
-Includes security groups, RBAC assignments, and optional access reviews.
-",
+      "description": "Azure Key Vault for secure secrets, keys, and certificates management.\nIncludes security groups, RBAC assignments, and optional access reviews.\n",
       "category": "single-resource",
       "components": [
         "keyvault",
@@ -1582,10 +1572,7 @@ Includes security groups, RBAC assignments, and optional access reviews.
     },
     "linux-vm": {
       "name": "linux-vm",
-      "description": "Azure Linux Virtual Machine with managed identity and SSH key management.
-SSH keys are automatically generated and stored in Key Vault.
-Includes security groups for operators and admins with RBAC.
-",
+      "description": "Azure Linux Virtual Machine with managed identity and SSH key management.\nSSH keys are automatically generated and stored in Key Vault.\nIncludes security groups for operators and admins with RBAC.\n",
       "category": "single-resource",
       "components": [
         "linux-vm",
@@ -1755,10 +1742,7 @@ Includes security groups for operators and admins with RBAC.
     },
     "mongodb": {
       "name": "mongodb",
-      "description": "Azure Cosmos DB with MongoDB API for document database workloads.
-Connection strings stored in Key Vault with security group-based access.
-Supports automatic failover and configurable consistency levels.
-",
+      "description": "Azure Cosmos DB with MongoDB API for document database workloads.\nConnection strings stored in Key Vault with security group-based access.\nSupports automatic failover and configurable consistency levels.\n",
       "category": "single-resource",
       "components": [
         "mongodb",
@@ -1935,9 +1919,7 @@ Supports automatic failover and configurable consistency levels.
     },
     "postgresql": {
       "name": "postgresql",
-      "description": "Azure Database for PostgreSQL Flexible Server with automatic secret management.
-Connection strings stored in Key Vault with security group-based access.
-",
+      "description": "Azure Database for PostgreSQL Flexible Server with automatic secret management.\nConnection strings stored in Key Vault with security group-based access.\n",
       "category": "single-resource",
       "components": [
         "postgresql",
@@ -2103,10 +2085,7 @@ Connection strings stored in Key Vault with security group-based access.
     },
     "sql-database": {
       "name": "sql-database",
-      "description": "Azure SQL Database (managed) with automatic credential management.
-Connection strings stored in Key Vault with security group-based access.
-Supports zone redundancy for high availability.
-",
+      "description": "Azure SQL Database (managed) with automatic credential management.\nConnection strings stored in Key Vault with security group-based access.\nSupports zone redundancy for high availability.\n",
       "category": "single-resource",
       "components": [
         "sql-database",
@@ -2261,10 +2240,7 @@ Supports zone redundancy for high availability.
     },
     "static-site": {
       "name": "static-site",
-      "description": "Azure Static Web Apps for hosting single-page applications and static sites.
-Includes built-in CI/CD, global CDN, and free SSL certificates.
-Security groups for developers and admins.
-",
+      "description": "Azure Static Web Apps for hosting single-page applications and static sites.\nIncludes built-in CI/CD, global CDN, and free SSL certificates.\nSecurity groups for developers and admins.\n",
       "category": "single-resource",
       "components": [
         "static-web-app",
@@ -2423,9 +2399,7 @@ Security groups for developers and admins.
     },
     "storage": {
       "name": "storage",
-      "description": "Azure Storage Account with blob containers, security group access,
-and optional private endpoint.
-",
+      "description": "Azure Storage Account with blob containers, security group access,\nand optional private endpoint.\n",
       "category": "single-resource",
       "components": [
         "storage-account",
@@ -2552,9 +2526,7 @@ and optional private endpoint.
     },
     "api-backend": {
       "name": "api-backend",
-      "description": "Function App API backend with database (PostgreSQL, SQL, or MongoDB) and
-Key Vault integration. For microservice backends and REST APIs.
-",
+      "description": "Function App API backend with database (PostgreSQL, SQL, or MongoDB) and\nKey Vault integration. For microservice backends and REST APIs.\n",
       "category": "composite",
       "components": [
         "function-app",
@@ -2681,9 +2653,7 @@ Key Vault integration. For microservice backends and REST APIs.
     },
     "data-pipeline": {
       "name": "data-pipeline",
-      "description": "Complete data pipeline with Event Hub ingestion, Function App processing,
-Data Lake storage, and optional Cosmos DB for processed data.
-",
+      "description": "Complete data pipeline with Event Hub ingestion, Function App processing,\nData Lake storage, and optional Cosmos DB for processed data.\n",
       "category": "composite",
       "components": [
         "eventhub (ingestion)",
@@ -2839,9 +2809,7 @@ Data Lake storage, and optional Cosmos DB for processed data.
     },
     "microservice": {
       "name": "microservice",
-      "description": "AKS namespace with Event Hub and Storage for event-driven microservices.
-Includes RBAC for namespace access and Key Vault for secrets.
-",
+      "description": "AKS namespace with Event Hub and Storage for event-driven microservices.\nIncludes RBAC for namespace access and Key Vault for secrets.\n",
       "category": "composite",
       "components": [
         "aks-namespace",
@@ -2962,9 +2930,7 @@ Includes RBAC for namespace access and Key Vault for secrets.
     },
     "web-app": {
       "name": "web-app",
-      "description": "Full-stack web application pattern with static frontend, serverless API backend,
-and database. Includes managed identity, Key Vault integration, and security groups.
-",
+      "description": "Full-stack web application pattern with static frontend, serverless API backend,\nand database. Includes managed identity, Key Vault integration, and security groups.\n",
       "category": "composite",
       "components": [
         "static-web-app (frontend)",
@@ -3258,7 +3224,7 @@ and database. Includes managed identity, Key Vault integration, and security gro
   },
   "metadata": {
     "pattern_count": 14,
-    "generated_at": "2026-01-24T22:32:32.617386+00:00",
+    "generated_at": "2026-01-24T23:13:11.346936+00:00",
     "categories": {
       "single-resource": 10,
       "composite": 4

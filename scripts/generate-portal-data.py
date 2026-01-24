@@ -148,7 +148,8 @@ def embed_in_html(data: dict, html_path: str) -> None:
 
     if re.search(pattern, html_content, re.DOTALL):
         # Replace existing embedded data
-        html_content = re.sub(pattern, replacement, html_content, flags=re.DOTALL)
+        # Use lambda to avoid regex backreference interpretation of \n, \t etc in JSON
+        html_content = re.sub(pattern, lambda m: replacement, html_content, flags=re.DOTALL)
     else:
         # Look for a placeholder comment and insert after it
         placeholder = "// PATTERNS_DATA_PLACEHOLDER"
