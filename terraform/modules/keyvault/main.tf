@@ -51,7 +51,7 @@ resource "azurerm_key_vault" "main" {
     soft_delete_retention_days = 7
     purge_protection_enabled   = false
 
-    enable_rbac_authorization = lookup(var.config, "rbac_enabled", true)
+    rbac_authorization_enabled = lookup(var.config, "rbac_enabled", true)
 
     network_acls {
         default_action = lookup(var.config, "default_action", "Allow")

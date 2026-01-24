@@ -1,0 +1,24 @@
+# Test Configuration
+#
+# Copy this file to terraform.tfvars and fill in your values:
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# DO NOT commit terraform.tfvars to git (it's in .gitignore)
+
+# Required: Azure subscription for test resources
+test_subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Required: Azure tenant ID
+test_tenant_id = "00000000-0000-0000-0000-000000000000"
+
+# Required: Your email for owner assignments
+test_owner_email = "your.email@company.com"
+
+# Optional: Azure region (default: eastus)
+# test_location = "eastus"
+
+# Optional: Owner object ID (looked up automatically if not provided)
+# test_owner_object_id = "00000000-0000-0000-0000-000000000000"
+
+# Optional: Log Analytics workspace for diagnostic tests
+# test_log_analytics_workspace_id = "/subscriptions/.../resourceGroups/.../providers/Microsoft.OperationalInsights/workspaces/..."

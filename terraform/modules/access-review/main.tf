@@ -91,13 +91,7 @@ resource "msgraph_resource" "access_review" {
 
     scope = {
       "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
-      query         = "/groups/${var.group_id}/transitiveMembers"
-      queryType     = "MicrosoftGraph"
-    }
-
-    instanceEnumerationScope = {
-      "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
-      query         = "/groups/${var.group_id}"
+      query         = "/groups/${var.group_id}/members"
       queryType     = "MicrosoftGraph"
     }
 
@@ -106,29 +100,27 @@ resource "msgraph_resource" "access_review" {
 
     stageSettings = [
       {
-        stageId                        = "1"
-        durationInDays                 = var.stage_duration_days
-        recommendationsEnabled         = true
+        stageId                          = "1"
+        durationInDays                   = var.stage_duration_days
+        recommendationsEnabled           = true
         decisionsThatWillMoveToNextStage = ["NotReviewed", "Approve"]
         reviewers = [
           {
-            "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
-            query         = "./owners"
-            queryType     = "MicrosoftGraph"
+            query     = "./owners"
+            queryType = "MicrosoftGraph"
           }
         ]
       },
       {
-        stageId            = "2"
-        dependsOn          = ["1"]
-        durationInDays     = var.stage_duration_days
+        stageId                = "2"
+        dependsOn              = ["1"]
+        durationInDays         = var.stage_duration_days
         recommendationsEnabled = true
         reviewers = [
           {
-            "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
-            query         = "./manager"
-            queryType     = "MicrosoftGraph"
-            queryRoot     = "decisions"
+            query     = "./manager"
+            queryType = "MicrosoftGraph"
+            queryRoot = "decisions"
           }
         ]
       }
@@ -142,6 +134,7 @@ resource "msgraph_resource" "access_review" {
       defaultDecision                 = var.default_decision
       autoApplyDecisionsEnabled       = var.auto_apply_decisions
       recommendationsEnabled          = true
+      instanceDurationInDays          = var.stage_duration_days * 2
 
       recurrence = {
         pattern = {

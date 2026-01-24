@@ -1,0 +1,410 @@
+#!/bin/bash
+#
+# Run Terraform tests locally with Service Principal authentication
+#
+# Usage:
+#   ./run-tests.sh                    # Run all module tests
+#   ./run-tests.sh naming             # Run specific module test
+#   ./run-tests.sh -p keyvault        # Run specific pattern test
+#   ./run-tests.sh --quick            # Quick test (naming only, no Azure)
+#   ./run-tests.sh --setup            # Interactive setup helper
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Check Terraform version
+check_terraform() {
+    if ! command -v terraform &> /dev/null; then
+        echo -e "${RED}Error: terraform not found${NC}"
+        exit 1
+    fi
+
+    # Get version string (e.g., "1.9.8")
+    tf_version=$(terraform version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+    if [ -z "$tf_version" ]; then
+        echo -e "${YELLOW}Warning: Could not parse Terraform version${NC}"
+        tf_version="unknown"
+    else
+        major=$(echo "$tf_version" | cut -d. -f1)
+        minor=$(echo "$tf_version" | cut -d. -f2)
+
+        if [ "$major" -lt 1 ] || ([ "$major" -eq 1 ] && [ "$minor" -lt 6 ]); then
+            echo -e "${RED}Error: Terraform 1.6+ required (found $tf_version)${NC}"
+            exit 1
+        fi
+    fi
+    echo -e "${GREEN}✓ Terraform $tf_version${NC}"
+}
+
+# Check Azure service principal authentication
+check_azure_auth() {
+    local missing=()
+
+    [ -z "$ARM_CLIENT_ID" ] && missing+=("ARM_CLIENT_ID")
+    [ -z "$ARM_CLIENT_SECRET" ] && missing+=("ARM_CLIENT_SECRET")
+    [ -z "$ARM_TENANT_ID" ] && missing+=("ARM_TENANT_ID")
+    [ -z "$ARM_SUBSCRIPTION_ID" ] && missing+=("ARM_SUBSCRIPTION_ID")
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo -e "${RED}Error: Missing Azure authentication environment variables:${NC}"
+        for var in "${missing[@]}"; do
+            echo -e "  - $var"
+        done
+        echo ""
+        echo "Set up authentication with:"
+        echo "  1. cp setup/env.example setup/.env"
+        echo "  2. Edit setup/.env with your service principal credentials"
+        echo "  3. source setup/.env"
+        echo ""
+        echo "Or run: ./run-tests.sh --setup"
+        exit 1
+    fi
+
+    # Verify the service principal can authenticate
+    echo -e "${CYAN}Verifying Azure authentication...${NC}"
+    if ! az login --service-principal \
+        --username "$ARM_CLIENT_ID" \
+        --password "$ARM_CLIENT_SECRET" \
+        --tenant "$ARM_TENANT_ID" \
+        --output none 2>/dev/null; then
+        echo -e "${RED}Error: Failed to authenticate with Azure${NC}"
+        echo "Check your service principal credentials"
+        exit 1
+    fi
+
+    az account set --subscription "$ARM_SUBSCRIPTION_ID" 2>/dev/null
+    echo -e "${GREEN}✓ Azure authentication OK (SP: ${ARM_CLIENT_ID:0:8}...)${NC}"
+}
+
+# Check TF_VAR environment variables
+check_tf_vars() {
+    local missing=()
+
+    [ -z "$TF_VAR_test_subscription_id" ] && missing+=("TF_VAR_test_subscription_id")
+    [ -z "$TF_VAR_test_tenant_id" ] && missing+=("TF_VAR_test_tenant_id")
+    [ -z "$TF_VAR_test_owner_email" ] && missing+=("TF_VAR_test_owner_email")
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo -e "${RED}Error: Missing test configuration environment variables:${NC}"
+        for var in "${missing[@]}"; do
+            echo -e "  - $var"
+        done
+        echo ""
+        echo "Add these to your setup/.env file"
+        exit 1
+    fi
+
+    echo -e "${GREEN}✓ Test configuration OK${NC}"
+}
+
+# Full prereq check
+check_prereqs() {
+    echo -e "${CYAN}Checking prerequisites...${NC}"
+    check_terraform
+    check_azure_auth
+    check_tf_vars
+    echo ""
+}
+
+# Quick prereq check (no Azure)
+check_prereqs_quick() {
+    echo -e "${CYAN}Checking prerequisites (quick mode)...${NC}"
+    check_terraform
+    echo ""
+}
+
+# Interactive setup helper
+interactive_setup() {
+    echo -e "${CYAN}=== Terraform Test Setup ===${NC}"
+    echo ""
+
+    # Check if .env already exists
+    if [ -f "setup/.env" ]; then
+        echo -e "${YELLOW}setup/.env already exists${NC}"
+        read -p "Overwrite? (y/N) " confirm
+        if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+            echo "Setup cancelled"
+            exit 0
+        fi
+    fi
+
+    echo "Enter your Azure service principal details:"
+    echo "(These are used to authenticate Terraform with Azure)"
+    echo ""
+
+    read -p "ARM_CLIENT_ID (Service Principal App ID): " client_id
+    read -s -p "ARM_CLIENT_SECRET (Service Principal Secret): " client_secret
+    echo ""
+    read -p "ARM_TENANT_ID (Azure Tenant ID): " tenant_id
+    read -p "ARM_SUBSCRIPTION_ID (Azure Subscription ID): " subscription_id
+    read -p "Test owner email (your email): " owner_email
+    read -p "Test location [eastus]: " location
+    location=${location:-eastus}
+
+    # Create .env file
+    cat > setup/.env <<EOF
+# Azure Service Principal Authentication
+# Generated by run-tests.sh --setup
+
+export ARM_CLIENT_ID="$client_id"
+export ARM_CLIENT_SECRET="$client_secret"
+export ARM_TENANT_ID="$tenant_id"
+export ARM_SUBSCRIPTION_ID="$subscription_id"
+
+# Test configuration
+export TF_VAR_test_subscription_id="\$ARM_SUBSCRIPTION_ID"
+export TF_VAR_test_tenant_id="\$ARM_TENANT_ID"
+export TF_VAR_test_location="$location"
+export TF_VAR_test_owner_email="$owner_email"
+EOF
+
+    chmod 600 setup/.env
+    echo ""
+    echo -e "${GREEN}Created setup/.env${NC}"
+    echo ""
+    echo "To activate, run:"
+    echo -e "  ${CYAN}source setup/.env${NC}"
+    echo ""
+    echo "Then run tests:"
+    echo -e "  ${CYAN}./run-tests.sh --quick${NC}    # Quick test (no Azure)"
+    echo -e "  ${CYAN}./run-tests.sh -m keyvault${NC} # Single module"
+    echo -e "  ${CYAN}./run-tests.sh -m${NC}          # All modules"
+}
+
+# Run a single test
+run_test() {
+    local type=$1  # modules or patterns
+    local name=$2
+
+    echo -e "${YELLOW}Testing $type/$name...${NC}"
+    cd "$SCRIPT_DIR/$type/$name"
+
+    terraform init -upgrade > /dev/null 2>&1
+    if terraform test; then
+        echo -e "${GREEN}✓ $name passed${NC}"
+        cd "$SCRIPT_DIR"
+        return 0
+    else
+        echo -e "${RED}✗ $name failed${NC}"
+        cd "$SCRIPT_DIR"
+        return 1
+    fi
+}
+
+# Run all tests in a directory
+run_all_tests() {
+    local type=$1  # modules or patterns
+    local failed=0
+    local passed=0
+    local skipped=0
+
+    echo -e "${YELLOW}Running all $type tests...${NC}"
+    echo ""
+
+    for dir in "$SCRIPT_DIR/$type"/*/; do
+        name=$(basename "$dir")
+        if ls "$dir"*.tftest.hcl 1>/dev/null 2>&1; then
+            if run_test "$type" "$name"; then
+                ((passed++))
+            else
+                ((failed++))
+            fi
+            echo ""
+        else
+            ((skipped++))
+        fi
+    done
+
+    echo "========================================"
+    echo -e "Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}, $skipped skipped"
+    echo "========================================"
+
+    return $failed
+}
+
+# Quick test (naming module only)
+run_quick() {
+    echo -e "${YELLOW}Running quick test (naming module only)...${NC}"
+    cd "$SCRIPT_DIR/modules/naming"
+    terraform init -upgrade > /dev/null 2>&1
+    if terraform test; then
+        echo -e "${GREEN}Quick test passed${NC}"
+    else
+        echo -e "${RED}Quick test failed${NC}"
+        exit 1
+    fi
+}
+
+# Show test status
+show_status() {
+    echo -e "${CYAN}=== Test Environment Status ===${NC}"
+    echo ""
+
+    # Terraform
+    if command -v terraform &> /dev/null; then
+        tf_version=$(terraform version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+        echo -e "Terraform: ${GREEN}$tf_version${NC}"
+    else
+        echo -e "Terraform: ${RED}not found${NC}"
+    fi
+
+    # Azure auth
+    if [ -n "$ARM_CLIENT_ID" ]; then
+        echo -e "ARM_CLIENT_ID: ${GREEN}${ARM_CLIENT_ID:0:8}...${NC}"
+    else
+        echo -e "ARM_CLIENT_ID: ${RED}not set${NC}"
+    fi
+
+    if [ -n "$ARM_CLIENT_SECRET" ]; then
+        echo -e "ARM_CLIENT_SECRET: ${GREEN}****${NC}"
+    else
+        echo -e "ARM_CLIENT_SECRET: ${RED}not set${NC}"
+    fi
+
+    if [ -n "$ARM_TENANT_ID" ]; then
+        echo -e "ARM_TENANT_ID: ${GREEN}${ARM_TENANT_ID:0:8}...${NC}"
+    else
+        echo -e "ARM_TENANT_ID: ${RED}not set${NC}"
+    fi
+
+    if [ -n "$ARM_SUBSCRIPTION_ID" ]; then
+        echo -e "ARM_SUBSCRIPTION_ID: ${GREEN}${ARM_SUBSCRIPTION_ID:0:8}...${NC}"
+    else
+        echo -e "ARM_SUBSCRIPTION_ID: ${RED}not set${NC}"
+    fi
+
+    # Test config
+    echo ""
+    if [ -n "$TF_VAR_test_owner_email" ]; then
+        echo -e "Test owner: ${GREEN}$TF_VAR_test_owner_email${NC}"
+    else
+        echo -e "Test owner: ${RED}not set${NC}"
+    fi
+
+    if [ -n "$TF_VAR_test_location" ]; then
+        echo -e "Test location: ${GREEN}$TF_VAR_test_location${NC}"
+    else
+        echo -e "Test location: ${YELLOW}not set (default: eastus)${NC}"
+    fi
+
+    # .env file
+    echo ""
+    if [ -f "setup/.env" ]; then
+        echo -e "Config file: ${GREEN}setup/.env exists${NC}"
+        echo -e "  Source it with: ${CYAN}source setup/.env${NC}"
+    else
+        echo -e "Config file: ${YELLOW}setup/.env not found${NC}"
+        echo -e "  Create it with: ${CYAN}./run-tests.sh --setup${NC}"
+    fi
+
+    # Available tests
+    echo ""
+    echo "Available module tests:"
+    for dir in "$SCRIPT_DIR/modules"/*/; do
+        name=$(basename "$dir")
+        if ls "$dir"*.tftest.hcl 1>/dev/null 2>&1; then
+            echo -e "  - $name"
+        fi
+    done
+
+    echo ""
+    echo "Available pattern tests:"
+    for dir in "$SCRIPT_DIR/patterns"/*/; do
+        name=$(basename "$dir")
+        if ls "$dir"*.tftest.hcl 1>/dev/null 2>&1; then
+            echo -e "  - $name"
+        fi
+    done
+}
+
+# Main
+main() {
+    case "${1:-}" in
+        --setup|-s)
+            interactive_setup
+            ;;
+        --status)
+            show_status
+            ;;
+        --quick|-q)
+            check_prereqs_quick
+            run_quick
+            ;;
+        -p|--pattern)
+            check_prereqs
+            if [ -z "${2:-}" ]; then
+                run_all_tests patterns
+            else
+                run_test patterns "$2"
+            fi
+            ;;
+        -m|--module)
+            check_prereqs
+            if [ -z "${2:-}" ]; then
+                run_all_tests modules
+            else
+                run_test modules "$2"
+            fi
+            ;;
+        --all|-a)
+            check_prereqs
+            run_all_tests modules
+            run_all_tests patterns
+            echo -e "${GREEN}All tests completed${NC}"
+            ;;
+        --help|-h)
+            echo "Terraform Test Runner (Service Principal Auth)"
+            echo ""
+            echo "Usage: $0 [OPTIONS] [MODULE_NAME]"
+            echo ""
+            echo "Setup:"
+            echo "  -s, --setup           Interactive setup (creates .env file)"
+            echo "      --status          Show current environment status"
+            echo ""
+            echo "Test Options:"
+            echo "  -q, --quick           Run quick test (naming only, no Azure)"
+            echo "  -m, --module [name]   Run module test(s)"
+            echo "  -p, --pattern [name]  Run pattern test(s)"
+            echo "  -a, --all             Run all tests"
+            echo "  -h, --help            Show this help"
+            echo ""
+            echo "Examples:"
+            echo "  $0 --setup            Interactive setup"
+            echo "  $0 --status           Check environment"
+            echo "  $0 --quick            Quick sanity check"
+            echo "  $0 -m keyvault        Test keyvault module"
+            echo "  $0 -m                 Test all modules"
+            echo "  $0 -p keyvault        Test keyvault pattern"
+            echo "  $0 --all              Run everything"
+            echo ""
+            echo "Environment Variables (set in setup/.env):"
+            echo "  ARM_CLIENT_ID         Service Principal App ID"
+            echo "  ARM_CLIENT_SECRET     Service Principal Secret"
+            echo "  ARM_TENANT_ID         Azure Tenant ID"
+            echo "  ARM_SUBSCRIPTION_ID   Azure Subscription ID"
+            echo "  TF_VAR_test_owner_email  Your email for owner tests"
+            ;;
+        "")
+            # Default: show help
+            echo "Run './run-tests.sh --help' for usage"
+            echo "Run './run-tests.sh --setup' for initial setup"
+            echo "Run './run-tests.sh --status' to check environment"
+            ;;
+        *)
+            # Assume it's a module name
+            check_prereqs
+            run_test modules "$1"
+            ;;
+    esac
+}
+
+main "$@"

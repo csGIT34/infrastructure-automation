@@ -34,6 +34,14 @@ Thumbs.db
 # Local env files
 .env
 .env.local
+terraform/tests/setup/.env
+
+# Terraform test artifacts
+terraform/tests/**/.test-suffix
+terraform/tests/**/tfplan
+terraform/tests/**/.terraform/
+terraform/tests/**/.terraform.lock.hcl
+terraform/tests/**/terraform.tfstate*
 
 # Claude temp files
 *-cwd
