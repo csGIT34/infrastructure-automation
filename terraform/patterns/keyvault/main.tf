@@ -219,7 +219,6 @@ module "access_review" {
   group_name          = module.security_groups.group_names["secrets-admins"]
   reviewer_emails     = var.access_reviewers
   frequency           = "quarterly"
-  auto_remove_on_deny = true
 }
 
 # -----------------------------------------------------------------------------
