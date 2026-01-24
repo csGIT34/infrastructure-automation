@@ -71,6 +71,10 @@ config:
   required:
     - name
   optional:
+    - enable_access_review:
+        type: boolean
+        default: false
+        description: Enable quarterly access reviews for privileged groups
     - access_reviewers:
         type: array
         items: string
