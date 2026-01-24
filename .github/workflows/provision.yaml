@@ -224,6 +224,11 @@ jobs:
         with:
           name: tfvars-files
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.3"
+
       - name: Display pattern info
         run: |
           echo "Processing pattern ${{ matrix.pattern.index }}: ${{ matrix.pattern.pattern }}"
