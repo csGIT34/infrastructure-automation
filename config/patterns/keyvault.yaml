@@ -22,64 +22,47 @@ use_cases:
   - Certificates and encryption keys
 
 # T-shirt sizing matrix
+# Note: soft_delete is mandatory in Azure (7 days min), purge_protection disabled
 sizing:
   small:
     dev:
       sku: standard
-      soft_delete_days: 7
-      purge_protection: false
       enable_diagnostics: false
       enable_access_review: false
     staging:
       sku: standard
-      soft_delete_days: 30
-      purge_protection: false
       enable_diagnostics: true
       enable_access_review: false
     prod:
       sku: premium
-      soft_delete_days: 90
-      purge_protection: true
       enable_diagnostics: true
       enable_access_review: true
 
   medium:
     dev:
       sku: standard
-      soft_delete_days: 7
-      purge_protection: false
       enable_diagnostics: false
       enable_access_review: false
     staging:
       sku: standard
-      soft_delete_days: 60
-      purge_protection: true
       enable_diagnostics: true
       enable_access_review: false
     prod:
       sku: premium
-      soft_delete_days: 90
-      purge_protection: true
       enable_diagnostics: true
       enable_access_review: true
 
   large:
     dev:
       sku: standard
-      soft_delete_days: 30
-      purge_protection: false
       enable_diagnostics: true
       enable_access_review: false
     staging:
       sku: premium
-      soft_delete_days: 90
-      purge_protection: true
       enable_diagnostics: true
       enable_access_review: true
     prod:
       sku: premium
-      soft_delete_days: 90
-      purge_protection: true
       enable_diagnostics: true
       enable_access_review: true
 

@@ -111,7 +111,19 @@
       "WebFetch(domain:registry.terraform.io)",
       "WebSearch",
       "Bash(az account list-locations:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(az keyvault purge:*)",
+      "Bash(az appconfiguration deleted list:*)",
+      "Bash(az keyvault list-deleted:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(nslookup:*)",
+      "Bash(kubectl api-resources:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl replace:*)",
+      "Bash(kubectl run:*)",
+      "Bash(kubectl patch:*)",
+      "Bash(find:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

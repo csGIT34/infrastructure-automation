@@ -74,14 +74,11 @@ variable "sku" {
   default     = "standard"
 }
 
-variable "soft_delete_days" {
-  description = "Soft delete retention days"
-  type        = number
-  default     = 7
-}
+# Note: soft_delete and purge_protection are hardcoded in the keyvault module
+# (soft_delete=7 days minimum required by Azure, purge_protection=false)
 
 variable "purge_protection" {
-  description = "Enable purge protection"
+  description = "Ignored - purge protection is always disabled"
   type        = bool
   default     = false
 }
@@ -169,11 +166,9 @@ module "keyvault" {
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   config = {
-    sku              = var.sku
-    soft_delete_days = var.soft_delete_days
-    purge_protection = var.purge_protection
-    rbac_enabled     = true
-    default_action   = var.enable_private_endpoint ? "Deny" : "Allow"
+    sku            = var.sku
+    rbac_enabled   = true
+    default_action = var.enable_private_endpoint ? "Deny" : "Allow"
   }
   tags = module.naming.tags
 }

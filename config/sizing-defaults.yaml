@@ -38,11 +38,11 @@ conditional_features:
     staging: false
     prod: true
 
-  # Purge protection
+  # Purge protection (disabled - allows immediate purge of soft-deleted resources)
   purge_protection:
     dev: false
-    staging: true
-    prod: true
+    staging: false
+    prod: false
 
 # Common sizing mappings
 # Maps t-shirt sizes to Azure SKUs

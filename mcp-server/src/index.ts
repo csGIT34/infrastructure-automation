@@ -81,21 +81,22 @@ const PATTERN_DEFINITIONS: Record<string, PatternDefinition> = {
         subnet_id: { type: "string", default: "", description: "Subnet ID for private endpoint (if enabled)" }
       }
     },
+    // Note: soft_delete is mandatory in Azure (7 days min), purge_protection always disabled
     sizing: {
       small: {
-        dev: { sku: "standard", soft_delete_days: 7, purge_protection: false },
-        staging: { sku: "standard", soft_delete_days: 30, purge_protection: false },
-        prod: { sku: "premium", soft_delete_days: 90, purge_protection: true }
+        dev: { sku: "standard" },
+        staging: { sku: "standard" },
+        prod: { sku: "premium" }
       },
       medium: {
-        dev: { sku: "standard", soft_delete_days: 7, purge_protection: false },
-        staging: { sku: "premium", soft_delete_days: 60, purge_protection: true },
-        prod: { sku: "premium", soft_delete_days: 90, purge_protection: true }
+        dev: { sku: "standard" },
+        staging: { sku: "premium" },
+        prod: { sku: "premium" }
       },
       large: {
-        dev: { sku: "premium", soft_delete_days: 30, purge_protection: false },
-        staging: { sku: "premium", soft_delete_days: 90, purge_protection: true },
-        prod: { sku: "premium", soft_delete_days: 90, purge_protection: true }
+        dev: { sku: "premium" },
+        staging: { sku: "premium" },
+        prod: { sku: "premium" }
       }
     },
     estimated_costs: {

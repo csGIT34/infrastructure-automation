@@ -46,8 +46,10 @@ resource "azurerm_key_vault" "main" {
     location                   = var.location
     tenant_id                  = data.azurerm_client_config.current.tenant_id
     sku_name                   = lookup(var.config, "sku", "standard")
-    soft_delete_retention_days = lookup(var.config, "soft_delete_days", 7)
-    purge_protection_enabled   = lookup(var.config, "purge_protection", false)
+    # Soft delete is mandatory in Azure (min 7 days). We use minimum and disable
+    # purge protection so vaults can be purged immediately when deleted.
+    soft_delete_retention_days = 7
+    purge_protection_enabled   = false
 
     enable_rbac_authorization = lookup(var.config, "rbac_enabled", true)
 
