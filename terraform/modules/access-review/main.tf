@@ -1,5 +1,6 @@
 # terraform/modules/access-review/main.tf
 # Creates Entra ID access reviews for privileged groups using Microsoft Graph
+# Two-stage review: Group owners first, then member's manager
 # Requires Azure AD Premium P2 license
 
 terraform {
@@ -8,10 +9,6 @@ terraform {
     msgraph = {
       source  = "microsoft/msgraph"
       version = "~> 0.2"
-    }
-    azuread = {
-      source  = "hashicorp/azuread"
-      version = "~> 2.0"
     }
   }
 }
@@ -24,18 +21,6 @@ variable "group_id" {
 variable "group_name" {
   description = "Display name of the group (for review naming)"
   type        = string
-}
-
-variable "reviewer_object_ids" {
-  description = "Object IDs of reviewers (users or groups)"
-  type        = list(string)
-  default     = []
-}
-
-variable "reviewer_emails" {
-  description = "Email addresses of reviewers (alternative to object IDs)"
-  type        = list(string)
-  default     = []
 }
 
 variable "frequency" {
@@ -66,22 +51,20 @@ variable "default_decision" {
   }
 }
 
-variable "duration_days" {
-  description = "Number of days for review period"
+variable "stage_duration_days" {
+  description = "Number of days for each review stage"
   type        = number
-  default     = 14
+  default     = 7
 }
 
 variable "start_date" {
-  description = "Start date for the review schedule (YYYY-MM-DD format). Defaults to today."
+  description = "Start date for the review schedule (YYYY-MM-DD format)"
   type        = string
-  default     = ""
 }
 
-# Look up reviewers by email if provided
-data "azuread_users" "reviewers" {
-  count                = length(var.reviewer_emails) > 0 ? 1 : 0
-  user_principal_names = var.reviewer_emails
+variable "reviewer_id" {
+  description = "Object ID of the reviewer user"
+  type        = string
 }
 
 locals {
@@ -99,50 +82,38 @@ locals {
       type     = "absoluteMonthly"
     }
   }
-
-  # Use provided object IDs or look up from emails
-  reviewer_ids = length(var.reviewer_object_ids) > 0 ? var.reviewer_object_ids : (
-    length(var.reviewer_emails) > 0 ? data.azuread_users.reviewers[0].object_ids : []
-  )
-
-  # Use provided start date or default to today
-  start_date = var.start_date != "" ? var.start_date : formatdate("YYYY-MM-DD", timestamp())
-
-  # Build reviewers array for Graph API
-  reviewers = [for id in local.reviewer_ids : {
-    query     = "/users/${id}"
-    queryType = "MicrosoftGraph"
-  }]
 }
 
-# Access Review Schedule Definition via Microsoft Graph
+# Two-stage Access Review: Group Owners -> Manager
 resource "msgraph_resource" "access_review" {
-  count = length(local.reviewer_ids) > 0 ? 1 : 0
+  url         = "identityGovernance/accessReviews/definitions"
+  api_version = "v1.0"
 
-  url = "/identityGovernance/accessReviews/definitions"
-
-  body = jsonencode({
-    displayName = "Access Review: ${var.group_name}"
-    descriptionForAdmins = "Periodic access review for ${var.group_name} group membership"
-    descriptionForReviewers = "Please review the members of ${var.group_name} and approve or deny their continued access."
+  body = {
+    displayName             = "Access Review: ${var.group_name}"
+    descriptionForAdmins    = "Scheduled review of ${var.group_name} group membership"
+    descriptionForReviewers = "Please review and justify continued access"
 
     scope = {
       "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
-      query         = "/groups/${var.group_id}/members"
+      query         = "/groups/${var.group_id}/transitiveMembers"
       queryType     = "MicrosoftGraph"
     }
 
-    reviewers = local.reviewers
+    reviewers = [
+      {
+        query     = "/users/${var.reviewer_id}"
+        queryType = "MicrosoftGraph"
+      }
+    ]
 
     settings = {
       mailNotificationsEnabled        = true
       reminderNotificationsEnabled    = true
       justificationRequiredOnApproval = true
-      defaultDecisionEnabled          = true
-      defaultDecision                 = var.default_decision
-      autoApplyDecisionsEnabled       = var.auto_apply_decisions
+      defaultDecisionEnabled          = false
+      instanceDurationInDays          = var.stage_duration_days
       recommendationsEnabled          = true
-      instanceDurationInDays          = var.duration_days
 
       recurrence = {
         pattern = {
@@ -151,23 +122,16 @@ resource "msgraph_resource" "access_review" {
         }
         range = {
           type      = "noEnd"
-          startDate = local.start_date
+          startDate = "${var.start_date}T09:00:00.000Z"
         }
       }
     }
-  })
-
-  lifecycle {
-    ignore_changes = [
-      # Don't update start date on subsequent applies
-      body,
-    ]
   }
 }
 
 output "review_id" {
   description = "Access review schedule definition ID"
-  value       = length(msgraph_resource.access_review) > 0 ? msgraph_resource.access_review[0].id : null
+  value       = msgraph_resource.access_review.id
 }
 
 output "review_name" {
@@ -177,7 +141,7 @@ output "review_name" {
 
 output "enabled" {
   description = "Whether access review was created"
-  value       = length(msgraph_resource.access_review) > 0
+  value       = true
 }
 
 output "frequency" {
@@ -185,7 +149,7 @@ output "frequency" {
   value       = var.frequency
 }
 
-output "reviewer_count" {
-  description = "Number of reviewers configured"
-  value       = length(local.reviewer_ids)
+output "stages" {
+  description = "Review stages configured"
+  value       = ["Group Owners", "Member's Manager"]
 }
