@@ -391,24 +391,19 @@ jobs:
               status_emoji = '❌'
               status_text = 'Provisioning Failed'
 
-          # Build issue body
-          issue_body = f"""## {status_emoji} Infrastructure Provisioning Results
-
-### Overall Status: {status_text}
-
-| Property | Value |
-|----------|-------|
-| Documents | {document_count} |
-| Create Actions | {create_count} |
-| Destroy Actions | {destroy_count} |
-| Commit | `${{ needs.resolve-patterns.outputs.commit_sha }}` |
-| Workflow Run | [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
-
-### Pattern Results
-
-| Doc | Action | Pattern | Name | Status |
-|-----|--------|---------|------|--------|
-"""
+          # Build issue body - use string concat to avoid YAML parser issues with | and {
+          issue_body = f"## {status_emoji} Infrastructure Provisioning Results\n\n"
+          issue_body += f"### Overall Status: {status_text}\n\n"
+          issue_body += "| Property | Value |\n"
+          issue_body += "|----------|-------|\n"
+          issue_body += f"| Documents | {document_count} |\n"
+          issue_body += f"| Create Actions | {create_count} |\n"
+          issue_body += f"| Destroy Actions | {destroy_count} |\n"
+          issue_body += "| Commit | `${{ needs.resolve-patterns.outputs.commit_sha }}` |\n"
+          issue_body += "| Workflow Run | [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |\n\n"
+          issue_body += "### Pattern Results\n\n"
+          issue_body += "| Doc | Action | Pattern | Name | Status |\n"
+          issue_body += "|-----|--------|---------|------|--------|\n"
 
           # Add pattern results
           for pattern in patterns:
@@ -454,46 +449,28 @@ jobs:
                   except Exception as e:
                       print(f"Warning: Could not parse {output_file}: {e}")
 
-          # Add next steps
+          # Add next steps - use string concat to avoid YAML parser issues
           if overall_status == 'success':
-              issue_body += """### Next Steps
-
-1. **Request access**: Ask your team lead to add you to the appropriate security group
-2. **Access secrets**: Once added, retrieve secrets from Key Vault:
-   ```bash
-   az keyvault secret list --vault-name <vault-name>
-   az keyvault secret show --vault-name <vault-name> --name <secret-name>
-   ```
-
-### Questions or Issues?
-
-If you encounter problems, create an issue in the [infrastructure-automation](https://github.com/${{ github.repository }}) repository.
-"""
+              issue_body += "### Next Steps\n\n"
+              issue_body += "1. **Request access** - Ask your team lead to add you to the appropriate security group\n"
+              issue_body += "2. **Access secrets** - Once added, retrieve secrets from Key Vault\n\n"
+              issue_body += "### Questions or Issues?\n\n"
+              issue_body += "If you encounter problems, create an issue in the infrastructure-automation repository.\n"
           else:
-              issue_body += """### Troubleshooting
+              issue_body += "### Troubleshooting\n\n"
+              issue_body += "1. **View the error** - Check the workflow run for detailed error messages\n"
+              issue_body += "2. **Fix the issue** - Update your infrastructure.yaml based on the error\n"
+              issue_body += "3. **Retry** - Commit and push to trigger a new provisioning attempt\n\n"
+              issue_body += "### Common Issues\n\n"
+              issue_body += "- Invalid pattern configuration - Check that all required fields are present\n"
+              issue_body += "- Naming conflicts - Resource names must be unique within Azure\n"
+              issue_body += "- Permission errors - The service principal may not have required permissions\n"
+              issue_body += "- Quota limits - Your subscription may have hit resource limits\n\n"
+              issue_body += "### Need Help?\n\n"
+              issue_body += "Create an issue in the infrastructure-automation repository.\n"
 
-1. **View the error**: Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed error messages
-2. **Fix the issue**: Update your `infrastructure.yaml` based on the error
-3. **Retry**: Commit and push to trigger a new provisioning attempt
-
-### Common Issues
-
-- **Invalid pattern configuration**: Check that all required fields are present
-- **Naming conflicts**: Resource names must be unique within Azure
-- **Permission errors**: The service principal may not have required permissions
-- **Quota limits**: Your subscription may have hit resource limits
-
-### Need Help?
-
-Create an issue in the [infrastructure-automation](https://github.com/${{ github.repository }}) repository with:
-- Your `infrastructure.yaml` content
-- The error message from the workflow run
-"""
-
-          issue_body += f"""
----
-*Provisioned by Infrastructure Platform • Request ID: `${{ needs.resolve-patterns.outputs.request_id }}`*
-"""
+          issue_body += "\n---\n"
+          issue_body += "*Provisioned by Infrastructure Platform*\n"
 
           # Write outputs
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
