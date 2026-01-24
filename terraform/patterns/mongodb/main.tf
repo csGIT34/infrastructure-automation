@@ -63,6 +63,22 @@ variable "enable_diagnostics" {
   type    = bool
   default = false
 }
+variable "enable_access_review" {
+  type    = bool
+  default = false
+}
+variable "purge_protection" {
+  type    = bool
+  default = false
+}
+variable "geo_redundant_backup" {
+  type    = bool
+  default = false
+}
+variable "access_reviewers" {
+  type    = list(string)
+  default = []
+}
 variable "log_analytics_workspace_id" {
   type    = string
   default = ""
@@ -175,6 +191,31 @@ module "rbac" {
       scope                = module.mongodb.account_id
     }
   ]
+}
+
+# -----------------------------------------------------------------------------
+# Access Review (prod only)
+# -----------------------------------------------------------------------------
+module "access_review" {
+  source = "../../modules/access-review"
+  count  = var.enable_access_review && length(var.access_reviewers) > 0 ? 1 : 0
+
+  group_id        = module.security_groups.group_ids["mongo-admins"]
+  group_name      = module.security_groups.group_names["mongo-admins"]
+  reviewer_emails = var.access_reviewers
+  frequency       = "quarterly"
+}
+
+# -----------------------------------------------------------------------------
+# Diagnostics (staging/prod)
+# -----------------------------------------------------------------------------
+module "diagnostics" {
+  source = "../../modules/diagnostic-settings"
+  count  = var.enable_diagnostics && var.log_analytics_workspace_id != "" ? 1 : 0
+
+  name                       = module.mongodb_naming.name
+  target_resource_id         = module.mongodb.account_id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
 }
 
 # -----------------------------------------------------------------------------

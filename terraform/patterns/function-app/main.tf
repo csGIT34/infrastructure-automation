@@ -105,6 +105,30 @@ variable "enable_diagnostics" {
   default     = false
 }
 
+variable "enable_access_review" {
+  description = "Enable Entra access reviews"
+  type        = bool
+  default     = false
+}
+
+variable "purge_protection" {
+  description = "Enable purge protection (not applicable, ignored)"
+  type        = bool
+  default     = false
+}
+
+variable "geo_redundant_backup" {
+  description = "Enable geo-redundant backup (not applicable, ignored)"
+  type        = bool
+  default     = false
+}
+
+variable "access_reviewers" {
+  description = "Email addresses of access reviewers"
+  type        = list(string)
+  default     = []
+}
+
 variable "log_analytics_workspace_id" {
   description = "Log Analytics workspace ID"
   type        = string
@@ -251,6 +275,19 @@ module "diagnostics" {
   log_analytics_workspace_id = var.log_analytics_workspace_id
   logs                       = ["FunctionAppLogs"]
   metrics                    = ["AllMetrics"]
+}
+
+# -----------------------------------------------------------------------------
+# Access Review (prod only)
+# -----------------------------------------------------------------------------
+module "access_review" {
+  source = "../../modules/access-review"
+  count  = var.enable_access_review && length(var.access_reviewers) > 0 ? 1 : 0
+
+  group_id        = module.security_groups.group_ids["func-admins"]
+  group_name      = module.security_groups.group_names["func-admins"]
+  reviewer_emails = var.access_reviewers
+  frequency       = "quarterly"
 }
 
 # -----------------------------------------------------------------------------

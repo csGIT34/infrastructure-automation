@@ -41,6 +41,31 @@ variable "pod_limit" {
   default = 20
 }
 
+variable "enable_diagnostics" {
+  type    = bool
+  default = false
+}
+variable "enable_access_review" {
+  type    = bool
+  default = false
+}
+variable "purge_protection" {
+  type    = bool
+  default = false
+}
+variable "geo_redundant_backup" {
+  type    = bool
+  default = false
+}
+variable "access_reviewers" {
+  type    = list(string)
+  default = []
+}
+variable "log_analytics_workspace_id" {
+  type    = string
+  default = ""
+}
+
 # Kubernetes provider config
 data "azurerm_kubernetes_cluster" "aks" {
   name                = var.aks_cluster_name
@@ -109,6 +134,17 @@ module "rbac" {
       scope                = "${data.azurerm_kubernetes_cluster.aks.id}/namespaces/${module.aks_namespace.namespace_name}"
     }
   ]
+}
+
+# Access Review (prod only)
+module "access_review" {
+  source = "../../modules/access-review"
+  count  = var.enable_access_review && length(var.access_reviewers) > 0 ? 1 : 0
+
+  group_id        = module.security_groups.group_ids["k8s-admins"]
+  group_name      = module.security_groups.group_names["k8s-admins"]
+  reviewer_emails = var.access_reviewers
+  frequency       = "quarterly"
 }
 
 # Outputs

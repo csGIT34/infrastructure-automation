@@ -93,6 +93,30 @@ variable "enable_diagnostics" {
   default     = false
 }
 
+variable "enable_access_review" {
+  description = "Enable Entra access reviews"
+  type        = bool
+  default     = false
+}
+
+variable "purge_protection" {
+  description = "Enable purge protection (not applicable, ignored)"
+  type        = bool
+  default     = false
+}
+
+variable "geo_redundant_backup" {
+  description = "Enable geo-redundant backup (not applicable, ignored)"
+  type        = bool
+  default     = false
+}
+
+variable "access_reviewers" {
+  description = "Email addresses of access reviewers"
+  type        = list(string)
+  default     = []
+}
+
 variable "enable_private_endpoint" {
   description = "Enable private endpoint"
   type        = bool
@@ -266,6 +290,19 @@ module "private_endpoint" {
   subresource_names   = ["blob"]
   dns_zone_id         = data.azurerm_private_dns_zone.storage[0].id
   tags                = module.naming.tags
+}
+
+# -----------------------------------------------------------------------------
+# Access Review (prod only)
+# -----------------------------------------------------------------------------
+module "access_review" {
+  source = "../../modules/access-review"
+  count  = var.enable_access_review && length(var.access_reviewers) > 0 ? 1 : 0
+
+  group_id        = module.security_groups.group_ids["storage-contributors"]
+  group_name      = module.security_groups.group_names["storage-contributors"]
+  reviewer_emails = var.access_reviewers
+  frequency       = "quarterly"
 }
 
 # -----------------------------------------------------------------------------

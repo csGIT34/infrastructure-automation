@@ -59,6 +59,31 @@ variable "output_location" {
   default = "build"
 }
 
+variable "enable_diagnostics" {
+  type    = bool
+  default = false
+}
+variable "enable_access_review" {
+  type    = bool
+  default = false
+}
+variable "purge_protection" {
+  type    = bool
+  default = false
+}
+variable "geo_redundant_backup" {
+  type    = bool
+  default = false
+}
+variable "access_reviewers" {
+  type    = list(string)
+  default = []
+}
+variable "log_analytics_workspace_id" {
+  type    = string
+  default = ""
+}
+
 # Resource Group
 module "naming" {
   source        = "../../modules/naming"
@@ -130,6 +155,17 @@ module "rbac" {
       scope                = module.static_web_app.id
     }
   ]
+}
+
+# Access Review (prod only)
+module "access_review" {
+  source = "../../modules/access-review"
+  count  = var.enable_access_review && length(var.access_reviewers) > 0 ? 1 : 0
+
+  group_id        = module.security_groups.group_ids["swa-admins"]
+  group_name      = module.security_groups.group_names["swa-admins"]
+  reviewer_emails = var.access_reviewers
+  frequency       = "quarterly"
 }
 
 # Outputs
