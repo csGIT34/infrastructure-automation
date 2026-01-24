@@ -213,10 +213,10 @@ class PatternResolver:
             if feature not in tfvars:
                 tfvars[feature] = env_values.get(environment, False)
 
-        # Auto-enable access_review when access_reviewers is provided
-        # This overrides the environment-based default
-        if tfvars.get("access_reviewers") and len(tfvars.get("access_reviewers", [])) > 0:
-            tfvars["enable_access_review"] = True
+        # Note: access_review requires enable_access_review: true in sizing config
+        # It is NOT auto-enabled when access_reviewers is provided because
+        # the msgraph provider has reliability issues. Users can explicitly
+        # set enable_access_review in their pattern config to override.
 
         return tfvars
 
