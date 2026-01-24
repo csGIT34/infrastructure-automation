@@ -106,7 +106,12 @@
       "Bash(gh run view:*)",
       "Bash(terraform fmt:*)",
       "Bash(terraform validate:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(terraform init:*)",
+      "WebFetch(domain:registry.terraform.io)",
+      "WebSearch",
+      "Bash(az account list-locations:*)",
+      "Bash(python3:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
