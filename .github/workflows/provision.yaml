@@ -250,6 +250,9 @@ jobs:
           cp -r terraform/modules terraform-workspace/terraform/
           cp "terraform.tfvars.${INDEX}.json" "terraform-workspace/terraform/patterns/$PATTERN/terraform.tfvars.json"
 
+      - name: Ensure Terraform plugin cache exists
+        run: mkdir -p /tmp/terraform-plugin-cache
+
       - name: Terraform Init
         working-directory: terraform-workspace/terraform/patterns/${{ matrix.pattern.pattern }}
         env:
