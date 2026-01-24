@@ -33,7 +33,7 @@ jobs:
   # Job 1: Parse and resolve all patterns from multi-document YAML
   # =========================================================================
   resolve-patterns:
-    runs-on: ["self-hosted", "linux"]
+    runs-on: ubuntu-latest
     outputs:
       patterns_json: ${{ steps.resolve.outputs.patterns_json }}
       execution_order: ${{ steps.resolve.outputs.execution_order }}
@@ -110,7 +110,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip3 install --quiet --break-system-packages pyyaml
+          pip3 install --quiet pyyaml
 
       - name: Resolve all patterns
         id: resolve
@@ -204,7 +204,7 @@ jobs:
   # =========================================================================
   provision-pattern:
     needs: resolve-patterns
-    runs-on: ["self-hosted", "linux"]
+    runs-on: ubuntu-latest
     if: ${{ needs.resolve-patterns.outputs.patterns_json != '[]' }}
     strategy:
       matrix:
@@ -334,7 +334,7 @@ jobs:
   report-status:
     needs: [resolve-patterns, provision-pattern]
     if: always()
-    runs-on: ["self-hosted", "linux"]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout infrastructure-automation
