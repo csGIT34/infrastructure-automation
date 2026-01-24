@@ -208,6 +208,7 @@ module "keyvault_naming" {
   resource_type = "keyvault"
   name          = var.name
   business_unit = var.business_unit
+  pattern_name  = var.pattern_name
 }
 
 locals {
