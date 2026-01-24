@@ -31,6 +31,12 @@ variable "business_unit" {
   default     = ""
 }
 
+variable "pattern_name" {
+  description = "Pattern name for unique resource group naming"
+  type        = string
+  default     = ""
+}
+
 locals {
   # Azure resource naming prefixes
   prefixes = {
@@ -66,8 +72,9 @@ locals {
     var.resource_type == "keyvault" ? local.keyvault_name : local.standard_name
   )
 
-  # Resource group follows consistent pattern
-  resource_group_name = "rg-${var.project}-${var.environment}"
+  # Resource group includes pattern name for uniqueness across patterns
+  # If pattern_name is empty, fall back to project-environment only
+  resource_group_name = var.pattern_name != "" ? "rg-${var.project}-${var.pattern_name}-${var.environment}" : "rg-${var.project}-${var.environment}"
 }
 
 output "name" {

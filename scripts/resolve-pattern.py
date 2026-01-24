@@ -143,6 +143,9 @@ class PatternResolver:
             "owners": metadata["owners"],
             "location": metadata.get("location", "eastus"),
 
+            # Pattern name for unique resource group naming
+            "pattern_name": pattern_name,
+
             # Resource name from config
             "name": config.get("name", metadata["project"]),
         }

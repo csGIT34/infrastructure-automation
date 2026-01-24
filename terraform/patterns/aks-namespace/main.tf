@@ -32,6 +32,12 @@ variable "cpu_limit" {
   type    = string
   default = "2"
 }
+
+variable "pattern_name" {
+  description = "Pattern name for resource group naming"
+  type        = string
+  default     = "aks-namespace"
+}
 variable "memory_limit" {
   type    = string
   default = "4Gi"
@@ -87,6 +93,7 @@ module "naming" {
   resource_type = "aks_namespace"
   name          = var.name
   business_unit = var.business_unit
+  pattern_name  = var.pattern_name
 }
 
 # AKS Namespace (base module)

@@ -27,6 +27,12 @@ variable "location" {
   default = "eastus"
 }
 
+variable "pattern_name" {
+  description = "Pattern name for resource group naming"
+  type        = string
+  default     = "eventhub"
+}
+
 variable "sku" {
   type    = string
   default = "Basic"
@@ -77,6 +83,7 @@ module "naming" {
   resource_type = "resource_group"
   name          = var.name
   business_unit = var.business_unit
+  pattern_name  = var.pattern_name
 }
 
 resource "azurerm_resource_group" "main" {
