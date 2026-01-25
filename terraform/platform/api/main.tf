@@ -275,7 +275,12 @@ resource "azurerm_function_app_flex_consumption" "api" {
   maximum_instance_count = 40
   instance_memory_in_mb  = 2048
 
-  site_config {}
+  site_config {
+    cors {
+      allowed_origins     = var.cors_allowed_origins
+      support_credentials = true
+    }
+  }
 
   identity {
     type = "SystemAssigned"

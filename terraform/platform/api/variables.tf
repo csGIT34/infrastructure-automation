@@ -39,7 +39,12 @@ variable "owners" {
 variable "cors_allowed_origins" {
   description = "CORS allowed origins for the API"
   type        = list(string)
-  default     = ["*"]
+  default = [
+    "https://wonderful-sand-05ab6a20f.4.azurestaticapps.net",
+    "http://localhost:3000",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500"
+  ]
 }
 
 variable "app_insights_key" {
