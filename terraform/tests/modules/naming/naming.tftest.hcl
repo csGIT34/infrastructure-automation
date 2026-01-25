@@ -107,11 +107,13 @@ run "keyvault_with_pattern_name" {
     pattern_name  = "webapi"
   }
 
+  # Resource name uses 'name' variable, not pattern_name
   assert {
-    condition     = can(regex("webapi", output.name))
-    error_message = "Key Vault name should include pattern_name"
+    condition     = output.name == "kv-myapp-secrets-d"
+    error_message = "Key Vault name should be 'kv-myapp-secrets-d', got '${output.name}'"
   }
 
+  # Resource group DOES include pattern_name
   assert {
     condition     = output.resource_group_name == "rg-myapp-webapi-dev"
     error_message = "Resource group should include pattern_name"
