@@ -3,6 +3,13 @@
 All notable changes to the web-app pattern.
 
 
+## [2.0.0] - 2026-01-25
+
+### Bug Fixes
+- fix(naming): remove trailing hyphens from Key Vault names after truncation (142052f)
+
+
+
 ## [1.0.0] - 2026-01-25
 
 ### Features
