@@ -489,17 +489,17 @@ Provision workflow runs display helpful information in GitHub Actions:
 
 The provision workflow handles long-running Terraform applies (e.g., SQL Server creation ~30 min) by refreshing the Azure OIDC token every 4 minutes in the background. This prevents token expiration errors during extended operations.
 
-### Access Review State Cleanup
+### Access Reviews (Fire-and-Forget)
 
-Access reviews in Entra ID can be deleted externally (manual deletion, expiration policies). If Terraform fails with a 404 error when trying to update an access review, remove it from state:
+Access reviews are created using Azure CLI in a "fire-and-forget" mode. They are NOT tracked in Terraform state, which means:
+- No state drift when reviews are modified/deleted externally
+- No Terraform errors from Graph API inconsistencies
+- Reviews are created idempotently (skipped if already exists)
 
-```bash
-cd terraform/patterns/<pattern>
-terraform init -backend-config="key=<state-path>"
-terraform state rm 'module.access_review[0].msgraph_resource.access_review'
-```
-
-The next apply will recreate the access review.
+Access reviews created:
+- **Annual review** for each security group (prod environments only)
+- Reviewers: Group owners
+- Auto-apply: Enabled (removes access if not approved)
 
 ## Project RBAC and Secrets Management
 

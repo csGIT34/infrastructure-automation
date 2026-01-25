@@ -3873,12 +3873,12 @@ config:
         }
 
         function populateVersionDropdown(select, versions, currentVersion) {
-            const selectedValue = state.currentVersion || currentVersion;
+            // Default to latest version unless editing an existing entry
+            const latestVersion = versions.length > 0 ? versions[0].version : currentVersion;
+            const selectedValue = state.editing ? (state.currentVersion || currentVersion) : latestVersion;
 
             select.innerHTML = versions.map(v => {
-                const label = v.version === currentVersion
-                    ? `${v.version} (current)`
-                    : (v.prerelease ? `${v.version} (pre-release)` : v.version);
+                const label = v.prerelease ? `${v.version} (pre-release)` : v.version;
                 const selected = v.version === selectedValue ? 'selected' : '';
                 return `<option value="${v.version}" ${selected}>${label}</option>`;
             }).join('');
