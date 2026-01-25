@@ -113,10 +113,10 @@ jobs:
           ARM_USE_OIDC: true
         run: |
           terraform init \
-            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="resource_group_name=rg-terraform-state-prod" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
-            -backend-config="key=mcp/${{ inputs.environment || 'prod' }}/terraform.tfstate"
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=platform/mcp-server/terraform.tfstate"
 
       - name: Terraform Plan
         working-directory: terraform/mcp-server
