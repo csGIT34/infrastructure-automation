@@ -263,6 +263,39 @@
             color: white;
         }
 
+        /* Back to Top Button */
+        .back-to-top {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 48px;
+            height: 48px;
+            background: #7c3aed;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s, transform 0.2s;
+            z-index: 1000;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .back-to-top:hover {
+            background: #6d28d9;
+            transform: translateY(-2px);
+        }
+
         .pattern-filters {
             display: flex;
             gap: 0.5rem;
@@ -1129,6 +1162,9 @@ config:
             </div>
         </div>
     </div>
+
+    <!-- Back to Top Button -->
+    <button class="back-to-top" onclick="scrollToTop()" title="Back to top">↑</button>
 
     <script>
         // PATTERNS_DATA_PLACEHOLDER
@@ -4279,10 +4315,25 @@ config:
             }
         }
 
+        // Back to Top Button
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function handleScroll() {
+            const btn = document.querySelector('.back-to-top');
+            if (window.scrollY > 300) {
+                btn.classList.add('visible');
+            } else {
+                btn.classList.remove('visible');
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             initPatternGrid();
             updatePreview();
+            window.addEventListener('scroll', handleScroll);
         });
     </script>
 </body>
