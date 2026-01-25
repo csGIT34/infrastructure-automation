@@ -5,6 +5,13 @@ All notable changes to the mongodb pattern.
 
 ## [2.0.0] - 2026-01-25
 
+### Other Changes
+- chore(mongodb): release v2.0.0 (dbbca81)
+
+
+
+## [2.0.0] - 2026-01-25
+
 No notable changes in this release.
 
 
