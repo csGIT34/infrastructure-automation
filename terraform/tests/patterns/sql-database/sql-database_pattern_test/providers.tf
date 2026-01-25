@@ -14,7 +14,3 @@ provider "azurerm" {
 }
 
 provider "azuread" {}
-
-provider "msgraph" {
-  # Uses ARM_* environment variables for authentication
-}
