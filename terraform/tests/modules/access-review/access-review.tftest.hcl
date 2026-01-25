@@ -1,11 +1,11 @@
 # End-to-end tests for the access-review module
 #
-# Creates a security group and configures an access review for it.
+# Creates a security group and triggers access review creation via Graph API.
+# Note: Access reviews are created but NOT tracked in Terraform state
+# to avoid 404 errors when reviews are modified externally in Entra ID.
 # Authentication: Uses ARM_* environment variables (source setup/.env)
 
 provider "azuread" {}
-
-provider "msgraph" {}
 
 # Generate unique suffix
 run "setup" {
@@ -43,10 +43,12 @@ run "access_review_creation" {
     error_message = "Security group name should follow naming convention"
   }
 
-  # === Access Review Created ===
+  # === Access Review Triggered ===
+  # Note: review_id is the null_resource trigger ID, not the Graph API ID
+  # The actual access review is created via Azure CLI and not tracked in state
   assert {
     condition     = output.review_id != ""
-    error_message = "Access review ID should not be empty"
+    error_message = "Access review trigger ID should not be empty"
   }
 
   assert {

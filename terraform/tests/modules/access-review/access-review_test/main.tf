@@ -1,6 +1,6 @@
 # Test fixture: Access review for security groups
 #
-# Creates a security group and an access review for it.
+# Creates a security group and triggers an access review for it.
 # Validates two-stage review configuration.
 
 terraform {
@@ -9,10 +9,6 @@ terraform {
     azuread = {
       source  = "hashicorp/azuread"
       version = "~> 2.0"
-    }
-    msgraph = {
-      source  = "microsoft/msgraph"
-      version = "~> 0.2"
     }
   }
 }
