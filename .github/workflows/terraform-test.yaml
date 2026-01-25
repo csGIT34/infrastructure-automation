@@ -336,8 +336,7 @@ jobs:
         if: steps.check-test.outputs.exists == 'true'
         working-directory: terraform/tests/modules/${{ matrix.module }}
         run: |
-          # terraform test handles its own module initialization for .tftest.hcl files
-          # No separate terraform init needed for test-only directories
+          terraform init
           terraform test -var-file=../../setup/terraform.tfvars
         timeout-minutes: 30
 
@@ -406,8 +405,7 @@ jobs:
         if: steps.check-test.outputs.exists == 'true'
         working-directory: terraform/tests/patterns/${{ matrix.pattern }}
         run: |
-          # terraform test handles its own module initialization for .tftest.hcl files
-          # No separate terraform init needed for test-only directories
+          terraform init
           terraform test -var-file=../../setup/terraform.tfvars
         timeout-minutes: 45
 
