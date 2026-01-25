@@ -1,0 +1,1848 @@
+{
+  "_comment": "Auto-generated from config/patterns/*.yaml - DO NOT EDIT MANUALLY",
+  "_generator": "scripts/generate-schema.py",
+  "patterns": {
+    "aks-namespace": {
+      "name": "aks-namespace",
+      "description": "Kubernetes namespace in a shared AKS cluster with resource quotas and RBAC.\nIncludes security groups for viewers, editors, and admins with automatic\nAzure Kubernetes Service RBAC role assignments.",
+      "category": "single",
+      "components": [
+        "aks-namespace",
+        "security-groups",
+        "rbac-assignments",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Team workload isolation",
+        "Microservice deployments",
+        "Development sandboxes",
+        "CI/CD deployment targets"
+      ],
+      "config": {
+        "required": [
+          "name",
+          "aks_cluster_name",
+          "aks_resource_group"
+        ],
+        "optional": {
+          "cpu_limit": {
+            "type": "string",
+            "default": null,
+            "description": "CPU quota for namespace (e.g., \"4\" for 4 cores)"
+          },
+          "memory_limit": {
+            "type": "string",
+            "default": null,
+            "description": "Memory quota for namespace (e.g., \"8Gi\")"
+          },
+          "pod_limit": {
+            "type": "number",
+            "default": null,
+            "description": "Maximum number of pods allowed"
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "pod_limit": 20,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "pod_limit": 20,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "pod_limit": 50,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "pod_limit": 50,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "pod_limit": 50,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "pod_limit": 100,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "pod_limit": 100,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "cpu_limit": "16",
+            "memory_limit": "32Gi",
+            "pod_limit": 200,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "cpu_limit": "32",
+            "memory_limit": "64Gi",
+            "pod_limit": 500,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 0,
+          "staging": 0,
+          "prod": 50
+        },
+        "medium": {
+          "dev": 0,
+          "staging": 25,
+          "prod": 100
+        },
+        "large": {
+          "dev": 25,
+          "staging": 100,
+          "prod": 250
+        }
+      }
+    },
+    "api-backend": {
+      "name": "api-backend",
+      "description": "Function App API backend with database (PostgreSQL, SQL, or MongoDB) and\nKey Vault integration. For microservice backends and REST APIs.",
+      "category": "composite",
+      "components": [
+        "function-app",
+        "postgresql/azure_sql/mongodb (selectable)",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "Microservice APIs",
+        "REST API backends",
+        "GraphQL servers",
+        "BFF (Backend for Frontend)"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "database_type": {
+            "type": "string",
+            "default": "azure_sql",
+            "description": "",
+            "enum": [
+              "azure_sql",
+              "postgresql",
+              "mongodb",
+              "none"
+            ]
+          },
+          "runtime": {
+            "type": "string",
+            "default": "python",
+            "description": "",
+            "enum": [
+              "python",
+              "node",
+              "dotnet",
+              "java"
+            ]
+          },
+          "runtime_version": {
+            "type": "string",
+            "default": null,
+            "description": ""
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "function_sku": "FC1",
+            "db_sku": "Free",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "function_sku": "Y1",
+            "db_sku": "Basic",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "function_sku": "B1",
+            "db_sku": "S0",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "function_sku": "Y1",
+            "db_sku": "Basic",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "function_sku": "B1",
+            "db_sku": "S1",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "function_sku": "S1",
+            "db_sku": "S2",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "function_sku": "B1",
+            "db_sku": "S0",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "function_sku": "S1",
+            "db_sku": "S2",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "function_sku": "P1v2",
+            "db_sku": "S3",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 30,
+          "staging": 65,
+          "prod": 260
+        },
+        "medium": {
+          "dev": 55,
+          "staging": 260,
+          "prod": 475
+        },
+        "large": {
+          "dev": 260,
+          "staging": 475,
+          "prod": 950
+        }
+      }
+    },
+    "data-pipeline": {
+      "name": "data-pipeline",
+      "description": "Complete data pipeline with Event Hub ingestion, Function App processing,\nData Lake storage, and optional Cosmos DB for processed data.",
+      "category": "composite",
+      "components": [
+        "eventhub (ingestion)",
+        "function-app (processor)",
+        "storage-account (data lake)",
+        "mongodb (processed data, optional)",
+        "keyvault (secrets)",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "IoT data ingestion",
+        "Event streaming",
+        "Log aggregation",
+        "Real-time analytics",
+        "ETL pipelines"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "runtime": {
+            "type": "string",
+            "default": "python",
+            "description": ""
+          },
+          "enable_mongodb": {
+            "type": "boolean",
+            "default": true,
+            "description": "Include Cosmos DB for processed data"
+          },
+          "message_retention": {
+            "type": "number",
+            "default": 1,
+            "description": "Event Hub message retention in days"
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "eventhub_sku": "Basic",
+            "eventhub_capacity": 1,
+            "function_sku": "Y1",
+            "storage_replication": "LRS",
+            "partition_count": 2,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "eventhub_sku": "Basic",
+            "eventhub_capacity": 1,
+            "function_sku": "Y1",
+            "storage_replication": "LRS",
+            "partition_count": 4,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 2,
+            "function_sku": "B1",
+            "storage_replication": "GRS",
+            "partition_count": 8,
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "eventhub_sku": "Basic",
+            "eventhub_capacity": 1,
+            "function_sku": "Y1",
+            "storage_replication": "LRS",
+            "partition_count": 4,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 2,
+            "function_sku": "B1",
+            "storage_replication": "GRS",
+            "partition_count": 8,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 4,
+            "function_sku": "S1",
+            "storage_replication": "RAGRS",
+            "partition_count": 16,
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 2,
+            "function_sku": "B1",
+            "storage_replication": "GRS",
+            "partition_count": 8,
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 4,
+            "function_sku": "S1",
+            "storage_replication": "RAGRS",
+            "partition_count": 16,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 8,
+            "function_sku": "P1v2",
+            "storage_replication": "RAGRS",
+            "partition_count": 32,
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 30,
+          "staging": 80,
+          "prod": 250
+        },
+        "medium": {
+          "dev": 60,
+          "staging": 250,
+          "prod": 500
+        },
+        "large": {
+          "dev": 250,
+          "staging": 500,
+          "prod": 1000
+        }
+      }
+    },
+    "eventhub": {
+      "name": "eventhub",
+      "description": "Azure Event Hubs namespace for high-throughput event streaming.\nIncludes Key Vault for connection strings and security groups\nfor sender/receiver access with RBAC.",
+      "category": "single",
+      "components": [
+        "eventhub",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Real-time event streaming",
+        "Log aggregation",
+        "IoT data ingestion",
+        "Application telemetry",
+        "Event-driven architectures"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "partition_count": {
+            "type": "number",
+            "default": 2,
+            "description": "Number of partitions per Event Hub"
+          },
+          "message_retention": {
+            "type": "number",
+            "default": 1,
+            "description": "Message retention in days (1-7 for Standard, 1 for Basic)"
+          },
+          "enable_private_endpoint": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable private endpoint connectivity"
+          },
+          "subnet_id": {
+            "type": "string",
+            "default": null,
+            "description": "Subnet ID for private endpoint"
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku": "Basic",
+            "capacity": 1,
+            "partition_count": 2,
+            "message_retention": 1,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "Basic",
+            "capacity": 1,
+            "partition_count": 4,
+            "message_retention": 1,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku": "Standard",
+            "capacity": 1,
+            "partition_count": 4,
+            "message_retention": 7,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku": "Standard",
+            "capacity": 1,
+            "partition_count": 4,
+            "message_retention": 1,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "Standard",
+            "capacity": 2,
+            "partition_count": 8,
+            "message_retention": 4,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku": "Standard",
+            "capacity": 4,
+            "partition_count": 16,
+            "message_retention": 7,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku": "Standard",
+            "capacity": 2,
+            "partition_count": 8,
+            "message_retention": 4,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "Standard",
+            "capacity": 4,
+            "partition_count": 16,
+            "message_retention": 7,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "sku": "Standard",
+            "capacity": 8,
+            "partition_count": 32,
+            "message_retention": 7,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 11,
+          "staging": 22,
+          "prod": 45
+        },
+        "medium": {
+          "dev": 22,
+          "staging": 88,
+          "prod": 175
+        },
+        "large": {
+          "dev": 88,
+          "staging": 175,
+          "prod": 350
+        }
+      }
+    },
+    "function-app": {
+      "name": "function-app",
+      "description": "Azure Functions serverless compute with managed identity and Key Vault integration.\nAutomatically creates storage account and app service plan.",
+      "category": "single",
+      "components": [
+        "function-app",
+        "storage-account (backend)",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "REST APIs",
+        "Event-driven processing",
+        "Scheduled tasks",
+        "Webhooks",
+        "Microservice backends"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "runtime": {
+            "type": "string",
+            "default": "python",
+            "description": "",
+            "enum": [
+              "python",
+              "node",
+              "dotnet",
+              "java",
+              "powershell"
+            ]
+          },
+          "runtime_version": {
+            "type": "string",
+            "default": null,
+            "description": ""
+          },
+          "os_type": {
+            "type": "string",
+            "default": "Linux",
+            "description": "",
+            "enum": [
+              "Linux",
+              "Windows"
+            ]
+          },
+          "app_settings": {
+            "type": "object",
+            "default": null,
+            "description": "Additional app settings"
+          },
+          "cors_origins": {
+            "type": "array",
+            "default": null,
+            "description": ""
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku": "Y1",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "sku": "Y1",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "B1",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku": "Y1",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "sku": "B1",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "S1",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku": "B1",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "sku": "S1",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "P1v2",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 0,
+          "staging": 10,
+          "prod": 55
+        },
+        "medium": {
+          "dev": 0,
+          "staging": 55,
+          "prod": 73
+        },
+        "large": {
+          "dev": 55,
+          "staging": 73,
+          "prod": 146
+        }
+      }
+    },
+    "keyvault": {
+      "name": "keyvault",
+      "description": "Azure Key Vault for secure secrets, keys, and certificates management.\nIncludes security groups, RBAC assignments, and optional access reviews.",
+      "category": "single",
+      "components": [
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "access-review (prod only)",
+        "diagnostic-settings (staging/prod)",
+        "private-endpoint (optional)"
+      ],
+      "use_cases": [
+        "Application secrets storage",
+        "API keys and tokens",
+        "Database connection strings",
+        "Certificates and encryption keys"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "enable_access_review": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable quarterly access reviews for privileged groups"
+          },
+          "access_reviewers": {
+            "type": "array",
+            "default": null,
+            "description": "Email addresses of access reviewers (required for prod)"
+          },
+          "enable_private_endpoint": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable private endpoint connectivity"
+          },
+          "subnet_id": {
+            "type": "string",
+            "default": null,
+            "description": "Subnet ID for private endpoint (required if enable_private_endpoint)"
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku": "standard",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku": "premium",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku": "standard",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku": "premium",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku": "standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku": "premium",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "sku": "premium",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 0.03,
+          "staging": 20,
+          "prod": 50
+        },
+        "medium": {
+          "dev": 0.03,
+          "staging": 30,
+          "prod": 75
+        },
+        "large": {
+          "dev": 20,
+          "staging": 75,
+          "prod": 150
+        }
+      }
+    },
+    "linux-vm": {
+      "name": "linux-vm",
+      "description": "Azure Linux Virtual Machine with managed identity and SSH key management.\nSSH keys are automatically generated and stored in Key Vault.\nIncludes security groups for operators and admins with RBAC.",
+      "category": "single",
+      "components": [
+        "linux-vm",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Development workstations",
+        "Build agents",
+        "Custom workloads",
+        "Legacy application hosting",
+        "Bastion hosts"
+      ],
+      "config": {
+        "required": [
+          "name",
+          "subnet_id"
+        ],
+        "optional": {
+          "admin_username": {
+            "type": "string",
+            "default": "azureuser",
+            "description": "SSH admin username"
+          },
+          "image_publisher": {
+            "type": "string",
+            "default": "Canonical",
+            "description": "VM image publisher"
+          },
+          "image_offer": {
+            "type": "string",
+            "default": "0001-com-ubuntu-server-jammy",
+            "description": "VM image offer"
+          },
+          "image_sku": {
+            "type": "string",
+            "default": "22_04-lts",
+            "description": "Ubuntu version",
+            "enum": [
+              "20_04-lts",
+              "22_04-lts",
+              "24_04-lts"
+            ]
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "vm_size": "Standard_B1s",
+            "os_disk_size_gb": 30,
+            "os_disk_type": "Standard_LRS",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "vm_size": "Standard_B1ms",
+            "os_disk_size_gb": 64,
+            "os_disk_type": "Standard_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "vm_size": "Standard_B2s",
+            "os_disk_size_gb": 128,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "vm_size": "Standard_B2s",
+            "os_disk_size_gb": 64,
+            "os_disk_type": "Standard_LRS",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "vm_size": "Standard_D2s_v3",
+            "os_disk_size_gb": 128,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "vm_size": "Standard_D4s_v3",
+            "os_disk_size_gb": 256,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "vm_size": "Standard_D2s_v3",
+            "os_disk_size_gb": 128,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "vm_size": "Standard_D4s_v3",
+            "os_disk_size_gb": 256,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "vm_size": "Standard_D8s_v3",
+            "os_disk_size_gb": 512,
+            "os_disk_type": "Premium_LRS",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 8,
+          "staging": 18,
+          "prod": 50
+        },
+        "medium": {
+          "dev": 30,
+          "staging": 100,
+          "prod": 200
+        },
+        "large": {
+          "dev": 100,
+          "staging": 200,
+          "prod": 400
+        }
+      }
+    },
+    "microservice": {
+      "name": "microservice",
+      "description": "AKS namespace with Event Hub and Storage for event-driven microservices.\nIncludes RBAC for namespace access and Key Vault for secrets.",
+      "category": "composite",
+      "components": [
+        "aks-namespace",
+        "eventhub (optional)",
+        "storage-account (optional)",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments"
+      ],
+      "use_cases": [
+        "Kubernetes microservices",
+        "Event-driven services",
+        "Container workloads",
+        "Distributed systems"
+      ],
+      "config": {
+        "required": [
+          "name",
+          "aks_cluster_name",
+          "aks_resource_group"
+        ],
+        "optional": {
+          "enable_eventhub": {
+            "type": "boolean",
+            "default": true,
+            "description": ""
+          },
+          "enable_storage": {
+            "type": "boolean",
+            "default": true,
+            "description": ""
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "eventhub_sku": "Basic",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "eventhub_sku": "Basic",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "eventhub_sku": "Basic",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "cpu_limit": "16",
+            "memory_limit": "32Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 15,
+          "staging": 45,
+          "prod": 120
+        },
+        "medium": {
+          "dev": 45,
+          "staging": 120,
+          "prod": 250
+        },
+        "large": {
+          "dev": 120,
+          "staging": 250,
+          "prod": 500
+        }
+      }
+    },
+    "mongodb": {
+      "name": "mongodb",
+      "description": "Azure Cosmos DB with MongoDB API for document database workloads.\nConnection strings stored in Key Vault with security group-based access.\nSupports automatic failover and configurable consistency levels.",
+      "category": "single",
+      "components": [
+        "mongodb",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Document databases",
+        "Content management systems",
+        "User profile storage",
+        "Catalog data",
+        "Mobile app backends"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "consistency_level": {
+            "type": "string",
+            "default": "Session",
+            "description": "Consistency level for reads",
+            "enum": [
+              "Eventual",
+              "Session",
+              "BoundedStaleness",
+              "Strong"
+            ]
+          },
+          "enable_automatic_failover": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable automatic failover to secondary region"
+          },
+          "enable_private_endpoint": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable private endpoint connectivity"
+          },
+          "subnet_id": {
+            "type": "string",
+            "default": null,
+            "description": "Subnet ID for private endpoint"
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "throughput": 400,
+            "max_throughput": 1000,
+            "enable_automatic_failover": false,
+            "consistency_level": "Session",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "throughput": 400,
+            "max_throughput": 4000,
+            "enable_automatic_failover": false,
+            "consistency_level": "Session",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "throughput": 1000,
+            "max_throughput": 10000,
+            "enable_automatic_failover": true,
+            "consistency_level": "Strong",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "throughput": 1000,
+            "max_throughput": 4000,
+            "enable_automatic_failover": false,
+            "consistency_level": "Session",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "throughput": 2000,
+            "max_throughput": 10000,
+            "enable_automatic_failover": true,
+            "consistency_level": "BoundedStaleness",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "throughput": 4000,
+            "max_throughput": 20000,
+            "enable_automatic_failover": true,
+            "consistency_level": "Strong",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "throughput": 4000,
+            "max_throughput": 10000,
+            "enable_automatic_failover": true,
+            "consistency_level": "BoundedStaleness",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "throughput": 10000,
+            "max_throughput": 50000,
+            "enable_automatic_failover": true,
+            "consistency_level": "Strong",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "throughput": 20000,
+            "max_throughput": 100000,
+            "enable_automatic_failover": true,
+            "consistency_level": "Strong",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 25,
+          "staging": 50,
+          "prod": 150
+        },
+        "medium": {
+          "dev": 60,
+          "staging": 150,
+          "prod": 300
+        },
+        "large": {
+          "dev": 150,
+          "staging": 400,
+          "prod": 800
+        }
+      }
+    },
+    "postgresql": {
+      "name": "postgresql",
+      "description": "Azure Database for PostgreSQL Flexible Server with automatic secret management.\nConnection strings stored in Key Vault with security group-based access.",
+      "category": "single",
+      "components": [
+        "postgresql",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "private-endpoint (optional)",
+        "network-rules (optional)"
+      ],
+      "use_cases": [
+        "Application databases",
+        "Analytics data stores",
+        "Multi-tenant applications",
+        "Microservice backends"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "version": {
+            "type": "string",
+            "default": "14",
+            "description": "PostgreSQL version",
+            "enum": [
+              "12",
+              "13",
+              "14",
+              "15",
+              "16"
+            ]
+          },
+          "allowed_ips": {
+            "type": "array",
+            "default": null,
+            "description": "IP addresses allowed through firewall"
+          },
+          "enable_private_endpoint": {
+            "type": "boolean",
+            "default": false,
+            "description": ""
+          },
+          "subnet_id": {
+            "type": "string",
+            "default": null,
+            "description": ""
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku": "B_Standard_B1ms",
+            "storage_mb": 32768,
+            "backup_retention_days": 7,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "sku": "B_Standard_B1ms",
+            "storage_mb": 32768,
+            "backup_retention_days": 14,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "GP_Standard_D2s_v3",
+            "storage_mb": 65536,
+            "backup_retention_days": 35,
+            "geo_redundant_backup": true,
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku": "B_Standard_B2s",
+            "storage_mb": 32768,
+            "backup_retention_days": 7,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "sku": "GP_Standard_D2s_v3",
+            "storage_mb": 65536,
+            "backup_retention_days": 21,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "GP_Standard_D4s_v3",
+            "storage_mb": 131072,
+            "backup_retention_days": 35,
+            "geo_redundant_backup": true,
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku": "GP_Standard_D2s_v3",
+            "storage_mb": 65536,
+            "backup_retention_days": 7,
+            "geo_redundant_backup": false,
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "sku": "GP_Standard_D4s_v3",
+            "storage_mb": 131072,
+            "backup_retention_days": 35,
+            "geo_redundant_backup": true,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "sku": "GP_Standard_D8s_v3",
+            "storage_mb": 262144,
+            "backup_retention_days": 35,
+            "geo_redundant_backup": true,
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 25,
+          "staging": 50,
+          "prod": 200
+        },
+        "medium": {
+          "dev": 50,
+          "staging": 200,
+          "prod": 400
+        },
+        "large": {
+          "dev": 200,
+          "staging": 400,
+          "prod": 800
+        }
+      }
+    },
+    "sql-database": {
+      "name": "sql-database",
+      "description": "Azure SQL Database (managed) with automatic credential management.\nConnection strings stored in Key Vault with security group-based access.\nSupports zone redundancy for high availability.",
+      "category": "single",
+      "components": [
+        "sql-database",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "network-rules (optional)",
+        "diagnostic-settings (staging/prod)",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Relational data storage",
+        "Transaction processing",
+        "Reporting databases",
+        "Enterprise applications",
+        ".NET application backends"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "allowed_ips": {
+            "type": "array",
+            "default": null,
+            "description": "IP addresses allowed through firewall"
+          },
+          "enable_private_endpoint": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable private endpoint connectivity"
+          },
+          "subnet_id": {
+            "type": "string",
+            "default": null,
+            "description": "Subnet ID for private endpoint"
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku_name": "Basic",
+            "max_size_gb": 2,
+            "zone_redundant": false,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_name": "S0",
+            "max_size_gb": 10,
+            "zone_redundant": false,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku_name": "S1",
+            "max_size_gb": 50,
+            "zone_redundant": true,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku_name": "S0",
+            "max_size_gb": 10,
+            "zone_redundant": false,
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_name": "S1",
+            "max_size_gb": 50,
+            "zone_redundant": false,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku_name": "S2",
+            "max_size_gb": 100,
+            "zone_redundant": true,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku_name": "S1",
+            "max_size_gb": 50,
+            "zone_redundant": false,
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_name": "S2",
+            "max_size_gb": 100,
+            "zone_redundant": true,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "sku_name": "S3",
+            "max_size_gb": 250,
+            "zone_redundant": true,
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 5,
+          "staging": 25,
+          "prod": 75
+        },
+        "medium": {
+          "dev": 25,
+          "staging": 75,
+          "prod": 150
+        },
+        "large": {
+          "dev": 75,
+          "staging": 150,
+          "prod": 300
+        }
+      }
+    },
+    "static-site": {
+      "name": "static-site",
+      "description": "Azure Static Web Apps for hosting single-page applications and static sites.\nIncludes built-in CI/CD, global CDN, and free SSL certificates.\nSecurity groups for developers and admins.",
+      "category": "single",
+      "components": [
+        "static-web-app",
+        "security-groups",
+        "rbac-assignments",
+        "access-review (prod only)"
+      ],
+      "use_cases": [
+        "Single-page applications (React, Vue, Angular)",
+        "JAMstack sites",
+        "Documentation sites",
+        "Marketing landing pages",
+        "Portfolio websites"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "repository_url": {
+            "type": "string",
+            "default": null,
+            "description": "GitHub repository URL for automatic deployments"
+          },
+          "branch": {
+            "type": "string",
+            "default": "main",
+            "description": "Branch to deploy from"
+          },
+          "app_location": {
+            "type": "string",
+            "default": "/",
+            "description": "Location of app source code relative to repo root"
+          },
+          "api_location": {
+            "type": "string",
+            "default": "",
+            "description": "Location of Azure Functions API (if any)"
+          },
+          "output_location": {
+            "type": "string",
+            "default": "build",
+            "description": "Build output directory"
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "sku_tier": "Free",
+            "sku_size": "Free",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_tier": "Free",
+            "sku_size": "Free",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "sku_tier": "Free",
+            "sku_size": "Free",
+            "enable_diagnostics": false,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "prod": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        },
+        "large": {
+          "dev": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": false
+          },
+          "staging": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          },
+          "prod": {
+            "sku_tier": "Standard",
+            "sku_size": "Standard",
+            "enable_diagnostics": true,
+            "enable_access_review": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 0,
+          "staging": 0,
+          "prod": 9
+        },
+        "medium": {
+          "dev": 0,
+          "staging": 9,
+          "prod": 9
+        },
+        "large": {
+          "dev": 9,
+          "staging": 9,
+          "prod": 9
+        }
+      }
+    },
+    "storage": {
+      "name": "storage",
+      "description": "Azure Storage Account with blob containers, security group access,\nand optional private endpoint.",
+      "category": "single",
+      "components": [
+        "storage-account",
+        "blob-containers",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)",
+        "private-endpoint (optional)",
+        "network-rules (optional)"
+      ],
+      "use_cases": [
+        "Application file storage",
+        "Static asset hosting",
+        "Data lake staging",
+        "Backup storage",
+        "Log archival"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "containers": {
+            "type": "array",
+            "default": null,
+            "description": "List of blob containers to create"
+          },
+          "enable_private_endpoint": {
+            "type": "boolean",
+            "default": false,
+            "description": ""
+          },
+          "subnet_id": {
+            "type": "string",
+            "default": null,
+            "description": ""
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "account_tier": "Standard",
+            "replication_type": "LRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "account_tier": "Standard",
+            "replication_type": "LRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "account_tier": "Standard",
+            "replication_type": "GRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "account_tier": "Standard",
+            "replication_type": "LRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "account_tier": "Standard",
+            "replication_type": "GRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "account_tier": "Standard",
+            "replication_type": "RAGRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "account_tier": "Standard",
+            "replication_type": "GRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "account_tier": "Standard",
+            "replication_type": "RAGRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "account_tier": "Premium",
+            "replication_type": "ZRS",
+            "access_tier": "Hot",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 2,
+          "staging": 5,
+          "prod": 25
+        },
+        "medium": {
+          "dev": 5,
+          "staging": 25,
+          "prod": 50
+        },
+        "large": {
+          "dev": 25,
+          "staging": 50,
+          "prod": 100
+        }
+      }
+    },
+    "web-app": {
+      "name": "web-app",
+      "description": "Full-stack web application pattern with static frontend, serverless API backend,\nand database. Includes managed identity, Key Vault integration, and security groups.",
+      "category": "composite",
+      "components": [
+        "static-web-app (frontend)",
+        "function-app (API backend)",
+        "postgresql/azure_sql (database, optional)",
+        "keyvault (shared secrets)",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "Single-page applications (SPAs)",
+        "JAMstack applications",
+        "Admin dashboards",
+        "Customer portals",
+        "Internal tools"
+      ],
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": {
+          "database_type": {
+            "type": "string",
+            "default": "postgresql",
+            "description": "Database type (or none for frontend-only)",
+            "enum": [
+              "postgresql",
+              "azure_sql",
+              "none"
+            ]
+          },
+          "runtime": {
+            "type": "string",
+            "default": "python",
+            "description": "API backend runtime",
+            "enum": [
+              "python",
+              "node",
+              "dotnet",
+              "java"
+            ]
+          },
+          "runtime_version": {
+            "type": "string",
+            "default": null,
+            "description": "Runtime version (e.g., 3.11 for Python)"
+          }
+        }
+      },
+      "sizing": {
+        "small": {
+          "dev": {
+            "swa_sku_tier": "Free",
+            "function_sku": "Y1",
+            "db_sku": "B_Standard_B1ms",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "swa_sku_tier": "Free",
+            "function_sku": "Y1",
+            "db_sku": "B_Standard_B1ms",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "B1",
+            "db_sku": "GP_Standard_D2s_v3",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "swa_sku_tier": "Free",
+            "function_sku": "Y1",
+            "db_sku": "B_Standard_B2s",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "B1",
+            "db_sku": "GP_Standard_D2s_v3",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "S1",
+            "db_sku": "GP_Standard_D4s_v3",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "B1",
+            "db_sku": "GP_Standard_D2s_v3",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "S1",
+            "db_sku": "GP_Standard_D4s_v3",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "swa_sku_tier": "Standard",
+            "function_sku": "P1v2",
+            "db_sku": "GP_Standard_D8s_v3",
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 35,
+          "staging": 80,
+          "prod": 300
+        },
+        "medium": {
+          "dev": 60,
+          "staging": 250,
+          "prod": 550
+        },
+        "large": {
+          "dev": 250,
+          "staging": 550,
+          "prod": 1100
+        }
+      }
+    }
+  }
+}

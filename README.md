@@ -6,6 +6,7 @@ A **pattern-based** infrastructure provisioning platform that enables developmen
 
 - [Architecture Overview](#architecture-overview)
 - [Quick Start](#quick-start)
+  - [IDE Integration (VS Code)](#ide-integration-vs-code)
 - [Infrastructure Patterns](#infrastructure-patterns)
 - [Pattern Request Format](#pattern-request-format)
 - [Pattern Versioning](#pattern-versioning)
@@ -111,6 +112,37 @@ A **pattern-based** infrastructure provisioning platform that enables developmen
 4. **Create a PR** with your `infrastructure.yaml` changes
 5. **Review the plan preview** in the PR comment
 6. **Merge to main** to provision infrastructure
+
+### IDE Integration (VS Code)
+
+Get autocomplete, validation, and hover documentation when editing `infrastructure.yaml` files.
+
+1. **Install the YAML extension** ([Red Hat YAML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml))
+
+2. **Add schema association** to your repository's `.vscode/settings.json`:
+   ```json
+   {
+     "yaml.schemas": {
+       "https://raw.githubusercontent.com/csGIT34/infrastructure-automation/main/schemas/infrastructure.yaml.json": "infrastructure.yaml"
+     }
+   }
+   ```
+
+3. **Enjoy enhanced editing**:
+   - Autocomplete for patterns, environments, locations, and config options
+   - Inline validation with error highlighting
+   - Hover documentation for all fields
+
+**Alternative: User-level configuration**
+
+Add to your VS Code user settings (`Cmd/Ctrl + ,` → Open Settings JSON):
+```json
+{
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/csGIT34/infrastructure-automation/main/schemas/infrastructure.yaml.json": "**/infrastructure.yaml"
+  }
+}
+```
 
 ### For Platform Administrators
 
@@ -719,12 +751,20 @@ Creates versioned releases for patterns:
 - Creates GitHub release with release notes
 - Updates VERSION and CHANGELOG files
 
-### Validate Module Sync (`.github/workflows/validate-module-sync.yaml`)
+### Validate Pattern Sync (`.github/workflows/validate-module-sync.yaml`)
 
-CI gate ensuring patterns are in sync:
-- Pattern directories match config metadata
-- MCP server definitions match patterns
-- Workflow template matches pattern list
+CI gate ensuring all generated files are in sync with `config/patterns/*.yaml`:
+- JSON Schema (`schemas/infrastructure.yaml.json`)
+- Portal PATTERNS_DATA (`web/index.html`)
+- Workflow valid_patterns (`templates/infrastructure-workflow.yaml`)
+- MCP patterns (`mcp-server/src/patterns.generated.json`)
+
+**Triggers**: PRs/pushes affecting pattern files, or manually via workflow_dispatch.
+
+**Fix sync issues**:
+```bash
+python3 scripts/generate-schema.py
+```
 
 ---
 
@@ -784,6 +824,33 @@ Production patterns include Entra ID access reviews:
 | statuses | Write | Update commit status |
 | issues | Write | Create result issues |
 | metadata | Read | Basic repo access |
+
+---
+
+## Generated Files (Single Source of Truth)
+
+`config/patterns/*.yaml` is the **single source of truth** for pattern definitions. Several files are auto-generated from these pattern files to prevent drift:
+
+| Generated File | Purpose |
+|----------------|---------|
+| `schemas/infrastructure.yaml.json` | JSON Schema for IDE validation (VS Code autocomplete) |
+| `web/index.html` | Portal PATTERNS_DATA section |
+| `templates/infrastructure-workflow.yaml` | valid_patterns list |
+| `mcp-server/src/patterns.generated.json` | MCP server pattern data |
+
+### Regenerating Files
+
+After modifying any `config/patterns/*.yaml` file:
+
+```bash
+# Regenerate all derived files
+python3 scripts/generate-schema.py
+
+# Verify files are in sync
+python3 scripts/generate-schema.py --check
+```
+
+CI will fail if generated files are out of sync. See the [Validate Pattern Sync](#validate-pattern-sync-githubworkflowsvalidate-module-syncyaml) workflow.
 
 ---
 
@@ -921,14 +988,18 @@ infrastructure-automation/
 │
 ├── mcp-server/                     # MCP server for AI integration
 │   ├── src/
-│   │   └── index.ts               # Main implementation
+│   │   ├── index.ts               # Main implementation
+│   │   └── patterns.generated.json # Auto-generated pattern data
 │   ├── package.json
 │   └── Dockerfile
 │
+├── schemas/
+│   └── infrastructure.yaml.json   # JSON Schema (auto-generated)
+│
 ├── scripts/
 │   ├── resolve-pattern.py         # Pattern resolution engine
-│   ├── generate-portal-data.py    # Portal data generator
-│   └── sync-workflow-template.sh  # Workflow sync script
+│   ├── generate-schema.py         # Generates all derived files
+│   └── create-release.sh          # Creates pattern releases
 │
 ├── templates/
 │   └── infrastructure-workflow.yaml # GitOps template for consuming repos

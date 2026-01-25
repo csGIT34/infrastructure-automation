@@ -74,12 +74,21 @@ This guide is the complete reference for DevOps engineers who manage and extend 
 
 ### Source of Truth
 
-**`terraform/patterns/`** is the source of truth for valid patterns. All other sources must stay in sync:
-- `config/patterns/*.yaml` - Pattern metadata
-- `mcp-server/src/index.ts` - PATTERN_DEFINITIONS
-- `templates/infrastructure-workflow.yaml` - valid_patterns list
+**`config/patterns/*.yaml`** is the single source of truth for pattern definitions. The following files are **auto-generated** from these pattern files:
 
-The CI workflow `validate-module-sync.yaml` enforces this.
+| Generated File | Purpose |
+|----------------|---------|
+| `schemas/infrastructure.yaml.json` | JSON Schema for IDE validation (VS Code autocomplete) |
+| `web/index.html` | Portal PATTERNS_DATA section |
+| `templates/infrastructure-workflow.yaml` | valid_patterns list |
+| `mcp-server/src/patterns.generated.json` | MCP server pattern data |
+
+**Regenerate after editing patterns:**
+```bash
+python3 scripts/generate-schema.py
+```
+
+The CI workflow `validate-module-sync.yaml` enforces sync and will fail if generated files are out of date. You can also trigger it manually via workflow_dispatch.
 
 ---
 
@@ -278,14 +287,12 @@ Patterns are what developers request. Follow this complete checklist to add a ne
 ### Complete Checklist
 
 - [ ] **Step 1**: Create Terraform pattern in `terraform/patterns/{pattern}/`
-- [ ] **Step 2**: Create pattern metadata in `config/patterns/{pattern}.yaml`
-- [ ] **Step 3**: Add pattern to MCP server in `mcp-server/src/index.ts`
-- [ ] **Step 4**: Update workflow template `valid_patterns` list
-- [ ] **Step 5**: Create pattern test in `terraform/tests/patterns/{pattern}/`
-- [ ] **Step 6**: Add example in `examples/`
-- [ ] **Step 7**: Update portal icon mapping (optional)
-- [ ] **Step 8**: Run validation and tests
-- [ ] **Step 9**: Commit all files together
+- [ ] **Step 2**: Create pattern metadata in `config/patterns/{pattern}.yaml` (SOURCE OF TRUTH)
+- [ ] **Step 3**: Regenerate derived files with `python3 scripts/generate-schema.py`
+- [ ] **Step 4**: Create pattern test in `terraform/tests/patterns/{pattern}/`
+- [ ] **Step 5**: Add example in `examples/`
+- [ ] **Step 6**: Run validation and tests
+- [ ] **Step 7**: Commit all files together
 
 ### Step 1: Create Terraform Pattern
 
@@ -432,45 +439,26 @@ estimated_costs:
     prod: 400
 ```
 
-### Step 3: Add to MCP Server
+### Step 3: Regenerate Derived Files
 
-Edit `mcp-server/src/index.ts` and add to `PATTERN_DEFINITIONS`:
+Run the generation script to update all auto-generated files:
 
-```typescript
-const PATTERN_DEFINITIONS = {
-  // existing patterns...
-
-  "pattern-name": {
-    name: "pattern-name",
-    description: "Description",
-    category: "single",
-    components: ["..."],
-    use_cases: ["..."],
-    config: {
-      required: ["name"],
-      optional: { ... }
-    },
-    sizing: { ... },
-    estimated_costs: { ... },
-    detection_patterns: [
-      { pattern: /keyword/i, weight: 3 }
-    ]
-  }
-};
+```bash
+python3 scripts/generate-schema.py
 ```
 
-### Step 4: Update Workflow Template
+This updates:
+- `schemas/infrastructure.yaml.json` - JSON Schema for IDE validation
+- `web/index.html` - Portal PATTERNS_DATA
+- `templates/infrastructure-workflow.yaml` - valid_patterns list
+- `mcp-server/src/patterns.generated.json` - MCP server data
 
-Edit `templates/infrastructure-workflow.yaml`:
-
-```python
-valid_patterns = [
-    'keyvault', 'postgresql', ...,
-    'pattern-name'  # Add here
-]
+Verify the changes:
+```bash
+python3 scripts/generate-schema.py --check
 ```
 
-### Step 5: Create Pattern Test
+### Step 4: Create Pattern Test
 
 Create test structure:
 
@@ -483,7 +471,7 @@ terraform/tests/patterns/{pattern}/
     └── main.tf
 ```
 
-### Step 6: Add Example
+### Step 5: Add Example
 
 Create `examples/{pattern}-pattern.yaml`:
 
@@ -498,37 +486,36 @@ metadata:
   location: eastus
 
 pattern: pattern-name
+pattern_version: "1.0.0"
 config:
   name: myresource
   size: small
 ```
 
-### Step 7: Run Validation
+### Step 6: Run Validation
 
 ```bash
-# Check sync
-python << 'EOF'
-import os
-tf = sorted([d for d in os.listdir('terraform/patterns') if os.path.isdir(f'terraform/patterns/{d}')])
-cfg = sorted([f.replace('.yaml', '') for f in os.listdir('config/patterns') if f.endswith('.yaml')])
-print(f"TF: {tf}")
-print(f"Config: {cfg}")
-print("In sync!" if tf == cfg else "OUT OF SYNC!")
-EOF
+# Check all generated files are in sync
+python3 scripts/generate-schema.py --check
 
 # Run tests
 cd terraform/tests && ./run-tests.sh -p pattern-name
 ```
 
-### Step 8: Commit All Together
+### Step 7: Commit All Together
 
 ```bash
+# Manual files
 git add terraform/patterns/{pattern}/
 git add config/patterns/{pattern}.yaml
-git add mcp-server/src/index.ts
-git add templates/infrastructure-workflow.yaml
 git add terraform/tests/patterns/{pattern}/
 git add examples/{pattern}-pattern.yaml
+
+# Auto-generated files
+git add schemas/infrastructure.yaml.json
+git add web/index.html
+git add templates/infrastructure-workflow.yaml
+git add mcp-server/src/patterns.generated.json
 
 git commit -m "Add {pattern} pattern with security groups and RBAC"
 ```
@@ -537,18 +524,26 @@ git commit -m "Add {pattern} pattern with security groups and RBAC"
 
 ## Integration Checklist
 
+### Manual Files (you create/edit these)
+
 | File/Location | Required | Purpose |
 |--------------|----------|---------|
 | `terraform/patterns/{pattern}/main.tf` | **Yes** | Pattern Terraform code |
-| `config/patterns/{pattern}.yaml` | **Yes** | Sizing, costs, schema |
-| `mcp-server/src/index.ts` | **Yes** | AI integration |
-| `templates/infrastructure-workflow.yaml` | **Yes** | valid_patterns list |
+| `config/patterns/{pattern}.yaml` | **Yes** | Pattern metadata (SOURCE OF TRUTH) |
 | `terraform/tests/patterns/{pattern}/` | **Yes** | Pattern tests |
 | `examples/{pattern}-pattern.yaml` | Recommended | Usage example |
-| `scripts/generate-portal-data.py` | Optional | Icon mapping |
 | `terraform/modules/naming/main.tf` | If needed | Resource naming prefix |
 
-The CI workflow `validate-module-sync.yaml` enforces sync between these sources.
+### Auto-Generated Files (run `python3 scripts/generate-schema.py`)
+
+| File/Location | Purpose |
+|--------------|---------|
+| `schemas/infrastructure.yaml.json` | JSON Schema for IDE validation |
+| `web/index.html` | Portal PATTERNS_DATA section |
+| `templates/infrastructure-workflow.yaml` | valid_patterns list |
+| `mcp-server/src/patterns.generated.json` | MCP server pattern data |
+
+The CI workflow `validate-module-sync.yaml` enforces sync and fails if generated files are out of date. You can trigger it manually via Actions > Validate Pattern Sync > Run workflow.
 
 ---
 

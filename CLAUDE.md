@@ -35,6 +35,13 @@ python3 scripts/resolve-pattern.py examples/multi-pattern.yaml --output multi-js
 
 # Sync workflow template with patterns
 ./scripts/sync-workflow-template.sh
+
+# Generate all derived files from pattern definitions
+# (JSON Schema, portal PATTERNS_DATA, workflow valid_patterns, MCP patterns)
+python3 scripts/generate-schema.py
+
+# Check if all generated files are up to date (for CI)
+python3 scripts/generate-schema.py --check
 ```
 
 ## Architecture
@@ -301,63 +308,55 @@ Features automatically enabled based on environment:
 - **High Availability**: prod only
 - **Geo-Redundant Backup**: prod only
 
+## Single Source of Truth
+
+`config/patterns/*.yaml` is the **single source of truth** for pattern definitions. The following files are auto-generated from these pattern files:
+
+| Generated File | Purpose |
+|----------------|---------|
+| `schemas/infrastructure.yaml.json` | JSON Schema for IDE validation (VS Code autocomplete) |
+| `web/index.html` | Portal PATTERNS_DATA for the UI |
+| `templates/infrastructure-workflow.yaml` | valid_patterns list for consumer workflows |
+| `mcp-server/src/patterns.generated.json` | Pattern data for MCP server |
+
+**Regenerate all files after editing patterns:**
+```bash
+python3 scripts/generate-schema.py
+```
+
+The CI workflow `validate-module-sync.yaml` will fail if generated files are out of sync.
+
 ## Adding New Infrastructure Patterns
 
 When asked to add a new pattern, follow these steps:
 
 ### Required Steps
 
-1. **Add PATTERN_DEFINITIONS entry** in `mcp-server/src/index.ts`:
-   ```typescript
-   const PATTERN_DEFINITIONS: Record<string, PatternDefinition> = {
-     new_pattern: {
-       name: "new_pattern",
-       description: "Description of the pattern",
-       category: "single",  // or "composite"
-       components: ["base-resource", "security-groups", "rbac-assignments"],
-       use_cases: ["Use case 1", "Use case 2"],
-       config: {
-         required: ["name"],
-         optional: {
-           some_option: { type: "boolean", default: false, description: "Description" }
-         }
-       },
-       sizing: {
-         small: { dev: {...}, staging: {...}, prod: {...} },
-         medium: { dev: {...}, staging: {...}, prod: {...} },
-         large: { dev: {...}, staging: {...}, prod: {...} }
-       },
-       estimated_costs: {
-         small: { dev: 10, staging: 30, prod: 100 },
-         medium: { dev: 30, staging: 100, prod: 200 },
-         large: { dev: 100, staging: 200, prod: 400 }
-       },
-       detection_patterns: [
-         { pattern: /regex_to_detect/i, weight: 5 }
-       ]
-     }
-   };
-   ```
-
-2. **Create pattern Terraform config** in `terraform/patterns/new_pattern/`:
-   - `main.tf` - Compose modules from terraform/modules/
-   - `variables.tf` - Input variables (from pattern resolution)
-   - `outputs.tf` - Resource outputs
-
-3. **Create pattern metadata** in `config/patterns/new_pattern.yaml`:
+1. **Create pattern metadata** in `config/patterns/new_pattern.yaml` (SOURCE OF TRUTH):
    ```yaml
    name: new_pattern
    description: |
      Description of what this pattern provisions.
-   category: single
+   category: single-resource  # or "composite"
    components:
      - base-resource
      - security-groups
      - rbac-assignments
+   use_cases:
+     - Use case 1
+     - Use case 2
    sizing:
      small:
        dev: { sku: "basic" }
        staging: { sku: "standard" }
+       prod: { sku: "premium" }
+     medium:
+       dev: { sku: "standard" }
+       staging: { sku: "premium" }
+       prod: { sku: "premium" }
+     large:
+       dev: { sku: "premium" }
+       staging: { sku: "premium" }
        prod: { sku: "premium" }
    config:
      required:
@@ -366,32 +365,52 @@ When asked to add a new pattern, follow these steps:
        - some_option:
            type: boolean
            default: false
+           description: Enable some optional feature
+   estimated_costs:
+     small:
+       dev: 10
+       staging: 30
+       prod: 100
+     medium:
+       dev: 30
+       staging: 100
+       prod: 200
+     large:
+       dev: 100
+       staging: 200
+       prod: 400
    ```
 
-4. **Sync the workflow template**:
+2. **Create pattern Terraform config** in `terraform/patterns/new_pattern/`:
+   - `main.tf` - Compose modules from terraform/modules/
+   - `variables.tf` - Input variables (from pattern resolution)
+   - `outputs.tf` - Resource outputs
+   - `VERSION` - Set to `1.0.0`
+
+3. **Regenerate all derived files**:
    ```bash
-   ./scripts/sync-workflow-template.sh
+   python3 scripts/generate-schema.py
    ```
 
-5. **Commit all changes together** - The CI workflow `validate-pattern-sync.yaml` will fail if patterns are out of sync.
+4. **Commit all changes together** - The CI workflow will fail if generated files are out of sync.
 
 ### Files to Update (Checklist)
 
-- [ ] `mcp-server/src/index.ts` - PATTERN_DEFINITIONS
+**Manual edits required:**
+- [ ] `config/patterns/<new_pattern>.yaml` - Pattern metadata (SOURCE OF TRUTH)
 - [ ] `terraform/patterns/<new_pattern>/main.tf`
 - [ ] `terraform/patterns/<new_pattern>/variables.tf`
 - [ ] `terraform/patterns/<new_pattern>/outputs.tf`
 - [ ] `terraform/patterns/<new_pattern>/VERSION` - Set to `1.0.0`
-- [ ] `config/patterns/<new_pattern>.yaml` - Pattern metadata
-- [ ] `templates/infrastructure-workflow.yaml` - Run sync script
+
+**Auto-generated (run `python3 scripts/generate-schema.py`):**
+- [ ] `schemas/infrastructure.yaml.json` - JSON Schema
+- [ ] `web/index.html` - Portal PATTERNS_DATA
+- [ ] `templates/infrastructure-workflow.yaml` - valid_patterns list
+- [ ] `mcp-server/src/patterns.generated.json` - MCP pattern data
+
+**After merging:**
 - [ ] Create initial release: `./scripts/create-release.sh <new_pattern> 1.0.0`
-
-### Single Source of Truth
-
-`terraform/patterns/` is the source of truth for valid patterns. The CI workflow validates:
-- Pattern directories match `config/patterns/*.yaml` metadata
-- Workflow template `valid_patterns` list matches pattern directories
-- MCP server `PATTERN_DEFINITIONS` includes all patterns
 
 ### Pattern Structure Template
 

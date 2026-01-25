@@ -1120,6 +1120,47 @@ config:
                             </p>
                         </div>
                     </div>
+
+                    <div class="collapsible">
+                        <div class="collapsible-header" onclick="toggleCollapsible(this.parentElement)">
+                            <h3>IDE Integration (VS Code)</h3>
+                            <span class="collapsible-icon">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 1rem;">
+                                Get autocomplete, validation, and hover documentation when editing <code>infrastructure.yaml</code> files in VS Code.
+                            </p>
+
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Step 1: Install YAML Extension</strong></p>
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 1rem;">
+                                Install the <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml" target="_blank" style="color: #3b82f6;">Red Hat YAML extension</a> from the VS Code marketplace.
+                            </p>
+
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Step 2: Configure Schema Association</strong></p>
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;">
+                                Add to your repository's <code>.vscode/settings.json</code>:
+                            </p>
+                            <pre style="background: #1e1e2e; padding: 0.75rem; border-radius: 4px; font-size: 0.8rem; overflow-x: auto; margin-bottom: 1rem;">{
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/csGIT34/infrastructure-automation/main/schemas/infrastructure.yaml.json": "infrastructure.yaml"
+  }
+}</pre>
+
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>What You Get:</strong></p>
+                            <ul style="color: #a1a1aa; font-size: 0.85rem; padding-left: 1.5rem; margin-bottom: 1rem;">
+                                <li><strong>Autocomplete</strong> - Pattern names, environments, locations, config options</li>
+                                <li><strong>Validation</strong> - Red squiggles for invalid values or missing fields</li>
+                                <li><strong>Hover Docs</strong> - Descriptions for every field when you hover</li>
+                                <li><strong>Enum Dropdowns</strong> - Valid values shown as suggestions</li>
+                            </ul>
+
+                            <div style="background: #1e3a5f; border: 1px solid #3b82f6; padding: 0.75rem; border-radius: 4px;">
+                                <p style="color: #93c5fd; font-size: 0.85rem; margin: 0;">
+                                    <strong>Tip:</strong> For user-level config (all projects), add to VS Code user settings with <code>"**/infrastructure.yaml"</code> as the file pattern.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1167,12 +1208,12 @@ config:
     <button class="back-to-top" onclick="scrollToTop()" title="Back to top">↑</button>
 
     <script>
-        // PATTERNS_DATA_PLACEHOLDER
+        // PATTERNS_DATA_START (auto-generated - do not edit manually)
         const PATTERNS_DATA = {
   "patterns": {
     "aks-namespace": {
       "name": "aks-namespace",
-      "description": "Kubernetes namespace in a shared AKS cluster with resource quotas and RBAC.\nIncludes security groups for viewers, editors, and admins with automatic\nAzure Kubernetes Service RBAC role assignments.\n",
+      "description": "Kubernetes namespace in a shared AKS cluster with resource quotas and RBAC.\nIncludes security groups for viewers, editors, and admins with automatic\nAzure Kubernetes Service RBAC role assignments.",
       "category": "single-resource",
       "components": [
         "aks-namespace",
@@ -1319,14 +1360,282 @@ config:
           "aks_cluster_name": "aks-shared-dev",
           "aks_resource_group": "rg-aks-shared"
         }
+      }
+    },
+    "api-backend": {
+      "name": "api-backend",
+      "description": "Function App API backend with database (PostgreSQL, SQL, or MongoDB) and\nKey Vault integration. For microservice backends and REST APIs.",
+      "category": "composite",
+      "components": [
+        "function-app",
+        "postgresql/azure_sql/mongodb (selectable)",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "Microservice APIs",
+        "REST API backends",
+        "GraphQL servers",
+        "BFF (Backend for Frontend)"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "function_sku": "FC1",
+            "db_sku": "Free",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "function_sku": "Y1",
+            "db_sku": "Basic",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "function_sku": "B1",
+            "db_sku": "S0",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "function_sku": "Y1",
+            "db_sku": "Basic",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "function_sku": "B1",
+            "db_sku": "S1",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "function_sku": "S1",
+            "db_sku": "S2",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "function_sku": "B1",
+            "db_sku": "S0",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "function_sku": "S1",
+            "db_sku": "S2",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "function_sku": "P1v2",
+            "db_sku": "S3",
+            "enable_diagnostics": true
+          }
+        }
       },
-      "icon": "box",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "database_type": {
+              "type": "string",
+              "default": "azure_sql",
+              "enum": [
+                "azure_sql",
+                "postgresql",
+                "mongodb",
+                "none"
+              ]
+            }
+          },
+          {
+            "runtime": {
+              "type": "string",
+              "default": "python",
+              "enum": [
+                "python",
+                "node",
+                "dotnet",
+                "java"
+              ]
+            }
+          },
+          {
+            "runtime_version": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 30,
+          "staging": 65,
+          "prod": 260
+        },
+        "medium": {
+          "dev": 55,
+          "staging": 260,
+          "prod": 475
+        },
+        "large": {
+          "dev": 260,
+          "staging": 475,
+          "prod": 950
+        }
+      }
+    },
+    "data-pipeline": {
+      "name": "data-pipeline",
+      "description": "Complete data pipeline with Event Hub ingestion, Function App processing,\nData Lake storage, and optional Cosmos DB for processed data.",
+      "category": "composite",
+      "components": [
+        "eventhub (ingestion)",
+        "function-app (processor)",
+        "storage-account (data lake)",
+        "mongodb (processed data, optional)",
+        "keyvault (secrets)",
+        "security-groups",
+        "rbac-assignments",
+        "diagnostic-settings (staging/prod)"
+      ],
+      "use_cases": [
+        "IoT data ingestion",
+        "Event streaming",
+        "Log aggregation",
+        "Real-time analytics",
+        "ETL pipelines"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "eventhub_sku": "Basic",
+            "eventhub_capacity": 1,
+            "function_sku": "Y1",
+            "storage_replication": "LRS",
+            "partition_count": 2,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "eventhub_sku": "Basic",
+            "eventhub_capacity": 1,
+            "function_sku": "Y1",
+            "storage_replication": "LRS",
+            "partition_count": 4,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 2,
+            "function_sku": "B1",
+            "storage_replication": "GRS",
+            "partition_count": 8,
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "eventhub_sku": "Basic",
+            "eventhub_capacity": 1,
+            "function_sku": "Y1",
+            "storage_replication": "LRS",
+            "partition_count": 4,
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 2,
+            "function_sku": "B1",
+            "storage_replication": "GRS",
+            "partition_count": 8,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 4,
+            "function_sku": "S1",
+            "storage_replication": "RAGRS",
+            "partition_count": 16,
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 2,
+            "function_sku": "B1",
+            "storage_replication": "GRS",
+            "partition_count": 8,
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 4,
+            "function_sku": "S1",
+            "storage_replication": "RAGRS",
+            "partition_count": 16,
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "eventhub_sku": "Standard",
+            "eventhub_capacity": 8,
+            "function_sku": "P1v2",
+            "storage_replication": "RAGRS",
+            "partition_count": 32,
+            "enable_diagnostics": true
+          }
+        }
+      },
+      "config": {
+        "required": [
+          "name"
+        ],
+        "optional": [
+          {
+            "runtime": {
+              "type": "string",
+              "default": "python"
+            }
+          },
+          {
+            "enable_mongodb": {
+              "type": "boolean",
+              "default": true,
+              "description": "Include Cosmos DB for processed data"
+            }
+          },
+          {
+            "message_retention": {
+              "type": "number",
+              "default": 1,
+              "description": "Event Hub message retention in days"
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 30,
+          "staging": 80,
+          "prod": 250
+        },
+        "medium": {
+          "dev": 60,
+          "staging": 250,
+          "prod": 500
+        },
+        "large": {
+          "dev": 250,
+          "staging": 500,
+          "prod": 1000
+        }
+      }
     },
     "eventhub": {
       "name": "eventhub",
-      "description": "Azure Event Hubs namespace for high-throughput event streaming.\nIncludes Key Vault for connection strings and security groups\nfor sender/receiver access with RBAC.\n",
+      "description": "Azure Event Hubs namespace for high-throughput event streaming.\nIncludes Key Vault for connection strings and security groups\nfor sender/receiver access with RBAC.",
       "category": "single-resource",
       "components": [
         "eventhub",
@@ -1491,14 +1800,11 @@ config:
           "size": "small",
           "partition_count": 4
         }
-      },
-      "icon": "activity",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
+      }
     },
     "function-app": {
       "name": "function-app",
-      "description": "Azure Functions serverless compute with managed identity and Key Vault integration.\nAutomatically creates storage account and app service plan.\n",
+      "description": "Azure Functions serverless compute with managed identity and Key Vault integration.\nAutomatically creates storage account and app service plan.",
       "category": "single-resource",
       "components": [
         "function-app",
@@ -1622,14 +1928,11 @@ config:
           "staging": 73,
           "prod": 146
         }
-      },
-      "icon": "zap",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
+      }
     },
     "keyvault": {
       "name": "keyvault",
-      "description": "Azure Key Vault for secure secrets, keys, and certificates management.\nIncludes security groups, RBAC assignments, and optional access reviews.\n",
+      "description": "Azure Key Vault for secure secrets, keys, and certificates management.\nIncludes security groups, RBAC assignments, and optional access reviews.",
       "category": "single-resource",
       "components": [
         "keyvault",
@@ -1732,21 +2035,6 @@ config:
           }
         ]
       },
-      "excludable": [
-        {
-          "diagnostics": {
-            "description": "Disable diagnostic logs to Log Analytics",
-            "cost_impact": "~$20/month"
-          }
-        },
-        {
-          "access_review": {
-            "description": "Disable quarterly access reviews",
-            "requires_justification": true,
-            "prod_only": true
-          }
-        }
-      ],
       "estimated_costs": {
         "small": {
           "dev": 0.03,
@@ -1779,14 +2067,11 @@ config:
           "name": "secrets",
           "size": "small"
         }
-      },
-      "icon": "key",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
+      }
     },
     "linux-vm": {
       "name": "linux-vm",
-      "description": "Azure Linux Virtual Machine with managed identity and SSH key management.\nSSH keys are automatically generated and stored in Key Vault.\nIncludes security groups for operators and admins with RBAC.\n",
+      "description": "Azure Linux Virtual Machine with managed identity and SSH key management.\nSSH keys are automatically generated and stored in Key Vault.\nIncludes security groups for operators and admins with RBAC.",
       "category": "single-resource",
       "components": [
         "linux-vm",
@@ -1950,14 +2235,130 @@ config:
           "subnet_id": "/subscriptions/.../subnets/default",
           "admin_username": "azureuser"
         }
+      }
+    },
+    "microservice": {
+      "name": "microservice",
+      "description": "AKS namespace with Event Hub and Storage for event-driven microservices.\nIncludes RBAC for namespace access and Key Vault for secrets.",
+      "category": "composite",
+      "components": [
+        "aks-namespace",
+        "eventhub (optional)",
+        "storage-account (optional)",
+        "keyvault",
+        "security-groups",
+        "rbac-assignments"
+      ],
+      "use_cases": [
+        "Kubernetes microservices",
+        "Event-driven services",
+        "Container workloads",
+        "Distributed systems"
+      ],
+      "sizing": {
+        "small": {
+          "dev": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "eventhub_sku": "Basic",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "cpu_limit": "2",
+            "memory_limit": "4Gi",
+            "eventhub_sku": "Basic",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          }
+        },
+        "medium": {
+          "dev": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "eventhub_sku": "Basic",
+            "enable_diagnostics": false
+          },
+          "staging": {
+            "cpu_limit": "4",
+            "memory_limit": "8Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          }
+        },
+        "large": {
+          "dev": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          },
+          "staging": {
+            "cpu_limit": "8",
+            "memory_limit": "16Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          },
+          "prod": {
+            "cpu_limit": "16",
+            "memory_limit": "32Gi",
+            "eventhub_sku": "Standard",
+            "enable_diagnostics": true
+          }
+        }
       },
-      "icon": "server",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
+      "config": {
+        "required": [
+          "name",
+          "aks_cluster_name",
+          "aks_resource_group"
+        ],
+        "optional": [
+          {
+            "enable_eventhub": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "enable_storage": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ]
+      },
+      "estimated_costs": {
+        "small": {
+          "dev": 15,
+          "staging": 45,
+          "prod": 120
+        },
+        "medium": {
+          "dev": 45,
+          "staging": 120,
+          "prod": 250
+        },
+        "large": {
+          "dev": 120,
+          "staging": 250,
+          "prod": 500
+        }
+      }
     },
     "mongodb": {
       "name": "mongodb",
-      "description": "Azure Cosmos DB with MongoDB API for document database workloads.\nConnection strings stored in Key Vault with security group-based access.\nSupports automatic failover and configurable consistency levels.\n",
+      "description": "Azure Cosmos DB with MongoDB API for document database workloads.\nConnection strings stored in Key Vault with security group-based access.\nSupports automatic failover and configurable consistency levels.",
       "category": "single-resource",
       "components": [
         "mongodb",
@@ -2128,14 +2529,11 @@ config:
           "size": "small",
           "consistency_level": "Session"
         }
-      },
-      "icon": "database",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
+      }
     },
     "postgresql": {
       "name": "postgresql",
-      "description": "Azure Database for PostgreSQL Flexible Server with automatic secret management.\nConnection strings stored in Key Vault with security group-based access.\n",
+      "description": "Azure Database for PostgreSQL Flexible Server with automatic secret management.\nConnection strings stored in Key Vault with security group-based access.",
       "category": "single-resource",
       "components": [
         "postgresql",
@@ -2295,14 +2693,11 @@ config:
           "size": "small",
           "version": "14"
         }
-      },
-      "icon": "database",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
+      }
     },
     "sql-database": {
       "name": "sql-database",
-      "description": "Azure SQL Database (managed) with automatic credential management.\nConnection strings stored in Key Vault with security group-based access.\nSupports zone redundancy for high availability.\n",
+      "description": "Azure SQL Database (managed) with automatic credential management.\nConnection strings stored in Key Vault with security group-based access.\nSupports zone redundancy for high availability.",
       "category": "single-resource",
       "components": [
         "sql-database",
@@ -2451,14 +2846,11 @@ config:
           "name": "maindb",
           "size": "small"
         }
-      },
-      "icon": "database",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
+      }
     },
     "static-site": {
       "name": "static-site",
-      "description": "Azure Static Web Apps for hosting single-page applications and static sites.\nIncludes built-in CI/CD, global CDN, and free SSL certificates.\nSecurity groups for developers and admins.\n",
+      "description": "Azure Static Web Apps for hosting single-page applications and static sites.\nIncludes built-in CI/CD, global CDN, and free SSL certificates.\nSecurity groups for developers and admins.",
       "category": "single-resource",
       "components": [
         "static-web-app",
@@ -2611,14 +3003,11 @@ config:
           "app_location": "/src",
           "output_location": "dist"
         }
-      },
-      "icon": "globe",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
+      }
     },
     "storage": {
       "name": "storage",
-      "description": "Azure Storage Account with blob containers, security group access,\nand optional private endpoint.\n",
+      "description": "Azure Storage Account with blob containers, security group access,\nand optional private endpoint.",
       "category": "single-resource",
       "components": [
         "storage-account",
@@ -2739,421 +3128,11 @@ config:
           "staging": 50,
           "prod": 100
         }
-      },
-      "icon": "folder",
-      "category_display": "Single Resource",
-      "version": "1.0.0"
-    },
-    "api-backend": {
-      "name": "api-backend",
-      "description": "Function App API backend with database (PostgreSQL, SQL, or MongoDB) and\nKey Vault integration. For microservice backends and REST APIs.\n",
-      "category": "composite",
-      "components": [
-        "function-app",
-        "postgresql/azure_sql/mongodb (selectable)",
-        "keyvault",
-        "security-groups",
-        "rbac-assignments",
-        "diagnostic-settings (staging/prod)"
-      ],
-      "use_cases": [
-        "Microservice APIs",
-        "REST API backends",
-        "GraphQL servers",
-        "BFF (Backend for Frontend)"
-      ],
-      "sizing": {
-        "small": {
-          "dev": {
-            "function_sku": "FC1",
-            "db_sku": "Free",
-            "enable_diagnostics": false
-          },
-          "staging": {
-            "function_sku": "Y1",
-            "db_sku": "Basic",
-            "enable_diagnostics": true
-          },
-          "prod": {
-            "function_sku": "B1",
-            "db_sku": "S0",
-            "enable_diagnostics": true
-          }
-        },
-        "medium": {
-          "dev": {
-            "function_sku": "Y1",
-            "db_sku": "Basic",
-            "enable_diagnostics": false
-          },
-          "staging": {
-            "function_sku": "B1",
-            "db_sku": "S1",
-            "enable_diagnostics": true
-          },
-          "prod": {
-            "function_sku": "S1",
-            "db_sku": "S2",
-            "enable_diagnostics": true
-          }
-        },
-        "large": {
-          "dev": {
-            "function_sku": "B1",
-            "db_sku": "S0",
-            "enable_diagnostics": true
-          },
-          "staging": {
-            "function_sku": "S1",
-            "db_sku": "S2",
-            "enable_diagnostics": true
-          },
-          "prod": {
-            "function_sku": "P1v2",
-            "db_sku": "S3",
-            "enable_diagnostics": true
-          }
-        }
-      },
-      "config": {
-        "required": [
-          "name"
-        ],
-        "optional": [
-          {
-            "database_type": {
-              "type": "string",
-              "default": "azure_sql",
-              "enum": [
-                "azure_sql",
-                "postgresql",
-                "mongodb",
-                "none"
-              ]
-            }
-          },
-          {
-            "runtime": {
-              "type": "string",
-              "default": "python",
-              "enum": [
-                "python",
-                "node",
-                "dotnet",
-                "java"
-              ]
-            }
-          },
-          {
-            "runtime_version": {
-              "type": "string"
-            }
-          }
-        ]
-      },
-      "estimated_costs": {
-        "small": {
-          "dev": 30,
-          "staging": 65,
-          "prod": 260
-        },
-        "medium": {
-          "dev": 55,
-          "staging": 260,
-          "prod": 475
-        },
-        "large": {
-          "dev": 260,
-          "staging": 475,
-          "prod": 950
-        }
-      },
-      "icon": "cpu",
-      "category_display": "Composite",
-      "version": "1.0.0"
-    },
-    "data-pipeline": {
-      "name": "data-pipeline",
-      "description": "Complete data pipeline with Event Hub ingestion, Function App processing,\nData Lake storage, and optional Cosmos DB for processed data.\n",
-      "category": "composite",
-      "components": [
-        "eventhub (ingestion)",
-        "function-app (processor)",
-        "storage-account (data lake)",
-        "mongodb (processed data, optional)",
-        "keyvault (secrets)",
-        "security-groups",
-        "rbac-assignments",
-        "diagnostic-settings (staging/prod)"
-      ],
-      "use_cases": [
-        "IoT data ingestion",
-        "Event streaming",
-        "Log aggregation",
-        "Real-time analytics",
-        "ETL pipelines"
-      ],
-      "sizing": {
-        "small": {
-          "dev": {
-            "eventhub_sku": "Basic",
-            "eventhub_capacity": 1,
-            "function_sku": "Y1",
-            "storage_replication": "LRS",
-            "partition_count": 2,
-            "enable_diagnostics": false
-          },
-          "staging": {
-            "eventhub_sku": "Basic",
-            "eventhub_capacity": 1,
-            "function_sku": "Y1",
-            "storage_replication": "LRS",
-            "partition_count": 4,
-            "enable_diagnostics": true
-          },
-          "prod": {
-            "eventhub_sku": "Standard",
-            "eventhub_capacity": 2,
-            "function_sku": "B1",
-            "storage_replication": "GRS",
-            "partition_count": 8,
-            "enable_diagnostics": true
-          }
-        },
-        "medium": {
-          "dev": {
-            "eventhub_sku": "Basic",
-            "eventhub_capacity": 1,
-            "function_sku": "Y1",
-            "storage_replication": "LRS",
-            "partition_count": 4,
-            "enable_diagnostics": false
-          },
-          "staging": {
-            "eventhub_sku": "Standard",
-            "eventhub_capacity": 2,
-            "function_sku": "B1",
-            "storage_replication": "GRS",
-            "partition_count": 8,
-            "enable_diagnostics": true
-          },
-          "prod": {
-            "eventhub_sku": "Standard",
-            "eventhub_capacity": 4,
-            "function_sku": "S1",
-            "storage_replication": "RAGRS",
-            "partition_count": 16,
-            "enable_diagnostics": true
-          }
-        },
-        "large": {
-          "dev": {
-            "eventhub_sku": "Standard",
-            "eventhub_capacity": 2,
-            "function_sku": "B1",
-            "storage_replication": "GRS",
-            "partition_count": 8,
-            "enable_diagnostics": true
-          },
-          "staging": {
-            "eventhub_sku": "Standard",
-            "eventhub_capacity": 4,
-            "function_sku": "S1",
-            "storage_replication": "RAGRS",
-            "partition_count": 16,
-            "enable_diagnostics": true
-          },
-          "prod": {
-            "eventhub_sku": "Standard",
-            "eventhub_capacity": 8,
-            "function_sku": "P1v2",
-            "storage_replication": "RAGRS",
-            "partition_count": 32,
-            "enable_diagnostics": true
-          }
-        }
-      },
-      "config": {
-        "required": [
-          "name"
-        ],
-        "optional": [
-          {
-            "runtime": {
-              "type": "string",
-              "default": "python"
-            }
-          },
-          {
-            "enable_mongodb": {
-              "type": "boolean",
-              "default": true,
-              "description": "Include Cosmos DB for processed data"
-            }
-          },
-          {
-            "message_retention": {
-              "type": "number",
-              "default": 1,
-              "description": "Event Hub message retention in days"
-            }
-          }
-        ]
-      },
-      "excludable": [
-        {
-          "mongodb": {
-            "description": "Deploy without Cosmos DB (storage only)",
-            "cost_impact": "~$25-100/month"
-          }
-        }
-      ],
-      "estimated_costs": {
-        "small": {
-          "dev": 30,
-          "staging": 80,
-          "prod": 250
-        },
-        "medium": {
-          "dev": 60,
-          "staging": 250,
-          "prod": 500
-        },
-        "large": {
-          "dev": 250,
-          "staging": 500,
-          "prod": 1000
-        }
-      },
-      "icon": "git-branch",
-      "category_display": "Composite",
-      "version": "1.0.0"
-    },
-    "microservice": {
-      "name": "microservice",
-      "description": "AKS namespace with Event Hub and Storage for event-driven microservices.\nIncludes RBAC for namespace access and Key Vault for secrets.\n",
-      "category": "composite",
-      "components": [
-        "aks-namespace",
-        "eventhub (optional)",
-        "storage-account (optional)",
-        "keyvault",
-        "security-groups",
-        "rbac-assignments"
-      ],
-      "use_cases": [
-        "Kubernetes microservices",
-        "Event-driven services",
-        "Container workloads",
-        "Distributed systems"
-      ],
-      "sizing": {
-        "small": {
-          "dev": {
-            "cpu_limit": "2",
-            "memory_limit": "4Gi",
-            "eventhub_sku": "Basic",
-            "enable_diagnostics": false
-          },
-          "staging": {
-            "cpu_limit": "2",
-            "memory_limit": "4Gi",
-            "eventhub_sku": "Basic",
-            "enable_diagnostics": true
-          },
-          "prod": {
-            "cpu_limit": "4",
-            "memory_limit": "8Gi",
-            "eventhub_sku": "Standard",
-            "enable_diagnostics": true
-          }
-        },
-        "medium": {
-          "dev": {
-            "cpu_limit": "4",
-            "memory_limit": "8Gi",
-            "eventhub_sku": "Basic",
-            "enable_diagnostics": false
-          },
-          "staging": {
-            "cpu_limit": "4",
-            "memory_limit": "8Gi",
-            "eventhub_sku": "Standard",
-            "enable_diagnostics": true
-          },
-          "prod": {
-            "cpu_limit": "8",
-            "memory_limit": "16Gi",
-            "eventhub_sku": "Standard",
-            "enable_diagnostics": true
-          }
-        },
-        "large": {
-          "dev": {
-            "cpu_limit": "8",
-            "memory_limit": "16Gi",
-            "eventhub_sku": "Standard",
-            "enable_diagnostics": true
-          },
-          "staging": {
-            "cpu_limit": "8",
-            "memory_limit": "16Gi",
-            "eventhub_sku": "Standard",
-            "enable_diagnostics": true
-          },
-          "prod": {
-            "cpu_limit": "16",
-            "memory_limit": "32Gi",
-            "eventhub_sku": "Standard",
-            "enable_diagnostics": true
-          }
-        }
-      },
-      "config": {
-        "required": [
-          "name",
-          "aks_cluster_name",
-          "aks_resource_group"
-        ],
-        "optional": [
-          {
-            "enable_eventhub": {
-              "type": "boolean",
-              "default": true
-            }
-          },
-          {
-            "enable_storage": {
-              "type": "boolean",
-              "default": true
-            }
-          }
-        ]
-      },
-      "estimated_costs": {
-        "small": {
-          "dev": 15,
-          "staging": 45,
-          "prod": 120
-        },
-        "medium": {
-          "dev": 45,
-          "staging": 120,
-          "prod": 250
-        },
-        "large": {
-          "dev": 120,
-          "staging": 250,
-          "prod": 500
-        }
-      },
-      "icon": "layers",
-      "category_display": "Composite",
-      "version": "1.0.0"
+      }
     },
     "web-app": {
       "name": "web-app",
-      "description": "Full-stack web application pattern with static frontend, serverless API backend,\nand database. Includes managed identity, Key Vault integration, and security groups.\n",
+      "description": "Full-stack web application pattern with static frontend, serverless API backend,\nand database. Includes managed identity, Key Vault integration, and security groups.",
       "category": "composite",
       "components": [
         "static-web-app (frontend)",
@@ -3271,20 +3250,6 @@ config:
           }
         ]
       },
-      "excludable": [
-        {
-          "database": {
-            "description": "Deploy without database (frontend + API only)",
-            "cost_impact": "~$25-400/month depending on size"
-          }
-        },
-        {
-          "diagnostics": {
-            "description": "Disable diagnostic logs",
-            "cost_impact": "~$30/month"
-          }
-        }
-      ],
       "estimated_costs": {
         "small": {
           "dev": 35,
@@ -3320,182 +3285,9 @@ config:
           "database_type": "postgresql",
           "runtime": "python"
         }
-      },
-      "icon": "layout",
-      "category_display": "Composite",
-      "version": "1.0.0"
-    }
-  },
-  "sizing_defaults": {
-    "version": "1",
-    "environment_defaults": {
-      "dev": "small",
-      "staging": "medium",
-      "prod": "medium"
-    },
-    "cost_limits": {
-      "dev": 500,
-      "staging": 2000,
-      "prod": 10000
-    },
-    "conditional_features": {
-      "enable_diagnostics": {
-        "dev": false,
-        "staging": true,
-        "prod": true
-      },
-      "enable_access_review": {
-        "dev": true,
-        "staging": true,
-        "prod": true
-      },
-      "geo_redundant_backup": {
-        "dev": false,
-        "staging": false,
-        "prod": true
-      },
-      "purge_protection": {
-        "dev": false,
-        "staging": false,
-        "prod": false
-      }
-    },
-    "common_skus": {
-      "function_app": {
-        "small": "Y1",
-        "medium": "B1",
-        "large": "S1"
-      },
-      "app_service": {
-        "small": "B1",
-        "medium": "S1",
-        "large": "P1v2"
-      },
-      "postgresql": {
-        "small": "B_Standard_B1ms",
-        "medium": "GP_Standard_D2s_v3",
-        "large": "GP_Standard_D4s_v3"
-      },
-      "azure_sql": {
-        "small": "Basic",
-        "medium": "S1",
-        "large": "S2"
-      },
-      "storage": {
-        "small": {
-          "tier": "Standard",
-          "replication": "LRS"
-        },
-        "medium": {
-          "tier": "Standard",
-          "replication": "GRS"
-        },
-        "large": {
-          "tier": "Standard",
-          "replication": "RAGRS"
-        }
-      },
-      "keyvault": {
-        "small": "standard",
-        "medium": "standard",
-        "large": "premium"
-      },
-      "eventhub": {
-        "small": "Basic",
-        "medium": "Standard",
-        "large": "Standard"
-      },
-      "linux_vm": {
-        "small": "Standard_B1s",
-        "medium": "Standard_B2s",
-        "large": "Standard_D2s_v3"
-      },
-      "aks_namespace": {
-        "small": {
-          "cpu_limit": "2",
-          "memory_limit": "4Gi",
-          "pod_limit": 20
-        },
-        "medium": {
-          "cpu_limit": "4",
-          "memory_limit": "8Gi",
-          "pod_limit": 50
-        },
-        "large": {
-          "cpu_limit": "8",
-          "memory_limit": "16Gi",
-          "pod_limit": 100
-        }
-      }
-    },
-    "retention": {
-      "soft_delete": {
-        "dev": 7,
-        "staging": 30,
-        "prod": 90
-      },
-      "backup": {
-        "dev": 7,
-        "staging": 14,
-        "prod": 35
-      },
-      "logs": {
-        "dev": 7,
-        "staging": 30,
-        "prod": 90
       }
     }
   },
-  "metadata": {
-    "pattern_count": 14,
-    "generated_at": "2026-01-25T01:43:33.853586+00:00",
-    "categories": {
-      "single-resource": 10,
-      "composite": 4
-    }
-  },
-  "locations": [
-    {
-      "value": "eastus",
-      "label": "East US"
-    },
-    {
-      "value": "eastus2",
-      "label": "East US 2"
-    },
-    {
-      "value": "westus",
-      "label": "West US"
-    },
-    {
-      "value": "westus2",
-      "label": "West US 2"
-    },
-    {
-      "value": "centralus",
-      "label": "Central US"
-    },
-    {
-      "value": "northeurope",
-      "label": "North Europe"
-    },
-    {
-      "value": "westeurope",
-      "label": "West Europe"
-    },
-    {
-      "value": "uksouth",
-      "label": "UK South"
-    },
-    {
-      "value": "southeastasia",
-      "label": "Southeast Asia"
-    },
-    {
-      "value": "australiaeast",
-      "label": "Australia East"
-    }
-  ],
   "environments": [
     {
       "value": "dev",
@@ -3511,6 +3303,7 @@ config:
     }
   ]
 };
+        // PATTERNS_DATA_END
 
         // Application State
         const state = {

@@ -108,9 +108,10 @@ jobs:
               sys.exit(1)
 
           valid_patterns = [
-              'keyvault', 'postgresql', 'mongodb', 'storage', 'function-app',
-              'sql-database', 'eventhub', 'aks-namespace', 'linux-vm', 'static-site',
-              'web-app', 'api-backend', 'microservice', 'data-pipeline'
+              # Single-resource patterns (auto-generated)
+              'aks-namespace', 'eventhub', 'function-app', 'keyvault', 'linux-vm', 'mongodb', 'postgresql', 'sql-database', 'static-site', 'storage',
+              # Composite patterns (auto-generated)
+              'api-backend', 'data-pipeline', 'microservice', 'web-app'
           ]
 
           # Cache for version validation

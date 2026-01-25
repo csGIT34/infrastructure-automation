@@ -1,12 +1,17 @@
 name: Validate Pattern Sync
 
 on:
+  workflow_dispatch:  # Allow manual triggering
   pull_request:
     paths:
       - 'mcp-server/src/index.ts'
       - 'templates/infrastructure-workflow.yaml'
       - 'config/patterns/*.yaml'
       - 'terraform/patterns/*/main.tf'
+      - 'schemas/*.json'
+      - 'scripts/generate-schema.py'
+      - 'web/index.html'
+      - 'mcp-server/src/patterns.generated.json'
   push:
     branches:
       - main
@@ -15,6 +20,10 @@ on:
       - 'templates/infrastructure-workflow.yaml'
       - 'config/patterns/*.yaml'
       - 'terraform/patterns/*/main.tf'
+      - 'schemas/*.json'
+      - 'scripts/generate-schema.py'
+      - 'web/index.html'
+      - 'mcp-server/src/patterns.generated.json'
 
 jobs:
   validate-sync:
@@ -158,6 +167,15 @@ jobs:
           print("\n✅ All patterns are in sync!")
           EOF
 
+      - name: Validate generated files are up to date
+        run: |
+          echo "Checking if generated files are up to date..."
+          echo "  - schemas/infrastructure.yaml.json"
+          echo "  - web/index.html (PATTERNS_DATA)"
+          echo "  - templates/infrastructure-workflow.yaml (valid_patterns)"
+          echo "  - mcp-server/src/patterns.generated.json"
+          python scripts/generate-schema.py --check
+
       - name: Create summary
         if: always()
         run: |
@@ -197,3 +215,16 @@ jobs:
               done
             fi
           fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Generated Files" >> $GITHUB_STEP_SUMMARY
+          echo "These files are auto-generated from \`config/patterns/*.yaml\`:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Purpose |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`schemas/infrastructure.yaml.json\` | JSON Schema for IDE validation |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`web/index.html\` | Portal PATTERNS_DATA |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`templates/infrastructure-workflow.yaml\` | valid_patterns list |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`mcp-server/src/patterns.generated.json\` | MCP server pattern data |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Regenerate with: \`python scripts/generate-schema.py\`" >> $GITHUB_STEP_SUMMARY
