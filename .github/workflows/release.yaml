@@ -303,6 +303,7 @@ jobs:
           echo "Updated $CHANGELOG_FILE"
 
       - name: Commit VERSION and CHANGELOG updates
+        continue-on-error: true  # Don't fail the release if commit fails (race condition with parallel releases)
         run: |
           PATTERN="${{ needs.parse-tag.outputs.pattern }}"
           VERSION="${{ needs.parse-tag.outputs.version }}"
@@ -318,7 +319,10 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore($PATTERN): release v$VERSION"
-            git push origin HEAD:main
+            # Try to push, but don't fail if there's a race condition
+            # The CHANGELOG will be updated on the next release
+            git pull --rebase origin main || true
+            git push origin HEAD:main || echo "::warning::Could not push CHANGELOG update. Will be included in next release."
           fi
 
       - name: Create GitHub Release
