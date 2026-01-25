@@ -3,6 +3,11 @@
 All notable changes to the static-site pattern.
 
 
+## [2.0.0] - 2026-01-25
+
+No notable changes in this release.
+
+
 ## [1.0.1] - 2026-01-25
 
 ### Bug Fixes
