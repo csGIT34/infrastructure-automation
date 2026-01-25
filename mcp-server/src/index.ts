@@ -1292,11 +1292,18 @@ function validatePatternRequest(yamlContent: string): string {
     const config = configs[0];
 
     // Validate top-level structure - only allowed keys
-    const allowedTopLevel = ["version", "metadata", "pattern", "config", "action"];
+    const allowedTopLevel = ["version", "metadata", "pattern", "pattern_version", "config", "action"];
     for (const key of Object.keys(config)) {
       if (!allowedTopLevel.includes(key)) {
         errors.push(`Unknown top-level key '${key}'. Only allowed: ${allowedTopLevel.join(", ")}`);
       }
+    }
+
+    // Validate pattern_version (required)
+    if (!config.pattern_version) {
+      errors.push("Missing 'pattern_version' field. You must pin to a specific version (e.g., '1.0.0')");
+    } else if (!/^\d+\.\d+\.\d+(-[a-z0-9]+)?$/.test(config.pattern_version)) {
+      errors.push(`Invalid pattern_version format '${config.pattern_version}'. Expected: X.Y.Z (e.g., 1.0.0)`);
     }
 
     // Validate action field (optional, defaults to "create")
