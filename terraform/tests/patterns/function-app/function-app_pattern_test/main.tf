@@ -30,8 +30,9 @@ variable "location" {
 }
 
 variable "owner_email" {
-  description = "Owner email for security groups"
+  description = "Owner email for security groups (optional for tests)"
   type        = string
+  default     = ""
 }
 
 
@@ -135,7 +136,8 @@ module "security_groups" {
       description = "Administrators for ${local.name} function app (test)"
     }
   ]
-  owner_emails = [var.owner_email]
+  # Only pass owner_emails if owner_email is set, otherwise empty list
+  owner_emails = var.owner_email != "" ? [var.owner_email] : []
 }
 
 # RBAC Assignments

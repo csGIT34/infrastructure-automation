@@ -20,6 +20,11 @@ provider "azuread" {}
 
 provider "msgraph" {}
 
+# Variables from terraform.tfvars
+variables {
+  test_owner_email = ""  # Passed via -var-file
+}
+
 # Generate unique suffix
 run "setup" {
   command = apply
@@ -38,6 +43,7 @@ run "deploy_microservice_pattern" {
 
   variables {
     resource_suffix = run.setup.suffix
+    owner_email     = var.test_owner_email
   }
 
   # === Event Hub ===

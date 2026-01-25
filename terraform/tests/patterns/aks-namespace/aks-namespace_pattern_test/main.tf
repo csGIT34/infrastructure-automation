@@ -32,8 +32,9 @@ variable "location" {
 }
 
 variable "owner_email" {
-  description = "Owner email for security groups"
+  description = "Owner email for security groups (optional for tests)"
   type        = string
+  default     = ""
 }
 
 locals {
@@ -77,7 +78,8 @@ module "security_groups" {
     { suffix = "k8s-editors", description = "Edit access to ${local.name} namespace (test)" },
     { suffix = "k8s-admins", description = "Admin access to ${local.name} namespace (test)" }
   ]
-  owner_emails = [var.owner_email]
+  # Only pass owner_emails if owner_email is set, otherwise empty list
+  owner_emails = var.owner_email != "" ? [var.owner_email] : []
 }
 
 # Access Reviews for Security Groups
