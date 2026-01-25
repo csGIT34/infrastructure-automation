@@ -980,6 +980,34 @@
                             </p>
                         </div>
                     </div>
+
+                    <div class="collapsible">
+                        <div class="collapsible-header" onclick="toggleCollapsible(this.parentElement)">
+                            <h3>Pattern Versioning</h3>
+                            <span class="collapsible-icon">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 1rem;">
+                                Each pattern has independent versioning using semantic versioning (semver). You must pin to a specific version in your configuration.
+                            </p>
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Version Format:</strong></p>
+                            <ul style="color: #a1a1aa; font-size: 0.85rem; padding-left: 1.5rem;">
+                                <li><strong>Major</strong> (X.0.0) - Breaking changes, review before upgrading</li>
+                                <li><strong>Minor</strong> (0.X.0) - New features, backward compatible</li>
+                                <li><strong>Patch</strong> (0.0.X) - Bug fixes, safe to upgrade</li>
+                            </ul>
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-top: 1rem; margin-bottom: 0.5rem;"><strong>Upgrading Versions:</strong></p>
+                            <ol style="color: #a1a1aa; font-size: 0.85rem; padding-left: 1.5rem;">
+                                <li>Check the <a href="https://github.com/csGIT34/infrastructure-automation/releases" target="_blank" style="color: #3b82f6;">releases page</a> for available versions</li>
+                                <li>Review release notes for breaking changes</li>
+                                <li>Update <code>pattern_version</code> in your infrastructure.yaml</li>
+                                <li>Create a PR to review the plan preview</li>
+                            </ol>
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-top: 1rem;">
+                                <strong>Tip:</strong> Use the update checker workflow to receive automated PRs when new versions are available.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3482,10 +3510,10 @@
                     </div>
                     <div class="form-group">
                         <label>Pattern Version <span class="label-hint">(pin to specific version)</span></label>
-                        <input type="text" id="config-version" value="${pattern.version || '1.0.0'}"
-                               onchange="state.currentVersion = this.value"
-                               placeholder="e.g., 1.0.0">
-                        <small class="field-hint">Current: v${pattern.version || '1.0.0'} · <a href="https://github.com/csGIT34/infrastructure-automation/releases" target="_blank">View releases</a></small>
+                        <select id="config-version" onchange="state.currentVersion = this.value">
+                            <option value="${pattern.version || '1.0.0'}">${pattern.version || '1.0.0'} (current)</option>
+                        </select>
+                        <small class="field-hint">Loading available versions... · <a href="https://github.com/csGIT34/infrastructure-automation/releases" target="_blank">View all releases</a></small>
                     </div>
                 </div>
             `;
@@ -3524,6 +3552,9 @@
             }
 
             form.innerHTML = html;
+
+            // Fetch available versions for this pattern
+            fetchPatternVersions(patternName);
 
             // Set default values
             if (state.editingIndex >= 0) {
@@ -3602,6 +3633,85 @@
                 const costEl = document.getElementById('pattern-cost');
                 if (costEl) costEl.textContent = cost || 0;
             }
+        }
+
+        // Cache for pattern versions
+        const patternVersionsCache = {};
+
+        async function fetchPatternVersions(patternName) {
+            const select = document.getElementById('config-version');
+            const hint = select.parentElement.querySelector('.field-hint');
+            const pattern = PATTERNS_DATA.patterns[patternName];
+            const currentVersion = pattern.version || '1.0.0';
+
+            // Check cache first
+            if (patternVersionsCache[patternName]) {
+                populateVersionDropdown(select, patternVersionsCache[patternName], currentVersion);
+                hint.innerHTML = `<a href="https://github.com/csGIT34/infrastructure-automation/releases" target="_blank">View all releases</a>`;
+                return;
+            }
+
+            try {
+                // Fetch releases from GitHub API
+                const response = await fetch('https://api.github.com/repos/csGIT34/infrastructure-automation/releases');
+                if (!response.ok) throw new Error('Failed to fetch releases');
+
+                const releases = await response.json();
+
+                // Filter releases for this pattern (format: pattern/vX.Y.Z)
+                const patternReleases = releases
+                    .filter(r => r.tag_name.startsWith(`${patternName}/v`))
+                    .map(r => ({
+                        version: r.tag_name.replace(`${patternName}/v`, ''),
+                        tag: r.tag_name,
+                        name: r.name,
+                        prerelease: r.prerelease,
+                        url: r.html_url
+                    }))
+                    .sort((a, b) => {
+                        // Sort by semver descending
+                        const aParts = a.version.split('.').map(Number);
+                        const bParts = b.version.split('.').map(Number);
+                        for (let i = 0; i < 3; i++) {
+                            if (bParts[i] !== aParts[i]) return bParts[i] - aParts[i];
+                        }
+                        return 0;
+                    });
+
+                // Cache the results
+                patternVersionsCache[patternName] = patternReleases;
+
+                if (patternReleases.length > 0) {
+                    populateVersionDropdown(select, patternReleases, currentVersion);
+                    hint.innerHTML = `${patternReleases.length} version(s) available · <a href="https://github.com/csGIT34/infrastructure-automation/releases" target="_blank">View all releases</a>`;
+                } else {
+                    // No releases found, keep current version
+                    hint.innerHTML = `No releases found · <a href="https://github.com/csGIT34/infrastructure-automation/releases" target="_blank">View all releases</a>`;
+                }
+            } catch (error) {
+                console.warn('Failed to fetch pattern versions:', error);
+                hint.innerHTML = `Could not load versions · <a href="https://github.com/csGIT34/infrastructure-automation/releases" target="_blank">View all releases</a>`;
+            }
+        }
+
+        function populateVersionDropdown(select, versions, currentVersion) {
+            const selectedValue = state.currentVersion || currentVersion;
+
+            select.innerHTML = versions.map(v => {
+                const label = v.version === currentVersion
+                    ? `${v.version} (current)`
+                    : (v.prerelease ? `${v.version} (pre-release)` : v.version);
+                const selected = v.version === selectedValue ? 'selected' : '';
+                return `<option value="${v.version}" ${selected}>${label}</option>`;
+            }).join('');
+
+            // If selected version isn't in the list, add it
+            if (!versions.find(v => v.version === selectedValue)) {
+                select.innerHTML = `<option value="${selectedValue}" selected>${selectedValue}</option>` + select.innerHTML;
+            }
+
+            // Update state
+            state.currentVersion = select.value;
         }
 
         // Add Pattern to Request
