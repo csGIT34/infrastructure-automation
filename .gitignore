@@ -58,3 +58,5 @@ package-lock.json
 !mcp-server/package-lock.json
 *.tgz
 .claude/settings.local.json
+.claude/settings.local.json
+docs/notes.txt
