@@ -187,8 +187,8 @@ module "security_groups" {
   owner_emails = var.owner_email != "" ? [var.owner_email] : []
 }
 
-# RBAC Assignments
-module "rbac" {
+# RBAC Assignments for Security Groups (no skip check needed)
+module "rbac_groups" {
   source = "../../../../modules/rbac-assignments"
 
   assignments = [
@@ -221,8 +221,15 @@ module "rbac" {
       role_definition_name = "Storage Blob Data Contributor"
       scope                = azurerm_storage_account.datalake.id
       description          = "Developers - storage write access (test)"
-    },
-    # Function app needs Event Hub receiver and storage writer
+    }
+  ]
+}
+
+# RBAC Assignments for Managed Identity (skip check needed)
+module "rbac_identity" {
+  source = "../../../../modules/rbac-assignments"
+
+  assignments = [
     {
       principal_id         = module.function_app.principal_id
       role_definition_name = "Azure Event Hubs Data Receiver"
@@ -237,7 +244,7 @@ module "rbac" {
     }
   ]
 
-  skip_service_principal_check = true  # For managed identity
+  skip_service_principal_check = true
 }
 
 # Access Reviews for Security Groups
