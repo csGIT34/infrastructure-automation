@@ -283,6 +283,7 @@ jobs:
       needs.detect-changes.outputs.has_changes == 'true' &&
       (needs.detect-changes.outputs.run_all == 'true' ||
        needs.detect-changes.outputs.modules_to_test != '[]')
+    environment: release
 
     permissions:
       id-token: write
@@ -351,6 +352,7 @@ jobs:
       needs.detect-changes.outputs.has_changes == 'true' &&
       (needs.detect-changes.outputs.run_all == 'true' ||
        needs.detect-changes.outputs.patterns_to_test != '[]')
+    environment: release
 
     permissions:
       id-token: write
