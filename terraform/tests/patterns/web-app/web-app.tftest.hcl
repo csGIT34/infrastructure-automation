@@ -21,7 +21,8 @@ provider "azuread" {}
 
 # Variables from terraform.tfvars
 variables {
-  test_owner_email = ""  # Passed via -var-file
+  test_owner_email = ""       # Passed via -var-file
+  test_location    = "eastus" # Passed via -var-file, default eastus
 }
 
 run "setup" {
@@ -41,6 +42,7 @@ run "deploy_web_app_pattern" {
   variables {
     resource_suffix = run.setup.suffix
     owner_email     = var.test_owner_email
+    location        = var.test_location
   }
 
   # === Frontend (Static Web App) ===
