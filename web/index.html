@@ -3675,6 +3675,21 @@ config:
                 const token = await getAccessToken();
                 console.log('Token acquired, length:', token.length);
 
+                // Decode and log the token payload for debugging
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    console.log('Token payload:', {
+                        aud: payload.aud,
+                        iss: payload.iss,
+                        sub: payload.sub,
+                        scp: payload.scp,
+                        azp: payload.azp,
+                        exp: new Date(payload.exp * 1000).toISOString()
+                    });
+                } catch (e) {
+                    console.log('Could not decode token');
+                }
+
                 const response = await fetch(apiConfig.endpoint, {
                     method: 'POST',
                     headers: {
