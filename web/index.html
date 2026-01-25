@@ -248,6 +248,21 @@
             margin-bottom: 1rem;
         }
 
+        .nav-link {
+            padding: 0.25rem 0.5rem;
+            background: #3f3f46;
+            border-radius: 4px;
+            color: #e5e5e5;
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .nav-link:hover {
+            background: #7c3aed;
+            color: white;
+        }
+
         .pattern-filters {
             display: flex;
             gap: 0.5rem;
@@ -1080,9 +1095,34 @@ config:
         <div id="tab-reference" class="tab-content">
             <div class="panel">
                 <h2>Available Patterns</h2>
-                <div class="info-box">
-                    <span id="pattern-total-count">14</span> patterns available with full documentation below.
+
+                <!-- Search and Filter -->
+                <div style="margin-bottom: 1.5rem;">
+                    <input type="text" id="pattern-reference-search" placeholder="Search patterns..."
+                           oninput="filterPatternReference(this.value)"
+                           style="width: 100%; max-width: 400px; padding: 0.75rem; border-radius: 6px; border: 1px solid #3f3f46; background: #27272a; color: #e5e5e5;">
                 </div>
+
+                <!-- Quick Navigation -->
+                <div id="pattern-nav" style="margin-bottom: 1.5rem; padding: 1rem; background: #1e1e2e; border-radius: 8px;">
+                    <div style="margin-bottom: 1rem;">
+                        <h4 style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;">Single Resource Patterns</h4>
+                        <div id="nav-single" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    <div>
+                        <h4 style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;">Composite Patterns</h4>
+                        <div id="nav-composite" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <span id="pattern-total-count">14</span> patterns available. Click a pattern name above to jump to its documentation.
+                </div>
+
                 <div id="pattern-reference-list">
                     <!-- Populated by JS -->
                 </div>
@@ -3698,7 +3738,9 @@ config:
             } else if (type === 'number') {
                 inputHtml = `<input type="number" id="config-${name}" value="${defaultVal}" placeholder="${defaultVal}" oninput="updateConfig('${name}', this.value)">`;
             } else {
-                inputHtml = `<input type="text" id="config-${name}" value="${defaultVal}" placeholder="${description || name}" oninput="updateConfig('${name}', this.value)">`;
+                // Use simple placeholder - description may contain HTML which breaks attributes
+                const placeholder = name === 'name' ? 'e.g., secrets, cache, data' : (def.placeholder || name);
+                inputHtml = `<input type="text" id="config-${name}" value="${defaultVal}" placeholder="${placeholder}" oninput="updateConfig('${name}', this.value)">`;
             }
 
             return `
@@ -4064,9 +4106,26 @@ config:
         // Pattern Reference
         function renderPatternReference() {
             const container = document.getElementById('pattern-reference-list');
-            container.innerHTML = '';
+            const navSingle = document.getElementById('nav-single');
+            const navComposite = document.getElementById('nav-composite');
+            const countDisplay = document.getElementById('pattern-total-count');
 
-            Object.entries(PATTERNS_DATA.patterns).forEach(([name, pattern]) => {
+            container.innerHTML = '';
+            navSingle.innerHTML = '';
+            navComposite.innerHTML = '';
+
+            const patterns = Object.entries(PATTERNS_DATA.patterns);
+            countDisplay.textContent = patterns.length;
+
+            // Build navigation links
+            patterns.forEach(([name, pattern]) => {
+                const isComposite = pattern.category === 'composite';
+                const navContainer = isComposite ? navComposite : navSingle;
+                navContainer.innerHTML += `<a href="#pattern-${name}" class="nav-link">${name}</a>`;
+            });
+
+            // Render pattern details
+            patterns.forEach(([name, pattern]) => {
                 // Generate sizing details table
                 const sizingHtml = pattern.sizing ? `
                     <div class="pattern-detail-section">
@@ -4143,7 +4202,7 @@ config:
                 const categoryClass = (pattern.category || 'single-resource');
 
                 const html = `
-                    <div class="pattern-detail">
+                    <div class="pattern-detail" id="pattern-${name}" data-pattern-name="${name}">
                         <div class="pattern-detail-header">
                             <div>
                                 <span class="pattern-icon icon-${pattern.icon || 'package'}" style="font-size: 1.5rem; margin-right: 0.5rem;"></span>
@@ -4190,6 +4249,34 @@ config:
             if (typeof value === 'boolean') return value ? 'Yes' : 'No';
             if (typeof value === 'number') return value.toLocaleString();
             return value;
+        }
+
+        // Filter Pattern Reference by search term
+        function filterPatternReference(searchTerm) {
+            const patterns = document.querySelectorAll('#pattern-reference-list .pattern-detail');
+            const search = searchTerm.toLowerCase().trim();
+            let visibleCount = 0;
+
+            patterns.forEach(pattern => {
+                const name = pattern.dataset.patternName || '';
+                const content = pattern.textContent.toLowerCase();
+
+                if (search === '' || name.includes(search) || content.includes(search)) {
+                    pattern.style.display = '';
+                    visibleCount++;
+                } else {
+                    pattern.style.display = 'none';
+                }
+            });
+
+            // Update count display
+            const countDisplay = document.getElementById('pattern-total-count');
+            const total = patterns.length;
+            if (search === '') {
+                countDisplay.textContent = total;
+            } else {
+                countDisplay.textContent = `${visibleCount} of ${total}`;
+            }
         }
 
         // Initialize
