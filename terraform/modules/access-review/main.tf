@@ -148,6 +148,12 @@ resource "msgraph_resource" "access_review" {
       }
     }
   }
+
+  # Access reviews can be deleted externally (expiration, manual deletion).
+  # If deleted, Terraform will recreate on next apply instead of failing on update.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 output "review_id" {
