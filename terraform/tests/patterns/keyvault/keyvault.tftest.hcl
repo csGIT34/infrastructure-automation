@@ -17,6 +17,11 @@ provider "azurerm" {
 
 provider "azuread" {}
 
+# Variables from terraform.tfvars
+variables {
+  test_owner_email = ""  # Passed via -var-file
+}
+
 run "setup" {
   command = apply
   module {
@@ -33,6 +38,7 @@ run "deploy_keyvault_pattern" {
 
   variables {
     resource_suffix = run.setup.suffix
+    owner_email     = var.test_owner_email
   }
 
   # === Key Vault ===
