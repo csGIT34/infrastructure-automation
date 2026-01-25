@@ -5,6 +5,13 @@ All notable changes to the storage pattern.
 
 ## [2.0.0] - 2026-01-25
 
+### Other Changes
+- chore(storage): release v2.0.0 (2d45333)
+
+
+
+## [2.0.0] - 2026-01-25
+
 No notable changes in this release.
 
 
