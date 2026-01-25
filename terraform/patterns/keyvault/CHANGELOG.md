@@ -5,6 +5,13 @@ All notable changes to the keyvault pattern.
 
 ## [2.0.0] - 2026-01-25
 
+### Other Changes
+- chore(keyvault): release v2.0.0 (b46604b)
+
+
+
+## [2.0.0] - 2026-01-25
+
 No notable changes in this release.
 
 
