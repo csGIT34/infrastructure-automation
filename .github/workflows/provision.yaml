@@ -1,5 +1,7 @@
 name: Infrastructure Provision
 
+run-name: "${{ github.event_name == 'repository_dispatch' && format('provision: {0}', github.event.client_payload.repository) || format('provision: {0}', inputs.repository) }}"
+
 on:
   repository_dispatch:
     types: [provision]
@@ -210,6 +212,7 @@ jobs:
   # Job 2: Process each pattern sequentially using matrix
   # =========================================================================
   provision-pattern:
+    name: "${{ matrix.pattern.action }}: ${{ matrix.pattern.pattern }} (${{ matrix.pattern.environment }})"
     needs: resolve-patterns
     runs-on: ubuntu-latest
     if: ${{ needs.resolve-patterns.outputs.patterns_json != '[]' }}
