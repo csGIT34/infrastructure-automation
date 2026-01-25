@@ -1183,7 +1183,7 @@ function validateSingleDocument(config: any, index: number = 0): any {
   const action = config.action || "create";
 
   // Validate top-level structure
-  const allowedTopLevel = ["version", "metadata", "pattern", "config", "action"];
+  const allowedTopLevel = ["version", "metadata", "pattern", "pattern_version", "config", "action"];
   for (const key of Object.keys(config)) {
     if (!allowedTopLevel.includes(key)) {
       errors.push(`Unknown top-level key '${key}'`);
@@ -1193,6 +1193,13 @@ function validateSingleDocument(config: any, index: number = 0): any {
   // Validate action
   if (!["create", "destroy"].includes(action)) {
     errors.push(`Invalid action '${action}'. Must be 'create' or 'destroy'`);
+  }
+
+  // Validate pattern_version (required)
+  if (!config.pattern_version) {
+    errors.push("Missing 'pattern_version' field. You must pin to a specific version (e.g., '1.0.0')");
+  } else if (!/^\d+\.\d+\.\d+(-[a-z0-9]+)?$/.test(config.pattern_version)) {
+    errors.push(`Invalid pattern_version format '${config.pattern_version}'. Expected: X.Y.Z (e.g., 1.0.0)`);
   }
 
   // Validate metadata

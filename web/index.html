@@ -4028,6 +4028,19 @@ config:
         }
 
         // Generate YAML
+        // Helper to safely format YAML string values
+        function yamlString(value) {
+            if (typeof value !== 'string') return String(value);
+            // Quote if contains special chars or looks like a number/bool/null
+            if (/[:#\[\]{}|>&*!?,'"\\@`]/.test(value) ||
+                /^[\s-]/.test(value) ||
+                /\s$/.test(value) ||
+                /^(true|false|null|yes|no|on|off|\d+\.?\d*|0x[0-9a-f]+)$/i.test(value)) {
+                return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+            }
+            return value;
+        }
+
         function generateYaml() {
             const metadata = getMetadata();
 
@@ -4040,17 +4053,22 @@ config:
                 const version = entry.version || pattern.version || '1.0.0';
 
                 const lines = [
-                    'version: "1"',
-                    `action: ${entry.action}`,
-                    'metadata:',
-                    `  project: ${metadata.project}`,
-                    `  environment: ${metadata.environment}`,
-                    `  business_unit: ${metadata.business_unit}`,
-                    '  owners:'
+                    'version: "1"'
                 ];
 
+                // Only include action if it's destroy (create is default)
+                if (entry.action === 'destroy') {
+                    lines.push('action: destroy');
+                }
+
+                lines.push('metadata:');
+                lines.push(`  project: ${yamlString(metadata.project)}`);
+                lines.push(`  environment: ${metadata.environment}`);
+                lines.push(`  business_unit: ${yamlString(metadata.business_unit)}`);
+                lines.push('  owners:');
+
                 metadata.owners.forEach(owner => {
-                    lines.push(`    - ${owner}`);
+                    lines.push(`    - ${yamlString(owner)}`);
                 });
 
                 lines.push(`  location: ${metadata.location}`);
@@ -4064,12 +4082,14 @@ config:
                         if (Array.isArray(value)) {
                             if (value.length > 0) {
                                 lines.push(`  ${key}:`);
-                                value.forEach(v => lines.push(`    - ${v}`));
+                                value.forEach(v => lines.push(`    - ${yamlString(v)}`));
                             }
                         } else if (typeof value === 'boolean') {
                             lines.push(`  ${key}: ${value}`);
-                        } else {
+                        } else if (typeof value === 'number') {
                             lines.push(`  ${key}: ${value}`);
+                        } else {
+                            lines.push(`  ${key}: ${yamlString(value)}`);
                         }
                     }
                 });
@@ -4077,7 +4097,7 @@ config:
                 return lines.join('\n');
             });
 
-            return docs.join('\n\n---\n');
+            return docs.join('\n---\n');
         }
 
         function updatePreview() {
