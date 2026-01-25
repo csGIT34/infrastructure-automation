@@ -2,14 +2,15 @@
 # Creates Entra ID access reviews for privileged groups using Microsoft Graph
 # Two-stage review: Group owners first, then member's manager
 # Requires Azure AD Premium P2 license
-#
-# NOTE: This module uses a "fire-and-forget" approach via Azure CLI.
-# The access review is created but NOT tracked in Terraform state.
-# This avoids 404 errors when access reviews are modified/deleted externally.
-# The review will only be recreated if the trigger values change.
 
 terraform {
   required_version = ">= 1.5.0"
+  required_providers {
+    msgraph = {
+      source  = "microsoft/msgraph"
+      version = "~> 0.2"
+    }
+  }
 }
 
 variable "group_id" {
@@ -76,9 +77,14 @@ locals {
       type     = "absoluteMonthly"
     }
   }
+}
 
-  # Build the access review JSON body
-  access_review_body = jsonencode({
+# Two-stage Access Review: Group Owners -> Member's Manager
+resource "msgraph_resource" "access_review" {
+  url         = "identityGovernance/accessReviews/definitions"
+  api_version = "v1.0"
+
+  body = {
     displayName             = "Access Review: ${var.group_name}"
     descriptionForAdmins    = "Two-stage access review for ${var.group_name}. Stage 1: Group owners. Stage 2: Member's manager."
     descriptionForReviewers = "Please review the members of ${var.group_name} and approve or deny their continued access."
@@ -89,6 +95,7 @@ locals {
       queryType     = "MicrosoftGraph"
     }
 
+    # Top-level reviewers empty - defined per stage
     reviewers = []
 
     stageSettings = [
@@ -140,37 +147,18 @@ locals {
         }
       }
     }
-  })
-}
-
-# Create access review via Azure CLI - NOT tracked in Terraform state
-# This avoids 404 errors when the review is modified/deleted externally in Entra ID
-resource "null_resource" "access_review" {
-  # Only recreate if these key values change
-  triggers = {
-    group_id   = var.group_id
-    group_name = var.group_name
-    frequency  = var.frequency
-    start_date = var.start_date
   }
 
-  provisioner "local-exec" {
-    command = <<-EOT
-      az rest \
-        --method POST \
-        --url "https://graph.microsoft.com/v1.0/identityGovernance/accessReviews/definitions" \
-        --headers "Content-Type=application/json" \
-        --body '${replace(local.access_review_body, "'", "'\\''")}' \
-        --output json || echo '{"status": "created_or_exists"}'
-    EOT
-
-    interpreter = ["/bin/bash", "-c"]
+  # Access reviews can be deleted externally (expiration, manual deletion).
+  # If deleted, Terraform will recreate on next apply instead of failing on update.
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
 output "review_id" {
-  description = "Access review trigger ID (not the actual Graph API ID - review is not tracked in state)"
-  value       = null_resource.access_review.id
+  description = "Access review schedule definition ID"
+  value       = msgraph_resource.access_review.id
 }
 
 output "review_name" {
@@ -179,7 +167,7 @@ output "review_name" {
 }
 
 output "enabled" {
-  description = "Whether access review creation was triggered"
+  description = "Whether access review was created"
   value       = true
 }
 
@@ -191,9 +179,4 @@ output "frequency" {
 output "stages" {
   description = "Review stages configured"
   value       = ["Group Owners", "Member's Manager"]
-}
-
-output "note" {
-  description = "Important note about state management"
-  value       = "Access review created via Graph API - not tracked in Terraform state to avoid 404 errors on external changes"
 }
