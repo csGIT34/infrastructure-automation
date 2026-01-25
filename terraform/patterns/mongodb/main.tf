@@ -12,10 +12,6 @@ terraform {
       source  = "hashicorp/azuread"
       version = "~> 2.0"
     }
-    msgraph = {
-      source  = "microsoft/msgraph"
-      version = "~> 0.2"
-    }
   }
   backend "azurerm" {
     use_oidc = true
@@ -31,9 +27,6 @@ provider "azuread" {
   use_oidc = true
 }
 
-provider "msgraph" {
-  use_oidc = true
-}
 
 # -----------------------------------------------------------------------------
 # Variables
