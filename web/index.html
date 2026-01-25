@@ -3591,10 +3591,33 @@ config:
                 html += `</div>`;
             }
 
-            // Optional fields
-            if (pattern.config && pattern.config.optional && pattern.config.optional.length > 0) {
+            // Governance section (always shown)
+            html += `
+                <div class="config-section">
+                    <h3>Governance</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="config-enable_access_review" onchange="updateConfig('enable_access_review', this.checked)" style="width: auto; margin-right: 0.5rem;">
+                            Enable Access Review
+                        </label>
+                        <div class="form-help">
+                            Quarterly review of security group membership. Reviewers are automatically set to group owners and member managers.
+                            <br><em style="color: #a1a1aa;">Note: Automatically enabled for production environments.</em>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Optional fields (filter out access review related fields since they're in governance section)
+            const optionalFields = (pattern.config && pattern.config.optional) || [];
+            const filteredOptional = optionalFields.filter(opt => {
+                const fieldName = typeof opt === 'string' ? opt : Object.keys(opt)[0];
+                return !['enable_access_review', 'access_reviewers'].includes(fieldName);
+            });
+
+            if (filteredOptional.length > 0) {
                 html += `<div class="config-section"><h3>Optional Configuration</h3>`;
-                pattern.config.optional.forEach(opt => {
+                filteredOptional.forEach(opt => {
                     const fieldName = typeof opt === 'string' ? opt : Object.keys(opt)[0];
                     const fieldDef = typeof opt === 'string' ? {} : opt[fieldName];
                     html += renderField(fieldName, false, fieldDef);
@@ -3647,10 +3670,20 @@ config:
         }
 
         function renderField(name, required, def = {}) {
+            // Skip access_reviewers - always uses group owners and member managers
+            if (name === 'access_reviewers') {
+                return '';
+            }
+
             const label = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             const type = def.type || 'string';
             const defaultVal = def.default !== undefined ? def.default : '';
-            const description = def.description || '';
+
+            // Provide helpful descriptions for common fields
+            let description = def.description || '';
+            if (name === 'name' && !description) {
+                description = 'Resource name suffix (combined with project name to create unique resource names)';
+            }
 
             let inputHtml = '';
 
