@@ -963,20 +963,84 @@
 
                     <div class="collapsible">
                         <div class="collapsible-header" onclick="toggleCollapsible(this.parentElement)">
-                            <h3>Multi-Pattern Requests</h3>
+                            <h3>Create &amp; Destroy Actions</h3>
                             <span class="collapsible-icon">▼</span>
                         </div>
                         <div class="collapsible-content">
                             <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 1rem;">
-                                You can provision multiple patterns in a single request using multi-document YAML (separated by <code>---</code>).
+                                Control whether resources are provisioned or torn down using the <code>action</code> field.
                             </p>
-                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Actions:</strong></p>
-                            <ul style="color: #a1a1aa; font-size: 0.85rem; padding-left: 1.5rem;">
+
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Available Actions:</strong></p>
+                            <ul style="color: #a1a1aa; font-size: 0.85rem; padding-left: 1.5rem; margin-bottom: 1rem;">
                                 <li><code>action: create</code> (default) - Provision new resources</li>
                                 <li><code>action: destroy</code> - Tear down existing resources</li>
                             </ul>
-                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-top: 0.5rem;">
-                                <strong>Execution order:</strong> All <code>destroy</code> actions run first, then <code>create</code> actions.
+
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Creating Resources:</strong></p>
+                            <pre style="background: #1e1e2e; padding: 0.75rem; border-radius: 4px; font-size: 0.8rem; overflow-x: auto; margin-bottom: 1rem;">version: "1"
+action: create  # Optional, this is the default
+metadata:
+  project: myapp
+  environment: dev
+  ...
+pattern: keyvault
+pattern_version: "1.0.0"
+config:
+  name: secrets</pre>
+
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Destroying Resources:</strong></p>
+                            <pre style="background: #1e1e2e; padding: 0.75rem; border-radius: 4px; font-size: 0.8rem; overflow-x: auto; margin-bottom: 1rem;">version: "1"
+action: destroy
+metadata:
+  project: myapp
+  environment: dev
+  ...
+pattern: keyvault
+pattern_version: "1.0.0"
+config:
+  name: secrets  # Must match the original name</pre>
+
+                            <div style="background: #422006; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem;">
+                                <p style="color: #fcd34d; font-size: 0.85rem; margin: 0;">
+                                    <strong>⚠️ Warning:</strong> Destroy actions permanently delete resources and data. Always verify the pattern name and config match exactly.
+                                </p>
+                            </div>
+
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Multi-Document YAML (Replace Resources):</strong></p>
+                            <p style="color: #a1a1aa; font-size: 0.85rem; margin-bottom: 0.5rem;">
+                                Combine multiple actions in one file using <code>---</code> separators:
+                            </p>
+                            <pre style="background: #1e1e2e; padding: 0.75rem; border-radius: 4px; font-size: 0.8rem; overflow-x: auto; margin-bottom: 1rem;"># Destroy old database
+---
+version: "1"
+action: destroy
+metadata:
+  project: myapp
+  environment: dev
+  business_unit: engineering
+  owners: [alice@company.com]
+pattern: postgresql
+pattern_version: "1.0.0"
+config:
+  name: olddb
+
+# Create new database
+---
+version: "1"
+action: create
+metadata:
+  project: myapp
+  environment: dev
+  business_unit: engineering
+  owners: [alice@company.com]
+pattern: postgresql
+pattern_version: "1.0.0"
+config:
+  name: newdb</pre>
+
+                            <p style="color: #a1a1aa; font-size: 0.85rem;">
+                                <strong>Execution order:</strong> All <code>destroy</code> actions run first, then <code>create</code> actions. This ensures resources are freed before new ones are provisioned.
                             </p>
                         </div>
                     </div>
@@ -3970,10 +4034,60 @@
             container.innerHTML = '';
 
             Object.entries(PATTERNS_DATA.patterns).forEach(([name, pattern]) => {
-                const env = 'dev';
+                // Generate sizing details table
+                const sizingHtml = pattern.sizing ? `
+                    <div class="pattern-detail-section">
+                        <h4>T-Shirt Sizing Details</h4>
+                        <p style="font-size: 0.85rem; color: #a1a1aa; margin-bottom: 0.75rem;">
+                            Each size resolves to environment-specific configurations. Default size: dev=small, staging=medium, prod=medium.
+                        </p>
+                        ${['small', 'medium', 'large'].map(size => {
+                            const sizeData = pattern.sizing[size];
+                            if (!sizeData) return '';
+
+                            // Get all unique keys across environments
+                            const allKeys = new Set();
+                            ['dev', 'staging', 'prod'].forEach(env => {
+                                if (sizeData[env]) {
+                                    Object.keys(sizeData[env]).forEach(k => allKeys.add(k));
+                                }
+                            });
+
+                            // Filter out internal/boolean keys for cleaner display
+                            const displayKeys = Array.from(allKeys).filter(k =>
+                                !k.startsWith('enable_') && k !== 'location'
+                            );
+
+                            if (displayKeys.length === 0) return '';
+
+                            return `
+                                <div style="margin-bottom: 1rem;">
+                                    <h5 style="color: #e5e5e5; font-size: 0.9rem; margin-bottom: 0.5rem; text-transform: capitalize;">${size}</h5>
+                                    <table class="sizing-table" style="font-size: 0.8rem;">
+                                        <tr>
+                                            <th>Property</th>
+                                            <th>Dev</th>
+                                            <th>Staging</th>
+                                            <th>Prod</th>
+                                        </tr>
+                                        ${displayKeys.map(key => `
+                                            <tr>
+                                                <td style="text-transform: capitalize;">${key.replace(/_/g, ' ')}</td>
+                                                <td><code>${formatSizingValue(sizeData.dev?.[key])}</code></td>
+                                                <td><code>${formatSizingValue(sizeData.staging?.[key])}</code></td>
+                                                <td><code>${formatSizingValue(sizeData.prod?.[key])}</code></td>
+                                            </tr>
+                                        `).join('')}
+                                    </table>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                ` : '';
+
                 const costHtml = pattern.estimated_costs ? `
                     <div class="pattern-detail-section">
-                        <h4>Estimated Monthly Cost</h4>
+                        <h4>Estimated Monthly Cost (USD)</h4>
                         <table class="sizing-table">
                             <tr>
                                 <th>Size</th>
@@ -4029,11 +4143,20 @@
                             </p>
                         </div>
 
+                        ${sizingHtml}
                         ${costHtml}
                     </div>
                 `;
                 container.innerHTML += html;
             });
+        }
+
+        // Helper function to format sizing values
+        function formatSizingValue(value) {
+            if (value === undefined || value === null) return '-';
+            if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+            if (typeof value === 'number') return value.toLocaleString();
+            return value;
         }
 
         // Initialize
