@@ -33,6 +33,7 @@ pattern: postgresql
 pattern_version: "1.0.0"              # Version that was used to create the resource
 config:
   name: olddb
+  version: "14"                       # PostgreSQL version
 
 # Document 1: Create new Key Vault for secrets
 ---
@@ -52,6 +53,7 @@ pattern_version: "1.0.0"              # Pin to specific version
 config:
   name: secrets
   size: small
+  enable_access_review: false         # Enable quarterly access reviews
 
 # Document 2: Create new storage account
 ---

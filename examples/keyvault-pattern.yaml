@@ -26,9 +26,5 @@ pattern_version: "1.0.0"              # Required - pin to specific version
 config:
   name: secrets
   size: small                         # small, medium, large (optional)
-
-  # Optional pattern-specific config:
-  # access_reviewers:                  # Required for prod
-  #   - security@company.com
-  # enable_private_endpoint: false     # Private endpoint access
-  # subnet_id: ""                      # Subnet for private endpoint
+  enable_access_review: false         # Enable quarterly access reviews
+  enable_private_endpoint: false      # Private endpoint access
