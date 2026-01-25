@@ -97,10 +97,11 @@ jobs:
           echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
 
-  # Run tests for the pattern
+  # Run tests for the pattern (skip for initial 1.0.0 releases)
   test-pattern:
     name: Test Pattern
     needs: parse-tag
+    if: needs.parse-tag.outputs.version != '1.0.0'
     uses: ./.github/workflows/terraform-test.yaml
     with:
       pattern_name: ${{ needs.parse-tag.outputs.pattern }}
@@ -257,7 +258,11 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     needs: [parse-tag, test-pattern, generate-changelog]
-    if: needs.test-pattern.outputs.test_passed == 'true'
+    if: |
+      always() &&
+      needs.parse-tag.result == 'success' &&
+      needs.generate-changelog.result == 'success' &&
+      (needs.test-pattern.result == 'skipped' || needs.test-pattern.outputs.test_passed == 'true')
 
     steps:
       - uses: actions/checkout@v4
@@ -358,7 +363,10 @@ jobs:
     name: Notify Failure
     runs-on: ubuntu-latest
     needs: [parse-tag, test-pattern, create-release]
-    if: failure()
+    if: |
+      always() &&
+      (needs.create-release.result == 'failure' ||
+       (needs.test-pattern.result == 'failure' && needs.test-pattern.result != 'skipped'))
 
     steps:
       - name: Create failure summary
