@@ -128,12 +128,10 @@ jobs:
           fi
 
           # Check if called from release workflow (workflow_call sets inputs.pattern_name)
-          # During releases, skip Azure-dependent tests (pattern/module) and only run quick validation
-          # This is because TEST_OWNER_EMAIL and other test-specific secrets may not be available
           if [ -n "${{ inputs.pattern_name }}" ]; then
             echo "Release validation for: ${{ inputs.pattern_name }}"
-            echo "Skipping pattern/module tests during release - only running quick validation"
-            echo "patterns_to_test=[]" >> $GITHUB_OUTPUT
+            echo "patterns_to_test=[\"${{ inputs.pattern_name }}\"]" >> $GITHUB_OUTPUT
+            # Skip module tests during release - they require Azure auth not available for tags
             echo "modules_to_test=[]" >> $GITHUB_OUTPUT
             echo "run_all=false" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
