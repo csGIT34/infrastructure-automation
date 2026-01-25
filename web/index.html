@@ -123,6 +123,28 @@
             color: #a1a1aa;
         }
 
+        .label-hint {
+            font-weight: 400;
+            color: #71717a;
+            font-size: 0.8rem;
+        }
+
+        .field-hint {
+            display: block;
+            font-size: 0.75rem;
+            color: #71717a;
+            margin-top: 0.25rem;
+        }
+
+        .field-hint a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+
+        .field-hint a:hover {
+            text-decoration: underline;
+        }
+
         input, select, textarea {
             width: 100%;
             padding: 0.75rem;
@@ -287,6 +309,16 @@
         .pattern-name {
             font-weight: 600;
             color: #fff;
+            flex: 1;
+        }
+
+        .pattern-version {
+            font-size: 0.65rem;
+            font-weight: 500;
+            color: #22c55e;
+            background: rgba(34, 197, 94, 0.15);
+            padding: 0.125rem 0.4rem;
+            border-radius: 4px;
         }
 
         .pattern-category {
@@ -385,6 +417,16 @@
         .added-pattern-name {
             font-weight: 600;
             color: #fff;
+        }
+
+        .pattern-version-badge {
+            font-size: 0.65rem;
+            font-weight: 500;
+            color: #22c55e;
+            background: rgba(34, 197, 94, 0.15);
+            padding: 0.125rem 0.4rem;
+            border-radius: 4px;
+            margin-left: 0.25rem;
         }
 
         .added-pattern-config {
@@ -1111,7 +1153,8 @@
         }
       },
       "icon": "box",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "eventhub": {
       "name": "eventhub",
@@ -1282,7 +1325,8 @@
         }
       },
       "icon": "activity",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "function-app": {
       "name": "function-app",
@@ -1412,7 +1456,8 @@
         }
       },
       "icon": "zap",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "keyvault": {
       "name": "keyvault",
@@ -1568,7 +1613,8 @@
         }
       },
       "icon": "key",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "linux-vm": {
       "name": "linux-vm",
@@ -1738,7 +1784,8 @@
         }
       },
       "icon": "server",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "mongodb": {
       "name": "mongodb",
@@ -1915,7 +1962,8 @@
         }
       },
       "icon": "database",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "postgresql": {
       "name": "postgresql",
@@ -2081,7 +2129,8 @@
         }
       },
       "icon": "database",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "sql-database": {
       "name": "sql-database",
@@ -2236,7 +2285,8 @@
         }
       },
       "icon": "database",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "static-site": {
       "name": "static-site",
@@ -2395,7 +2445,8 @@
         }
       },
       "icon": "globe",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "storage": {
       "name": "storage",
@@ -2522,7 +2573,8 @@
         }
       },
       "icon": "folder",
-      "category_display": "Single Resource"
+      "category_display": "Single Resource",
+      "version": "1.0.0"
     },
     "api-backend": {
       "name": "api-backend",
@@ -2649,7 +2701,8 @@
         }
       },
       "icon": "cpu",
-      "category_display": "Composite"
+      "category_display": "Composite",
+      "version": "1.0.0"
     },
     "data-pipeline": {
       "name": "data-pipeline",
@@ -2805,7 +2858,8 @@
         }
       },
       "icon": "git-branch",
-      "category_display": "Composite"
+      "category_display": "Composite",
+      "version": "1.0.0"
     },
     "microservice": {
       "name": "microservice",
@@ -2926,7 +2980,8 @@
         }
       },
       "icon": "layers",
-      "category_display": "Composite"
+      "category_display": "Composite",
+      "version": "1.0.0"
     },
     "web-app": {
       "name": "web-app",
@@ -3099,7 +3154,8 @@
         }
       },
       "icon": "layout",
-      "category_display": "Composite"
+      "category_display": "Composite",
+      "version": "1.0.0"
     }
   },
   "sizing_defaults": {
@@ -3224,7 +3280,7 @@
   },
   "metadata": {
     "pattern_count": 14,
-    "generated_at": "2026-01-24T23:13:11.346936+00:00",
+    "generated_at": "2026-01-25T01:43:33.853586+00:00",
     "categories": {
       "single-resource": 10,
       "composite": 4
@@ -3333,6 +3389,7 @@
                     <div class="pattern-card-header">
                         <span class="pattern-icon icon-${pattern.icon || 'package'}"></span>
                         <span class="pattern-name">${name}</span>
+                        <span class="pattern-version">v${pattern.version || '1.0.0'}</span>
                     </div>
                     <span class="pattern-category ${categoryClass}">${pattern.category_display || 'Single Resource'}</span>
                     <div class="pattern-description">${(pattern.description || '').split('\n')[0]}</div>
@@ -3378,9 +3435,11 @@
             document.querySelectorAll('.pattern-card').forEach(c => c.classList.remove('selected'));
             document.querySelector(`[data-pattern="${name}"]`).classList.add('selected');
 
+            const pattern = PATTERNS_DATA.patterns[name];
             state.currentPattern = name;
             state.currentConfig = { size: 'small' };
             state.currentAction = 'create';
+            state.currentVersion = pattern.version || '1.0.0';
 
             document.getElementById('selected-pattern-name').textContent = name;
             document.getElementById('pattern-config-section').classList.remove('hidden');
@@ -3420,6 +3479,13 @@
                                 <option value="large">Large</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Pattern Version <span class="label-hint">(pin to specific version)</span></label>
+                        <input type="text" id="config-version" value="${pattern.version || '1.0.0'}"
+                               onchange="state.currentVersion = this.value"
+                               placeholder="e.g., 1.0.0">
+                        <small class="field-hint">Current: v${pattern.version || '1.0.0'} · <a href="https://github.com/csGIT34/infrastructure-automation/releases" target="_blank">View releases</a></small>
                     </div>
                 </div>
             `;
@@ -3464,7 +3530,9 @@
                 const editing = state.addedPatterns[state.editingIndex];
                 document.getElementById('config-action').value = editing.action;
                 document.getElementById('config-size').value = editing.config.size || 'small';
+                document.getElementById('config-version').value = editing.version || pattern.version || '1.0.0';
                 state.currentAction = editing.action;
+                state.currentVersion = editing.version || pattern.version || '1.0.0';
                 state.currentConfig = { ...editing.config };
 
                 // Fill in other fields
@@ -3568,9 +3636,13 @@
             // Ensure size is set
             config.size = document.getElementById('config-size').value || 'small';
 
+            // Get the version (either from editing or from pattern data)
+            const patternVersion = state.currentVersion || pattern.version || '1.0.0';
+
             const patternEntry = {
                 pattern: state.currentPattern,
                 action: state.currentAction,
+                version: patternVersion,
                 config: config
             };
 
@@ -3618,11 +3690,13 @@
                     .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.length + ' items' : v}`)
                     .join(', ');
 
+                const version = entry.version || pattern.version || '1.0.0';
                 return `
                     <div class="added-pattern-card">
                         <div class="added-pattern-info">
                             <span class="pattern-icon icon-${pattern.icon || 'package'}"></span>
                             <span class="added-pattern-name">${entry.pattern}</span>
+                            <span class="pattern-version-badge">v${version}</span>
                             <span class="action-badge ${entry.action}">${entry.action}</span>
                             <div class="added-pattern-config">Size: ${entry.config.size || 'small'}${configSummary ? ', ' + configSummary : ''}</div>
                         </div>
@@ -3677,6 +3751,9 @@
             }
 
             const docs = state.addedPatterns.map(entry => {
+                const pattern = PATTERNS_DATA.patterns[entry.pattern];
+                const version = entry.version || pattern.version || '1.0.0';
+
                 const lines = [
                     'version: "1"',
                     `action: ${entry.action}`,
@@ -3694,6 +3771,7 @@
                 lines.push(`  location: ${metadata.location}`);
                 lines.push('');
                 lines.push(`pattern: ${entry.pattern}`);
+                lines.push(`pattern_version: "${version}"`);
                 lines.push('config:');
 
                 Object.entries(entry.config).forEach(([key, value]) => {
@@ -3813,6 +3891,7 @@
                             <div>
                                 <span class="pattern-icon icon-${pattern.icon || 'package'}" style="font-size: 1.5rem; margin-right: 0.5rem;"></span>
                                 <h3 style="display: inline;">${name}</h3>
+                                <span class="pattern-version" style="margin-left: 0.5rem;">v${pattern.version || '1.0.0'}</span>
                                 <span class="pattern-category ${categoryClass}" style="margin-left: 0.5rem;">${pattern.category_display || 'Single Resource'}</span>
                             </div>
                         </div>

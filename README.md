@@ -8,6 +8,7 @@ A **pattern-based** infrastructure provisioning platform that enables developmen
 - [Quick Start](#quick-start)
 - [Infrastructure Patterns](#infrastructure-patterns)
 - [Pattern Request Format](#pattern-request-format)
+- [Pattern Versioning](#pattern-versioning)
 - [T-Shirt Sizing](#t-shirt-sizing)
 - [Multi-Pattern Requests](#multi-pattern-requests)
 - [GitOps Workflow](#gitops-workflow)
@@ -97,6 +98,7 @@ A **pattern-based** infrastructure provisioning platform that enables developmen
      location: eastus
 
    pattern: keyvault
+   pattern_version: "1.0.0"  # Required - pin to specific version
    config:
      name: secrets
      size: small
@@ -171,6 +173,7 @@ metadata:
   location: eastus            # Optional: Azure region (default: eastus)
 
 pattern: keyvault             # Required: Pattern name
+pattern_version: "1.0.0"      # Required: Pinned version (semver)
 config:                       # Pattern-specific configuration
   name: secrets               # Required: Resource name suffix
   size: small                 # Optional: T-shirt size (default by environment)
@@ -196,6 +199,63 @@ Each pattern has its own config schema. Common fields:
 | `size` | T-shirt size: `small`, `medium`, `large` (optional) |
 
 See pattern-specific config options in `config/patterns/{pattern}.yaml`.
+
+---
+
+## Pattern Versioning
+
+The platform uses **per-pattern versioning** with semantic versioning (semver). Each pattern has its own independent version lifecycle, allowing patterns to evolve at different rates.
+
+### Why Version Pinning?
+
+- **Stability**: Your infrastructure won't change unexpectedly when patterns are updated
+- **Controlled Upgrades**: You decide when to adopt new versions
+- **Breaking Change Awareness**: Major version bumps signal breaking changes
+
+### Version Format
+
+Versions follow semantic versioning: `MAJOR.MINOR.PATCH`
+
+| Version Change | Meaning | Example |
+|----------------|---------|---------|
+| Major (X.0.0) | Breaking changes | `1.0.0` → `2.0.0` |
+| Minor (0.X.0) | New features, backward compatible | `1.0.0` → `1.1.0` |
+| Patch (0.0.X) | Bug fixes, backward compatible | `1.0.0` → `1.0.1` |
+
+### Checking Available Versions
+
+```bash
+# List all releases for a pattern
+gh release list --repo YOUR_ORG/infrastructure-automation | grep "keyvault/"
+
+# View release notes
+gh release view keyvault/v1.0.0 --repo YOUR_ORG/infrastructure-automation
+```
+
+Or browse releases in the GitHub UI.
+
+### Upgrading Versions
+
+1. Check the [releases page](../../releases) for available versions and changelogs
+2. Review release notes for breaking changes (major versions)
+3. Update `pattern_version` in your `infrastructure.yaml`:
+   ```yaml
+   pattern_version: "1.1.0"  # Updated from 1.0.0
+   ```
+4. Open a PR to review the plan preview
+5. Merge to apply the upgrade
+
+### Automated Update Notifications
+
+Use the update checker workflow to receive Dependabot-style PRs when new pattern versions are available:
+
+1. Copy `templates/update-checker-workflow.yaml` to `.github/workflows/`
+2. Configure the schedule (default: weekly)
+3. Receive automated PRs with version bumps and changelogs
+
+### Current Pattern Versions
+
+All patterns are currently at version `1.0.0`. Check the [releases page](../../releases) for the latest versions.
 
 ---
 
@@ -253,6 +313,7 @@ metadata:
   business_unit: engineering
   owners: [alice@company.com]
 pattern: postgresql
+pattern_version: "1.0.0"
 config:
   name: olddb
 
@@ -266,6 +327,7 @@ metadata:
   business_unit: engineering
   owners: [alice@company.com]
 pattern: keyvault
+pattern_version: "1.0.0"
 config:
   name: secrets
 
@@ -278,6 +340,7 @@ metadata:
   business_unit: engineering
   owners: [alice@company.com]
 pattern: storage
+pattern_version: "1.0.0"
 config:
   name: data
 ```
@@ -631,6 +694,16 @@ Deploys the MCP server:
 Runs the Terraform test suite:
 - Quick validation on PRs
 - Full suite on schedule and manual trigger
+- Smart detection runs only tests for changed patterns/modules
+
+### Pattern Release (`.github/workflows/release.yaml`)
+
+Creates versioned releases for patterns:
+- Triggered by git tags (`{pattern}/v{version}`)
+- Validates tests pass for the pattern
+- Generates changelog from commits
+- Creates GitHub release with release notes
+- Updates VERSION and CHANGELOG files
 
 ### Validate Module Sync (`.github/workflows/validate-module-sync.yaml`)
 

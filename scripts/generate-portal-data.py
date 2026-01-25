@@ -37,6 +37,27 @@ def load_pattern_configs(patterns_dir: str) -> dict:
     return patterns
 
 
+def load_pattern_versions(terraform_patterns_dir: str) -> dict:
+    """Load VERSION files from each pattern's terraform directory."""
+    versions = {}
+
+    if not os.path.exists(terraform_patterns_dir):
+        return versions
+
+    for pattern_dir in os.listdir(terraform_patterns_dir):
+        version_file = os.path.join(terraform_patterns_dir, pattern_dir, "VERSION")
+        if os.path.isfile(version_file):
+            try:
+                with open(version_file, "r") as f:
+                    version = f.read().strip()
+                    if version:
+                        versions[pattern_dir] = version
+            except Exception as e:
+                print(f"Warning: Failed to read {version_file}: {e}", file=sys.stderr)
+
+    return versions
+
+
 def load_sizing_defaults(path: str) -> dict:
     """Load sizing defaults configuration."""
     if not os.path.exists(path):
@@ -77,10 +98,15 @@ def get_pattern_icon(pattern_name: str) -> str:
     return icons.get(pattern_name, "package")
 
 
-def generate_portal_data(patterns_dir: str, sizing_defaults_path: str) -> dict:
+def generate_portal_data(patterns_dir: str, sizing_defaults_path: str, terraform_patterns_dir: str = None) -> dict:
     """Generate the complete portal data structure."""
     patterns = load_pattern_configs(patterns_dir)
     sizing_defaults = load_sizing_defaults(sizing_defaults_path)
+
+    # Load pattern versions from terraform directories
+    versions = {}
+    if terraform_patterns_dir:
+        versions = load_pattern_versions(terraform_patterns_dir)
 
     # Enhance patterns with computed fields
     for name, pattern in patterns.items():
@@ -88,6 +114,8 @@ def generate_portal_data(patterns_dir: str, sizing_defaults_path: str) -> dict:
         pattern["category_display"] = get_category_display_name(
             pattern.get("category", "single-resource")
         )
+        # Add version from VERSION file
+        pattern["version"] = versions.get(name, "1.0.0")
 
     # Sort patterns: single-resource first, then composite
     def sort_key(item):
@@ -180,6 +208,11 @@ def main():
         help="Directory containing pattern YAML files"
     )
     parser.add_argument(
+        "--terraform-patterns-dir",
+        default="terraform/patterns",
+        help="Directory containing pattern Terraform configs (for VERSION files)"
+    )
+    parser.add_argument(
         "--sizing-defaults",
         default="config/sizing-defaults.yaml",
         help="Path to sizing defaults YAML file"
@@ -214,12 +247,16 @@ def main():
     if not os.path.isabs(patterns_dir):
         patterns_dir = os.path.join(repo_root, patterns_dir)
 
+    terraform_patterns_dir = args.terraform_patterns_dir
+    if not os.path.isabs(terraform_patterns_dir):
+        terraform_patterns_dir = os.path.join(repo_root, terraform_patterns_dir)
+
     sizing_defaults = args.sizing_defaults
     if not os.path.isabs(sizing_defaults):
         sizing_defaults = os.path.join(repo_root, sizing_defaults)
 
     # Generate data
-    data = generate_portal_data(patterns_dir, sizing_defaults)
+    data = generate_portal_data(patterns_dir, sizing_defaults, terraform_patterns_dir)
 
     if args.embed:
         html_path = args.html_path

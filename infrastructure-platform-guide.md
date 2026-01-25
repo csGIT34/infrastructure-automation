@@ -11,9 +11,10 @@ This guide is the complete reference for DevOps engineers who manage and extend 
 5. [Integration Checklist](#integration-checklist)
 6. [Testing Framework](#testing-framework)
 7. [CI/CD Pipelines](#cicd-pipelines)
-8. [Day-to-Day Operations](#day-to-day-operations)
-9. [Troubleshooting](#troubleshooting)
-10. [Security & Permissions](#security--permissions)
+8. [Pattern Versioning](#pattern-versioning)
+9. [Day-to-Day Operations](#day-to-day-operations)
+10. [Troubleshooting](#troubleshooting)
+11. [Security & Permissions](#security--permissions)
 
 ---
 
@@ -658,6 +659,166 @@ TF_VAR_owner_email=your-email@company.com
 
 Ensures all pattern sources are in sync.
 
+### Pattern Release (`release.yaml`)
+
+**Triggered by**: Git tags matching `*/v*` (e.g., `keyvault/v1.2.0`)
+
+**Process**:
+1. Parse pattern name and version from tag
+2. Run tests for the pattern (skipped for v1.0.0 initial releases)
+3. Generate changelog from commits
+4. Create GitHub release with release notes
+5. Update VERSION and CHANGELOG files in pattern directory
+
+---
+
+## Pattern Versioning
+
+The platform uses **per-pattern versioning** with semantic versioning. Each pattern evolves independently.
+
+### Version Scheme
+
+| Version Change | Meaning | When to Use |
+|----------------|---------|-------------|
+| Major (X.0.0) | Breaking changes | Variable changes, resource replacements, behavior changes |
+| Minor (0.X.0) | New features | New optional variables, new outputs, feature additions |
+| Patch (0.0.X) | Bug fixes | Bug fixes, documentation, internal refactoring |
+
+### Tag Format
+
+Tags follow the pattern: `{pattern}/v{major}.{minor}.{patch}`
+
+Examples:
+- `keyvault/v1.0.0` - Initial release
+- `keyvault/v1.1.0` - Added new feature
+- `keyvault/v2.0.0` - Breaking change
+- `postgresql/v1.0.1` - Bug fix
+
+### Creating a Release
+
+**Using the helper script (recommended):**
+
+```bash
+# Check current version
+cat terraform/patterns/keyvault/VERSION
+
+# Create release
+./scripts/create-release.sh keyvault 1.2.0
+```
+
+The script will:
+- Validate the pattern exists
+- Validate version format
+- Check you're on the main branch
+- Show commits since last release
+- Create and push the tag
+
+**Manual process:**
+
+```bash
+# Create tag
+git tag keyvault/v1.2.0
+
+# Push tag to trigger release workflow
+git push origin keyvault/v1.2.0
+```
+
+### Release Workflow
+
+When a tag is pushed, `.github/workflows/release.yaml` automatically:
+
+1. **Parses the tag** - Extracts pattern name and version
+2. **Validates the pattern** - Ensures directory exists
+3. **Runs tests** - Validates the pattern works (skipped for v1.0.0)
+4. **Generates changelog** - From commits since last release
+5. **Creates GitHub release** - With release notes
+6. **Updates files** - VERSION and CHANGELOG.md in pattern directory
+
+### Development Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Development Workflow                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Create feature branch                                       │
+│     └─▶ git checkout -b feature/keyvault-new-option             │
+│                                                                 │
+│  2. Make changes to pattern/modules                             │
+│     └─▶ Edit terraform/patterns/keyvault/main.tf                │
+│                                                                 │
+│  3. Open PR                                                     │
+│     └─▶ CI runs tests for affected patterns                     │
+│     └─▶ Smart detection: only tests changed patterns/modules    │
+│                                                                 │
+│  4. Merge to main                                               │
+│     └─▶ Tests must pass                                         │
+│                                                                 │
+│  5. Create release tag when ready                               │
+│     └─▶ ./scripts/create-release.sh keyvault 1.2.0             │
+│     └─▶ Release workflow creates GitHub release                 │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Smart Test Detection
+
+The CI workflow (`.github/workflows/terraform-test.yaml`) uses smart detection to run only relevant tests:
+
+**Pattern-Module Dependencies:**
+```
+keyvault    → naming, keyvault, security-groups, rbac-assignments, access-review, diagnostic-settings, private-endpoint
+postgresql  → naming, postgresql, keyvault, security-groups, rbac-assignments, access-review, diagnostic-settings, private-endpoint
+web-app     → naming, static-web-app, function-app, postgresql, keyvault, storage-account, security-groups, rbac-assignments
+...
+```
+
+If you change `terraform/modules/keyvault/`, tests run for:
+- `keyvault` module
+- All patterns that depend on it (`keyvault`, `api-backend`, `web-app`)
+
+### Consumer Version Pinning
+
+Consumers **must** pin to specific versions:
+
+```yaml
+pattern: keyvault
+pattern_version: "1.2.0"  # Required
+```
+
+The provision workflow validates the version exists and checks out the tagged version of the pattern.
+
+### Update Checker for Consumers
+
+Consumers can use `templates/update-checker-workflow.yaml` to receive automated PRs when new versions are available:
+
+- Runs weekly (configurable)
+- Creates PRs with version bumps
+- Includes changelog in PR description
+- Highlights breaking changes (major versions)
+
+### Versioning Files
+
+| File | Location | Purpose |
+|------|----------|---------|
+| VERSION | `terraform/patterns/{pattern}/VERSION` | Current version number |
+| CHANGELOG.md | `terraform/patterns/{pattern}/CHANGELOG.md` | Release history |
+| create-release.sh | `scripts/create-release.sh` | Helper script |
+| release.yaml | `.github/workflows/release.yaml` | Release workflow |
+
+### Best Practices
+
+1. **Commit messages**: Use conventional commits for automatic changelog categorization
+   - `feat(keyvault): add soft-delete option` → Features section
+   - `fix(keyvault): correct RBAC assignment` → Bug Fixes section
+   - `feat!: rename sku variable` → Breaking Changes section
+
+2. **Test before releasing**: Always ensure tests pass before creating a release tag
+
+3. **Document breaking changes**: Major versions should have clear upgrade instructions
+
+4. **Coordinate releases**: When making breaking changes, consider communicating to consumers before releasing
+
 ---
 
 ## Day-to-Day Operations
@@ -828,6 +989,15 @@ cd terraform/tests && ./run-tests.sh -p keyvault
 
 # Build MCP server
 cd mcp-server && npm run build
+
+# Create a pattern release
+./scripts/create-release.sh keyvault 1.2.0
+
+# List releases
+gh release list | grep keyvault/
+
+# View release notes
+gh release view keyvault/v1.0.0
 ```
 
 ### File Locations
@@ -836,8 +1006,12 @@ cd mcp-server && npm run build
 |------|-------|
 | Pattern Terraform | `terraform/patterns/{pattern}/main.tf` |
 | Pattern metadata | `config/patterns/{pattern}.yaml` |
+| Pattern version | `terraform/patterns/{pattern}/VERSION` |
+| Pattern changelog | `terraform/patterns/{pattern}/CHANGELOG.md` |
 | MCP definitions | `mcp-server/src/index.ts` |
 | Workflow template | `templates/infrastructure-workflow.yaml` |
+| Update checker template | `templates/update-checker-workflow.yaml` |
+| Release workflow | `.github/workflows/release.yaml` |
 | Pattern tests | `terraform/tests/patterns/{pattern}/` |
 | Module tests | `terraform/tests/modules/{module}/` |
 | Examples | `examples/` |
@@ -846,9 +1020,11 @@ cd mcp-server && npm run build
 ### Adding a New Pattern (TL;DR)
 
 1. Create `terraform/patterns/{pattern}/main.tf`
-2. Create `config/patterns/{pattern}.yaml`
-3. Add to `PATTERN_DEFINITIONS` in `mcp-server/src/index.ts`
-4. Add to `valid_patterns` in `templates/infrastructure-workflow.yaml`
-5. Create `terraform/tests/patterns/{pattern}/`
-6. Create `examples/{pattern}-pattern.yaml`
-7. Commit all together
+2. Create `terraform/patterns/{pattern}/VERSION` with `1.0.0`
+3. Create `config/patterns/{pattern}.yaml`
+4. Add to `PATTERN_DEFINITIONS` in `mcp-server/src/index.ts`
+5. Add to `valid_patterns` in `templates/infrastructure-workflow.yaml`
+6. Create `terraform/tests/patterns/{pattern}/`
+7. Create `examples/{pattern}-pattern.yaml`
+8. Commit all together
+9. Create initial release: `./scripts/create-release.sh {pattern} 1.0.0`

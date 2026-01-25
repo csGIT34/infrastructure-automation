@@ -214,6 +214,7 @@ metadata:
   business_unit: engineering
   owners: [alice@company.com]
 pattern: postgresql
+pattern_version: "1.0.0"
 config:
   name: olddb
 
@@ -227,6 +228,7 @@ metadata:
   business_unit: engineering
   owners: [alice@company.com]
 pattern: keyvault
+pattern_version: "1.0.0"
 config:
   name: secrets
 
@@ -239,6 +241,7 @@ metadata:
   business_unit: engineering
   owners: [alice@company.com]
 pattern: storage
+pattern_version: "1.0.0"
 config:
   name: data
 ```
@@ -367,8 +370,10 @@ When asked to add a new pattern, follow these steps:
 - [ ] `terraform/patterns/<new_pattern>/main.tf`
 - [ ] `terraform/patterns/<new_pattern>/variables.tf`
 - [ ] `terraform/patterns/<new_pattern>/outputs.tf`
+- [ ] `terraform/patterns/<new_pattern>/VERSION` - Set to `1.0.0`
 - [ ] `config/patterns/<new_pattern>.yaml` - Pattern metadata
 - [ ] `templates/infrastructure-workflow.yaml` - Run sync script
+- [ ] Create initial release: `./scripts/create-release.sh <new_pattern> 1.0.0`
 
 ### Single Source of Truth
 
