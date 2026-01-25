@@ -6,6 +6,17 @@ All notable changes to the static-site pattern.
 ## [1.0.1] - 2026-01-25
 
 ### Bug Fixes
+- fix(access-review): add lifecycle handling and document state cleanup (837dd10)
+- fix(static-site): correct module output reference (19bbb5a)
+
+### Other Changes
+- chore(static-site): release v1.0.0 (39f8e59)
+
+
+
+## [1.0.1] - 2026-01-25
+
+### Bug Fixes
 - fix: Correct module output reference from `default_hostname` to `default_host_name`
 
 
