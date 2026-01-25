@@ -85,22 +85,20 @@ const apiConfig = {
 };
 ```
 
-### CLI Testing with az cli
+### Local Development (No Auth)
 
-For testing, you can obtain a token using the Azure CLI:
+When running locally with `func start`, authentication is not enforced:
 
 ```bash
-# Get an access token for the API
-TOKEN=$(az account get-access-token \
-  --resource "api://infra-platform-dry-run-api" \
-  --query accessToken -o tsv)
-
-# Call the API with the bearer token
-curl -X POST "https://<func>.azurewebsites.net/api/dry-run" \
+curl -X POST "http://localhost:7071/api/dry-run" \
   -H "Content-Type: text/yaml" \
-  -H "Authorization: Bearer $TOKEN" \
   -d @infrastructure.yaml
 ```
+
+### Production Testing
+
+For testing the deployed API, use the portal or a custom MSAL client.
+Azure CLI cannot directly obtain tokens for custom APIs.
 
 ### Entra ID Configuration
 

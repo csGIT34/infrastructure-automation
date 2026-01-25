@@ -100,6 +100,12 @@ resource "azuread_application" "api" {
   api {
     requested_access_token_version = 2
 
+    # Allow Azure CLI and Azure PowerShell to get tokens for testing
+    known_client_applications = [
+      "04b07795-8ddb-461a-bbee-02f9e1bf7b46", # Azure CLI
+      "1950a258-227b-4e31-a9cf-717495945fc2", # Azure PowerShell
+    ]
+
     oauth2_permission_scope {
       admin_consent_description  = "Allow the application to validate infrastructure patterns"
       admin_consent_display_name = "Validate Patterns"
