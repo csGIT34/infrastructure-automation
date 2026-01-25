@@ -3,6 +3,12 @@
 All notable changes to the static-site pattern.
 
 
+## [1.0.1] - 2026-01-25
+
+### Bug Fixes
+- fix: Correct module output reference from `default_hostname` to `default_host_name`
+
+
 ## [1.0.0] - 2026-01-25
 
 ### Features

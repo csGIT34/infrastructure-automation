@@ -187,7 +187,7 @@ module "access_review" {
 output "static_web_app" {
   value = {
     name        = module.static_web_app.name
-    default_url = module.static_web_app.default_hostname
+    default_url = module.static_web_app.default_host_name
     id          = module.static_web_app.id
   }
 }
@@ -196,7 +196,7 @@ output "security_groups" { value = module.security_groups.group_names }
 output "access_info" {
   value = <<-EOT
     Static Web App: ${module.static_web_app.name}
-    URL: https://${module.static_web_app.default_hostname}
+    URL: https://${module.static_web_app.default_host_name}
 
     Security Groups:
     - Developers: ${module.security_groups.group_names["swa-developers"]}
