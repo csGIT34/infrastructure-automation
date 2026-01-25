@@ -432,10 +432,24 @@ The platform includes a web-based portal for browsing patterns and generating co
 
 ### Features
 
-- **Pattern Browser**: View all available patterns with descriptions
-- **Configuration Builder**: Interactive form to build pattern configs
-- **Cost Estimates**: See estimated monthly costs per environment
-- **YAML Export**: Generate `infrastructure.yaml` for your repository
+**Pattern Builder Tab:**
+- Interactive form to build pattern configurations
+- T-shirt sizing selector (small/medium/large) with cost estimates
+- Governance options (access reviews for prod)
+- Live YAML preview with copy-to-clipboard
+- Pattern version selection from available releases
+
+**Setup Guide Tab:**
+- Step-by-step instructions for consuming repositories
+- GitHub App installation guide
+- Create and destroy action examples with multi-document YAML
+
+**Pattern Reference Tab:**
+- Complete documentation for all patterns
+- Quick navigation grouped by Single Resource and Composite patterns
+- Search filter to find patterns by name or content
+- T-shirt sizing details showing actual specs per environment
+- Estimated monthly costs per size/environment
 
 ### Accessing the Portal
 

@@ -457,6 +457,27 @@ gh workflow run provision.yaml \
   -f yaml_url=https://raw.githubusercontent.com/owner/repo/abc123/infrastructure.yaml
 ```
 
+### Purging Soft-Deleted Key Vaults
+
+When Key Vault names conflict with soft-deleted vaults, use the purge script:
+```bash
+# List and interactively purge soft-deleted Key Vaults
+./scripts/purge-keyvaults.sh
+
+# Force purge without confirmation
+./scripts/purge-keyvaults.sh --force
+```
+
+### Workflow Run Naming
+
+Provision workflow runs display helpful information in GitHub Actions:
+- **Run name**: Shows source repository (e.g., `provision: owner/repo`)
+- **Job name**: Shows action and pattern (e.g., `create: keyvault (dev)` or `destroy: postgresql (staging)`)
+
+### Long-Running Applies
+
+The provision workflow handles long-running Terraform applies (e.g., SQL Server creation ~30 min) by refreshing the Azure OIDC token every 4 minutes in the background. This prevents token expiration errors during extended operations.
+
 ## Project RBAC and Secrets Management
 
 ### Overview
