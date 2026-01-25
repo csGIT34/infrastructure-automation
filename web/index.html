@@ -3672,6 +3672,7 @@ config:
 
             try {
                 const token = await getAccessToken();
+                console.log('Token acquired, length:', token.length);
 
                 const response = await fetch(apiConfig.endpoint, {
                     method: 'POST',
@@ -3681,6 +3682,26 @@ config:
                     },
                     body: yaml
                 });
+
+                console.log('API response status:', response.status);
+
+                if (response.status === 401) {
+                    const text = await response.text();
+                    console.error('401 response body:', text);
+                    throw new Error('Authentication failed. Try signing out and back in.');
+                }
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        displayValidationResults(errorJson, false);
+                    } catch {
+                        throw new Error(`API error: ${response.status} - ${errorText || 'Unknown error'}`);
+                    }
+                    return;
+                }
 
                 const result = await response.json();
                 displayValidationResults(result, response.ok);
