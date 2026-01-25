@@ -42,7 +42,7 @@ run "deploy_web_app_pattern" {
   variables {
     resource_suffix = run.setup.suffix
     owner_email     = var.test_owner_email
-    location        = var.test_location
+    location        = "centralus"  # Hardcoded - PostgreSQL restricted in eastus/eastus2
   }
 
   # === Frontend (Static Web App) ===

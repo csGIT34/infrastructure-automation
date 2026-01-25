@@ -40,7 +40,7 @@ run "deploy_postgresql_pattern" {
   variables {
     resource_suffix = run.setup.suffix
     owner_email     = var.test_owner_email
-    location        = var.test_location
+    location        = "centralus"  # Hardcoded - PostgreSQL restricted in eastus/eastus2
   }
 
   # === PostgreSQL ===

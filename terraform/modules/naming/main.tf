@@ -87,9 +87,11 @@ locals {
 
   # Key Vault: max 24 chars, alphanumeric and hyphens only, must end with letter/digit
   # Format: kv-{project}-{name}-{env_abbrev}
-  keyvault_env  = lookup(local.env_abbrev, var.environment, substr(var.environment, 0, 1))
-  keyvault_base = "kv-${var.project}-${var.name}-${local.keyvault_env}"
-  keyvault_name = substr(local.keyvault_base, 0, 24)
+  keyvault_env       = lookup(local.env_abbrev, var.environment, substr(var.environment, 0, 1))
+  keyvault_base      = "kv-${var.project}-${var.name}-${local.keyvault_env}"
+  keyvault_truncated = substr(local.keyvault_base, 0, 24)
+  # Remove trailing hyphens after truncation to ensure valid Key Vault name
+  keyvault_name      = trimsuffix(local.keyvault_truncated, "-")
 
   # Select appropriate name based on resource type
   resource_name = var.resource_type == "storage_account" ? local.storage_name : (
