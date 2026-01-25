@@ -5,6 +5,13 @@ All notable changes to the sql-database pattern.
 
 ## [2.0.0] - 2026-01-25
 
+### Other Changes
+- chore(sql-database): release v2.0.0 (b81fb22)
+
+
+
+## [2.0.0] - 2026-01-25
+
 No notable changes in this release.
 
 
