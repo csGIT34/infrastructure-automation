@@ -17,7 +17,6 @@ provider "azurerm" {
 
 provider "azuread" {}
 
-provider "msgraph" {}
 
 # Variables from terraform.tfvars
 variables {
