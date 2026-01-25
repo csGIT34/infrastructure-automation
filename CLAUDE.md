@@ -165,6 +165,17 @@ The provision workflow reports back to the source repository:
 - `INFRA_APP_ID` - GitHub App ID
 - `INFRA_APP_PRIVATE_KEY` - GitHub App private key (PEM format)
 
+### Recommended Setup (consuming repos)
+
+**Branch Protection** - Require validation before merge:
+1. Go to Settings > Branches > Add branch protection rule
+2. Branch name pattern: `main`
+3. Enable "Require status checks to pass before merging"
+4. Search for and select: `Infrastructure GitOps / validate-and-plan`
+5. Save changes
+
+This prevents invalid `infrastructure.yaml` files from being merged to main.
+
 ### Pattern Request Format
 
 See `examples/` directory for templates. Basic structure:

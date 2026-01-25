@@ -23,6 +23,16 @@
 #   Use YAML document separators (---) to define multiple patterns
 #   Each document can have action: create (default) or action: destroy
 #   Destroy actions are executed first, then create actions
+#
+# Branch Protection (Recommended):
+#   To require validation before merging, configure branch protection:
+#   1. Go to Settings > Branches > Add branch protection rule
+#   2. Branch name pattern: main
+#   3. Enable "Require status checks to pass before merging"
+#   4. Search for and select: "Infrastructure GitOps / validate-and-plan"
+#   5. Save changes
+#
+#   This ensures invalid infrastructure.yaml files cannot be merged.
 
 name: Infrastructure GitOps
 
