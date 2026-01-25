@@ -21,7 +21,7 @@ variable "environment" {
 variable "location" {
   description = "Azure region"
   type        = string
-  default     = "westus2"
+  default     = "eastus2"
 }
 
 variable "business_unit" {
@@ -34,12 +34,6 @@ variable "owners" {
   description = "Email addresses of API owners"
   type        = list(string)
   default     = []
-}
-
-variable "sku" {
-  description = "App Service Plan SKU (Y1 for Consumption, B1/S1 for dedicated)"
-  type        = string
-  default     = "Y1"
 }
 
 variable "cors_allowed_origins" {

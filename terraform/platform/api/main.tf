@@ -116,7 +116,17 @@ resource "azurerm_storage_account" "func" {
 }
 
 # -----------------------------------------------------------------------------
-# App Service Plan (Consumption Y1 - serverless)
+# Blob Container for Flex Consumption deployments
+# -----------------------------------------------------------------------------
+
+resource "azurerm_storage_container" "deployments" {
+  name                  = "deployments"
+  storage_account_id    = azurerm_storage_account.func.id
+  container_access_type = "private"
+}
+
+# -----------------------------------------------------------------------------
+# App Service Plan (Flex Consumption FC1 - no VM quota required)
 # -----------------------------------------------------------------------------
 
 resource "azurerm_service_plan" "func" {
@@ -124,66 +134,38 @@ resource "azurerm_service_plan" "func" {
   resource_group_name = azurerm_resource_group.api.name
   location            = azurerm_resource_group.api.location
   os_type             = "Linux"
-  sku_name            = var.sku
+  sku_name            = "FC1"
 
   tags = local.tags
 }
 
 # -----------------------------------------------------------------------------
-# Function App
+# Function App (Flex Consumption)
 # -----------------------------------------------------------------------------
 
-resource "azurerm_linux_function_app" "api" {
+resource "azurerm_function_app_flex_consumption" "api" {
   name                = module.func_naming.name
   resource_group_name = azurerm_resource_group.api.name
   location            = azurerm_resource_group.api.location
   service_plan_id     = azurerm_service_plan.func.id
 
-  storage_account_name       = azurerm_storage_account.func.name
-  storage_account_access_key = azurerm_storage_account.func.primary_access_key
+  storage_container_type      = "blobContainer"
+  storage_container_endpoint  = "${azurerm_storage_account.func.primary_blob_endpoint}${azurerm_storage_container.deployments.name}"
+  storage_authentication_type = "StorageAccountConnectionString"
+  storage_access_key          = azurerm_storage_account.func.primary_access_key
 
-  https_only = true
+  runtime_name           = "python"
+  runtime_version        = "3.11"
+  maximum_instance_count = 40
+  instance_memory_in_mb  = 2048
 
-  site_config {
-    application_stack {
-      python_version = "3.11"
-    }
-
-    cors {
-      allowed_origins     = var.cors_allowed_origins
-      support_credentials = false
-    }
-
-    # API is stateless - scale to zero when not in use
-    app_scale_limit = 5
-  }
-
-  app_settings = {
-    # Function runtime settings
-    FUNCTIONS_WORKER_RUNTIME       = "python"
-    AzureWebJobsFeatureFlags       = "EnableWorkerIndexing"
-    SCM_DO_BUILD_DURING_DEPLOYMENT = "true"
-
-    # Application Insights (optional)
-    APPINSIGHTS_INSTRUMENTATIONKEY = var.app_insights_key != "" ? var.app_insights_key : null
-  }
+  site_config {}
 
   identity {
     type = "SystemAssigned"
   }
 
   tags = local.tags
-
-  lifecycle {
-    ignore_changes = [
-      # Ignore changes to tags made by Azure
-      tags["hidden-link: /app-insights-resource-id"],
-      tags["hidden-link: /app-insights-instrumentation-key"],
-      tags["hidden-link: /app-insights-conn-string"],
-      # Ignore deployment-related changes
-      app_settings["WEBSITE_RUN_FROM_PACKAGE"],
-    ]
-  }
 }
 
 # -----------------------------------------------------------------------------
@@ -233,7 +215,7 @@ module "rbac" {
     {
       principal_id         = module.security_groups.group_ids["api-admins"]
       role_definition_name = "Contributor"
-      scope                = azurerm_linux_function_app.api.id
+      scope                = azurerm_function_app_flex_consumption.api.id
       description          = "API admins - manage Function App"
     }
   ]
@@ -251,20 +233,20 @@ output "resource_group" {
 output "function_app" {
   description = "Function App details"
   value = {
-    name     = azurerm_linux_function_app.api.name
-    url      = "https://${azurerm_linux_function_app.api.default_hostname}"
-    hostname = azurerm_linux_function_app.api.default_hostname
+    name     = azurerm_function_app_flex_consumption.api.name
+    url      = "https://${azurerm_function_app_flex_consumption.api.default_hostname}"
+    hostname = azurerm_function_app_flex_consumption.api.default_hostname
   }
 }
 
 output "api_endpoint" {
   description = "Dry Run API endpoint"
-  value       = "https://${azurerm_linux_function_app.api.default_hostname}/api/dry-run"
+  value       = "https://${azurerm_function_app_flex_consumption.api.default_hostname}/api/dry-run"
 }
 
 output "function_app_principal_id" {
   description = "Function App managed identity principal ID"
-  value       = azurerm_linux_function_app.api.identity[0].principal_id
+  value       = azurerm_function_app_flex_consumption.api.identity[0].principal_id
 }
 
 output "security_groups" {
@@ -282,18 +264,18 @@ output "deployment_instructions" {
   value       = <<-EOT
     Dry Run API Infrastructure Provisioned!
 
-    Function App: ${azurerm_linux_function_app.api.name}
-    API Endpoint: https://${azurerm_linux_function_app.api.default_hostname}/api/dry-run
+    Function App: ${azurerm_function_app_flex_consumption.api.name}
+    API Endpoint: https://${azurerm_function_app_flex_consumption.api.default_hostname}/api/dry-run
 
     To deploy the function code:
     1. Navigate to terraform/platform/api/functions
-    2. Run: func azure functionapp publish ${azurerm_linux_function_app.api.name}
+    2. Run: func azure functionapp publish ${azurerm_function_app_flex_consumption.api.name}
 
     Or use GitHub Actions:
     - The workflow will automatically deploy on push to main
 
     To get the function key (for API auth):
-    - az functionapp keys list -g ${azurerm_resource_group.api.name} -n ${azurerm_linux_function_app.api.name}
+    - az functionapp keys list -g ${azurerm_resource_group.api.name} -n ${azurerm_function_app_flex_consumption.api.name}
 
     Security Groups:
     - API Users: ${module.security_groups.group_names["api-users"]}
