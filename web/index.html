@@ -793,13 +793,197 @@
         .icon-cpu::before { content: "⚙️"; }
         .icon-git-branch::before { content: "🔀"; }
         .icon-package::before { content: "📦"; }
+
+        /* Auth UI */
+        .auth-container {
+            position: absolute;
+            top: 1rem;
+            right: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #a1a1aa;
+            font-size: 0.875rem;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .btn-auth {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #3b82f6;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .btn-auth:hover {
+            background: rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-auth.logout {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .btn-auth.logout:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        /* Validation Results */
+        .validation-results {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .validation-results.show {
+            display: block;
+        }
+
+        .validation-results.valid {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .validation-results.invalid {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .validation-results.loading {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .validation-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .validation-results.valid .validation-header { color: #22c55e; }
+        .validation-results.invalid .validation-header { color: #ef4444; }
+        .validation-results.loading .validation-header { color: #3b82f6; }
+
+        .validation-details {
+            font-size: 0.875rem;
+            color: #e4e4e7;
+        }
+
+        .validation-details table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+        }
+
+        .validation-details th,
+        .validation-details td {
+            text-align: left;
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .validation-details th {
+            color: #a1a1aa;
+            font-weight: 500;
+        }
+
+        .validation-error-list {
+            list-style: none;
+            padding: 0;
+            margin: 0.5rem 0 0 0;
+        }
+
+        .validation-error-list li {
+            padding: 0.25rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .validation-error-list li::before {
+            content: "×";
+            position: absolute;
+            left: 0;
+            color: #ef4444;
+            font-weight: bold;
+        }
+
+        .btn-validate {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            border: none;
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-validate:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-validate:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        header {
+            position: relative;
+        }
     </style>
+    <!-- MSAL.js for Entra ID Authentication -->
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Infrastructure Self-Service Portal</h1>
             <p>Generate infrastructure.yaml for your projects</p>
+            <div class="auth-container" id="auth-container">
+                <div id="auth-loading" style="color: #a1a1aa; font-size: 0.875rem;">Loading...</div>
+            </div>
         </header>
 
         <div class="tabs">
@@ -906,7 +1090,17 @@
 
                     <textarea id="yaml-preview" class="yaml-preview" readonly placeholder="Add patterns to generate YAML..."></textarea>
 
+                    <!-- Validation Results -->
+                    <div id="validation-results" class="validation-results">
+                        <div class="validation-header">
+                            <span id="validation-icon"></span>
+                            <span id="validation-title"></span>
+                        </div>
+                        <div class="validation-details" id="validation-details"></div>
+                    </div>
+
                     <div class="btn-row" style="margin-top: 1rem;">
+                        <button class="btn-validate" onclick="validateYaml()" id="validate-btn" disabled title="Sign in to validate">Validate Configuration</button>
                         <button class="btn-success" onclick="downloadYaml()" id="download-btn" disabled>Download infrastructure.yaml</button>
                         <button class="btn-secondary" onclick="copyYaml()">Copy to Clipboard</button>
                     </div>
@@ -3321,6 +3515,253 @@ config:
             editingIndex: -1
         };
 
+        // =====================================================================
+        // MSAL Authentication Configuration
+        // =====================================================================
+        const msalConfig = {
+            auth: {
+                clientId: "596e2f1b-f721-41d2-a2a1-68e265c27bb7",
+                authority: "https://login.microsoftonline.com/c84490ff-0452-4bfb-9782-08a31017d89a",
+                redirectUri: window.location.origin + window.location.pathname
+            },
+            cache: {
+                cacheLocation: "sessionStorage",
+                storeAuthStateInCookie: false
+            }
+        };
+
+        const apiConfig = {
+            endpoint: "https://func-infra-api-dryrun-prod.azurewebsites.net/api/dry-run",
+            scopes: ["api://infra-platform-dry-run-api/Patterns.Validate"]
+        };
+
+        let msalInstance = null;
+        let currentAccount = null;
+
+        // Initialize MSAL
+        async function initAuth() {
+            try {
+                msalInstance = new msal.PublicClientApplication(msalConfig);
+                await msalInstance.initialize();
+
+                // Handle redirect response
+                const response = await msalInstance.handleRedirectPromise();
+                if (response) {
+                    currentAccount = response.account;
+                }
+
+                // Check for existing account
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    currentAccount = accounts[0];
+                }
+
+                updateAuthUI();
+            } catch (error) {
+                console.error("Auth initialization failed:", error);
+                document.getElementById('auth-loading').textContent = 'Auth unavailable';
+            }
+        }
+
+        // Update auth UI based on login state
+        function updateAuthUI() {
+            const container = document.getElementById('auth-container');
+            const validateBtn = document.getElementById('validate-btn');
+
+            if (currentAccount) {
+                const initials = getInitials(currentAccount.name || currentAccount.username);
+                container.innerHTML = `
+                    <div class="user-info">
+                        <div class="user-avatar">${initials}</div>
+                        <span>${currentAccount.name || currentAccount.username}</span>
+                    </div>
+                    <button class="btn-auth logout" onclick="signOut()">Sign Out</button>
+                `;
+                validateBtn.disabled = state.addedPatterns.length === 0;
+                validateBtn.title = state.addedPatterns.length === 0 ? 'Add patterns first' : 'Validate your configuration';
+            } else {
+                container.innerHTML = `
+                    <button class="btn-auth" onclick="signIn()">Sign In with Microsoft</button>
+                `;
+                validateBtn.disabled = true;
+                validateBtn.title = 'Sign in to validate';
+            }
+        }
+
+        function getInitials(name) {
+            return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        }
+
+        // Sign in
+        async function signIn() {
+            try {
+                const response = await msalInstance.loginPopup({
+                    scopes: apiConfig.scopes
+                });
+                currentAccount = response.account;
+                updateAuthUI();
+            } catch (error) {
+                console.error("Login failed:", error);
+                if (error.errorCode !== 'user_cancelled') {
+                    alert('Sign in failed. Please try again.');
+                }
+            }
+        }
+
+        // Sign out
+        function signOut() {
+            msalInstance.logoutPopup({
+                account: currentAccount,
+                postLogoutRedirectUri: window.location.origin + window.location.pathname
+            }).then(() => {
+                currentAccount = null;
+                updateAuthUI();
+                hideValidationResults();
+            });
+        }
+
+        // Get access token
+        async function getAccessToken() {
+            if (!currentAccount) {
+                throw new Error('Not signed in');
+            }
+
+            try {
+                const response = await msalInstance.acquireTokenSilent({
+                    scopes: apiConfig.scopes,
+                    account: currentAccount
+                });
+                return response.accessToken;
+            } catch (error) {
+                // If silent fails, try popup
+                const response = await msalInstance.acquireTokenPopup({
+                    scopes: apiConfig.scopes,
+                    account: currentAccount
+                });
+                return response.accessToken;
+            }
+        }
+
+        // =====================================================================
+        // Validation Functions
+        // =====================================================================
+
+        async function validateYaml() {
+            const yaml = generateYaml();
+            if (!yaml) {
+                alert('No patterns configured. Add at least one pattern.');
+                return;
+            }
+
+            const validateBtn = document.getElementById('validate-btn');
+            const resultsDiv = document.getElementById('validation-results');
+
+            // Show loading state
+            validateBtn.disabled = true;
+            validateBtn.innerHTML = '<span class="spinner"></span>Validating...';
+            showValidationLoading();
+
+            try {
+                const token = await getAccessToken();
+
+                const response = await fetch(apiConfig.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/yaml',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: yaml
+                });
+
+                const result = await response.json();
+                displayValidationResults(result, response.ok);
+            } catch (error) {
+                console.error('Validation failed:', error);
+                displayValidationError(error.message);
+            } finally {
+                validateBtn.disabled = false;
+                validateBtn.innerHTML = 'Validate Configuration';
+            }
+        }
+
+        function showValidationLoading() {
+            const resultsDiv = document.getElementById('validation-results');
+            resultsDiv.className = 'validation-results loading show';
+            document.getElementById('validation-icon').textContent = '⏳';
+            document.getElementById('validation-title').textContent = 'Validating configuration...';
+            document.getElementById('validation-details').innerHTML = 'Checking patterns against the API...';
+        }
+
+        function displayValidationResults(result, isOk) {
+            const resultsDiv = document.getElementById('validation-results');
+            const iconEl = document.getElementById('validation-icon');
+            const titleEl = document.getElementById('validation-title');
+            const detailsEl = document.getElementById('validation-details');
+
+            if (result.valid && isOk) {
+                resultsDiv.className = 'validation-results valid show';
+                iconEl.textContent = '✓';
+                titleEl.textContent = 'Configuration Valid';
+
+                let html = `
+                    <table>
+                        <tr><th>Patterns</th><td>${result.document_count || result.documents?.length || 0}</td></tr>
+                        <tr><th>Estimated Cost</th><td>$${result.total_monthly_cost_usd || 0}/month</td></tr>
+                        <tr><th>Create</th><td>${result.create_count || 0}</td></tr>
+                        <tr><th>Destroy</th><td>${result.destroy_count || 0}</td></tr>
+                    </table>
+                `;
+
+                if (result.documents && result.documents.length > 0) {
+                    html += '<h4 style="margin-top: 1rem; color: #a1a1aa;">Pattern Details</h4><table>';
+                    html += '<tr><th>Pattern</th><th>Resource Group</th><th>Components</th><th>Cost</th></tr>';
+                    result.documents.forEach(doc => {
+                        html += `<tr>
+                            <td>${doc.pattern}</td>
+                            <td><code>${doc.resource_group || 'N/A'}</code></td>
+                            <td>${(doc.components || []).length}</td>
+                            <td>$${doc.estimated_cost_usd || 0}/mo</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                }
+
+                detailsEl.innerHTML = html;
+            } else {
+                resultsDiv.className = 'validation-results invalid show';
+                iconEl.textContent = '✗';
+                titleEl.textContent = 'Validation Failed';
+
+                let errors = result.errors || [];
+                if (result.documents) {
+                    result.documents.forEach(doc => {
+                        if (doc.errors) {
+                            errors = errors.concat(doc.errors.map(e => `${doc.pattern}: ${e}`));
+                        }
+                    });
+                }
+
+                let html = '<ul class="validation-error-list">';
+                errors.forEach(err => {
+                    html += `<li>${err}</li>`;
+                });
+                html += '</ul>';
+                detailsEl.innerHTML = html;
+            }
+        }
+
+        function displayValidationError(message) {
+            const resultsDiv = document.getElementById('validation-results');
+            resultsDiv.className = 'validation-results invalid show';
+            document.getElementById('validation-icon').textContent = '✗';
+            document.getElementById('validation-title').textContent = 'Validation Error';
+            document.getElementById('validation-details').innerHTML = `<p>${message}</p>`;
+        }
+
+        function hideValidationResults() {
+            document.getElementById('validation-results').className = 'validation-results';
+        }
+
         // Tab Navigation
         function showTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -3899,6 +4340,12 @@ config:
         function updatePreview() {
             const yaml = generateYaml();
             document.getElementById('yaml-preview').value = yaml;
+            // Update validate button state if auth is initialized
+            if (msalInstance) {
+                updateAuthUI();
+            }
+            // Hide previous validation results when config changes
+            hideValidationResults();
         }
 
         // Download Functions
@@ -4150,6 +4597,8 @@ config:
             initPatternGrid();
             updatePreview();
             window.addEventListener('scroll', handleScroll);
+            // Initialize MSAL authentication
+            initAuth();
         });
     </script>
 </body>
