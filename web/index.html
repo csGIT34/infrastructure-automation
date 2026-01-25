@@ -3827,8 +3827,11 @@ config:
             }
 
             try {
-                // Fetch releases from GitHub API
-                const response = await fetch('https://api.github.com/repos/csGIT34/infrastructure-automation/releases');
+                // Fetch releases from GitHub API (with cache-busting)
+                const cacheBuster = Math.floor(Date.now() / 60000); // Changes every minute
+                const response = await fetch(`https://api.github.com/repos/csGIT34/infrastructure-automation/releases?_=${cacheBuster}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json' }
+                });
                 if (!response.ok) throw new Error('Failed to fetch releases');
 
                 const releases = await response.json();
