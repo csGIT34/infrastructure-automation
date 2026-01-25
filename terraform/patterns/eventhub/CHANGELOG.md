@@ -5,6 +5,13 @@ All notable changes to the eventhub pattern.
 
 ## [2.0.0] - 2026-01-25
 
+### Other Changes
+- chore(eventhub): release v2.0.0 (d0bca1a)
+
+
+
+## [2.0.0] - 2026-01-25
+
 No notable changes in this release.
 
 
