@@ -427,6 +427,138 @@ jobs:
           path: outputs
         continue-on-error: true
 
+      # -----------------------------------------------------------------------
+      # Infracost Integration - Real Azure cost estimates
+      # -----------------------------------------------------------------------
+      - name: Setup Infracost
+        if: needs.provision-pattern.result == 'success' && secrets.INFRACOST_API_KEY != ''
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Setup Terraform for Infracost
+        if: needs.provision-pattern.result == 'success' && secrets.INFRACOST_API_KEY != ''
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.3"
+          terraform_wrapper: false
+
+      - name: Download tfvars artifacts for cost estimation
+        if: needs.provision-pattern.result == 'success' && secrets.INFRACOST_API_KEY != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: tfvars-files
+          path: tfvars
+        continue-on-error: true
+
+      - name: Estimate costs for provisioned patterns
+        id: costs
+        if: needs.provision-pattern.result == 'success' && secrets.INFRACOST_API_KEY != ''
+        run: |
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import subprocess
+          import os
+          import glob
+
+          patterns_json = '${{ needs.resolve-patterns.outputs.patterns_json }}'
+          patterns = json.loads(patterns_json) if patterns_json else []
+
+          cost_results = []
+          total_monthly = 0.0
+
+          for pattern in patterns:
+              # Only estimate costs for create actions
+              if pattern.get('action') != 'create':
+                  continue
+
+              idx = pattern['index']
+              pattern_name = pattern['pattern']
+              tfvars_file = f"tfvars/terraform.tfvars.{idx}.json"
+
+              if not os.path.exists(tfvars_file):
+                  print(f"Warning: tfvars file not found for pattern {idx}")
+                  continue
+
+              pattern_dir = f"terraform/patterns/{pattern_name}"
+              if not os.path.exists(pattern_dir):
+                  print(f"Warning: pattern directory not found: {pattern_dir}")
+                  continue
+
+              print(f"Estimating costs for pattern {idx}: {pattern_name}")
+
+              # Run Infracost
+              try:
+                  result = subprocess.run(
+                      [
+                          'infracost', 'breakdown',
+                          '--path', pattern_dir,
+                          '--terraform-var-file', os.path.abspath(tfvars_file),
+                          '--format', 'json',
+                          '--no-color'
+                      ],
+                      capture_output=True,
+                      text=True,
+                      timeout=120
+                  )
+
+                  if result.returncode == 0:
+                      data = json.loads(result.stdout)
+                      # Extract total monthly cost
+                      total_cost_str = data.get('totalMonthlyCost', '0')
+                      try:
+                          monthly_cost = float(total_cost_str) if total_cost_str else 0.0
+                      except (ValueError, TypeError):
+                          monthly_cost = 0.0
+
+                      cost_results.append({
+                          'index': idx,
+                          'pattern': pattern_name,
+                          'name': pattern.get('name', pattern_name),
+                          'environment': pattern.get('environment', 'unknown'),
+                          'monthly_cost_usd': monthly_cost,
+                          'currency': 'USD'
+                      })
+                      total_monthly += monthly_cost
+                      print(f"  Cost: ${monthly_cost:.2f}/month")
+                  else:
+                      print(f"  Infracost failed: {result.stderr[:200]}")
+                      cost_results.append({
+                          'index': idx,
+                          'pattern': pattern_name,
+                          'name': pattern.get('name', pattern_name),
+                          'environment': pattern.get('environment', 'unknown'),
+                          'monthly_cost_usd': None,
+                          'error': 'Cost estimation failed'
+                      })
+              except subprocess.TimeoutExpired:
+                  print(f"  Infracost timeout for pattern {pattern_name}")
+                  cost_results.append({
+                      'index': idx,
+                      'pattern': pattern_name,
+                      'name': pattern.get('name', pattern_name),
+                      'monthly_cost_usd': None,
+                      'error': 'Cost estimation timed out'
+                  })
+              except Exception as e:
+                  print(f"  Error running Infracost: {e}")
+
+          # Write results
+          with open('/tmp/cost_results.json', 'w') as f:
+              json.dump({
+                  'costs': cost_results,
+                  'total_monthly_usd': round(total_monthly, 2)
+              }, f, indent=2)
+
+          # Write to GitHub output
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"total_monthly_cost={round(total_monthly, 2)}\n")
+              f.write(f"cost_count={len([c for c in cost_results if c.get('monthly_cost_usd') is not None])}\n")
+
+          print(f"\nTotal estimated monthly cost: ${total_monthly:.2f}")
+          PYTHON_SCRIPT
+        continue-on-error: true
+
       - name: Aggregate results and create report
         id: report
         run: |
@@ -476,20 +608,54 @@ jobs:
           issue_body += f"| Destroy Actions | {destroy_count} |\n"
           issue_body += "| Commit | `${{ needs.resolve-patterns.outputs.commit_sha }}` |\n"
           issue_body += "| Workflow Run | [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |\n\n"
+          # Load cost estimates if available
+          cost_data = {}
+          cost_by_index = {}
+          try:
+              with open('/tmp/cost_results.json', 'r') as f:
+                  cost_data = json.load(f)
+                  for cost in cost_data.get('costs', []):
+                      cost_by_index[cost['index']] = cost
+          except (FileNotFoundError, json.JSONDecodeError):
+              pass  # Cost estimation not available or failed
+
           issue_body += "### Pattern Results\n\n"
-          issue_body += "| Doc | Action | Pattern | Version | Name | Status |\n"
-          issue_body += "|-----|--------|---------|---------|------|--------|\n"
+
+          # Include cost column if we have cost data
+          if cost_data:
+              issue_body += "| Doc | Action | Pattern | Version | Name | Est. Cost/mo | Status |\n"
+              issue_body += "|-----|--------|---------|---------|------|-------------|--------|\n"
+          else:
+              issue_body += "| Doc | Action | Pattern | Version | Name | Status |\n"
+              issue_body += "|-----|--------|---------|---------|------|--------|\n"
 
           # Add pattern results
           for pattern in patterns:
               action_icon = "🗑️" if pattern['action'] == 'destroy' else "✨"
               version = pattern.get('pattern_version', 'latest')
-              # We'll mark all as success if the job succeeded, otherwise unknown
-              # In a real scenario, you'd track individual pattern results
               status_icon = "✅" if provision_result == 'success' else "⚠️"
-              issue_body += f"| {pattern['index']} | {action_icon} {pattern['action']} | `{pattern['pattern']}` | `{version}` | `{pattern['name']}` | {status_icon} |\n"
+
+              if cost_data:
+                  cost_info = cost_by_index.get(pattern['index'], {})
+                  monthly_cost = cost_info.get('monthly_cost_usd')
+                  if monthly_cost is not None:
+                      cost_str = f"${monthly_cost:.2f}"
+                  elif pattern['action'] == 'destroy':
+                      cost_str = "-"
+                  else:
+                      cost_str = "N/A"
+                  issue_body += f"| {pattern['index']} | {action_icon} {pattern['action']} | `{pattern['pattern']}` | `{version}` | `{pattern['name']}` | {cost_str} | {status_icon} |\n"
+              else:
+                  issue_body += f"| {pattern['index']} | {action_icon} {pattern['action']} | `{pattern['pattern']}` | `{version}` | `{pattern['name']}` | {status_icon} |\n"
 
           issue_body += "\n"
+
+          # Add cost summary if available
+          if cost_data and cost_data.get('total_monthly_usd', 0) > 0:
+              total_cost = cost_data.get('total_monthly_usd', 0)
+              issue_body += f"### Cost Estimate\n\n"
+              issue_body += f"**Estimated Monthly Cost: ${total_cost:.2f} USD**\n\n"
+              issue_body += "_Cost estimates are based on Azure pricing and may vary. Actual costs depend on usage._\n\n"
 
           # Add outputs section for create actions
           output_files = glob.glob('outputs/tf-outputs-*/tf-outputs-*.json')
