@@ -5,6 +5,13 @@ All notable changes to the linux-vm pattern.
 
 ## [2.0.0] - 2026-01-25
 
+### Other Changes
+- chore(linux-vm): release v2.0.0 (6af42a0)
+
+
+
+## [2.0.0] - 2026-01-25
+
 No notable changes in this release.
 
 
