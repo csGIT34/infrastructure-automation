@@ -3603,7 +3603,7 @@ config:
             return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
         }
 
-        // Sign in
+        // Sign in - uses redirect flow for better compatibility
         async function signIn() {
             if (!msalInstance) {
                 alert('Authentication not available. Please refresh the page and try again.');
@@ -3611,28 +3611,21 @@ config:
                 return;
             }
             try {
-                const response = await msalInstance.loginPopup({
+                // Use redirect instead of popup for better reliability
+                await msalInstance.loginRedirect({
                     scopes: apiConfig.scopes
                 });
-                currentAccount = response.account;
-                updateAuthUI();
             } catch (error) {
                 console.error("Login failed:", error);
-                if (error.errorCode !== 'user_cancelled') {
-                    alert('Sign in failed: ' + (error.message || 'Unknown error'));
-                }
+                alert('Sign in failed: ' + (error.message || 'Unknown error'));
             }
         }
 
         // Sign out
         function signOut() {
-            msalInstance.logoutPopup({
+            msalInstance.logoutRedirect({
                 account: currentAccount,
                 postLogoutRedirectUri: window.location.origin + window.location.pathname
-            }).then(() => {
-                currentAccount = null;
-                updateAuthUI();
-                hideValidationResults();
             });
         }
 
