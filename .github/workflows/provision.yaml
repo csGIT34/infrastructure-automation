@@ -340,8 +340,35 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', matrix.pattern.environment)] }}
+          # Pass credentials for background refresh
+          AZURE_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', matrix.pattern.environment)] }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
+          # Start background token refresh to handle long-running applies
+          # OIDC tokens expire after ~5 minutes, so refresh every 4 minutes
+          (
+            while true; do
+              sleep 240  # 4 minutes
+              echo "Refreshing Azure CLI token..."
+              az login --service-principal \
+                -u "$AZURE_CLIENT_ID" \
+                -t "$AZURE_TENANT_ID" \
+                --federated-token "$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')" \
+                --allow-no-subscriptions > /dev/null 2>&1 || true
+              az account set --subscription "$AZURE_SUBSCRIPTION_ID" > /dev/null 2>&1 || true
+            done
+          ) &
+          REFRESH_PID=$!
+
+          # Run terraform apply
           terraform apply -auto-approve tfplan
+          TF_EXIT_CODE=$?
+
+          # Stop the background refresh
+          kill $REFRESH_PID 2>/dev/null || true
+
+          exit $TF_EXIT_CODE
 
       - name: Capture Terraform Outputs
         id: outputs
