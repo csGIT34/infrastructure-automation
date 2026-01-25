@@ -3682,7 +3682,7 @@ config:
             // Provide helpful descriptions for common fields
             let description = def.description || '';
             if (name === 'name' && !description) {
-                description = 'Resource name suffix (combined with project name to create unique resource names)';
+                description = 'Resource name suffix. Combined with project name to create: <code>kv-{project}-{name}-{env}</code>. Example: project "myapp" + name "secrets" → <code>kv-myapp-secrets-dev</code>';
             }
 
             let inputHtml = '';
