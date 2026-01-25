@@ -3540,11 +3540,20 @@ config:
 
         // Initialize MSAL
         async function initAuth() {
+            // Check if MSAL library loaded
+            if (typeof msal === 'undefined') {
+                console.error("MSAL library not loaded. Check Content-Security-Policy.");
+                document.getElementById('auth-container').innerHTML = `
+                    <span style="color: #ef4444; font-size: 0.875rem;">Auth unavailable - reload page</span>
+                `;
+                return;
+            }
+
             try {
                 msalInstance = new msal.PublicClientApplication(msalConfig);
                 await msalInstance.initialize();
 
-                // Handle redirect response
+                // Handle redirect response (for redirect flow, not popup)
                 const response = await msalInstance.handleRedirectPromise();
                 if (response) {
                     currentAccount = response.account;
@@ -3559,7 +3568,9 @@ config:
                 updateAuthUI();
             } catch (error) {
                 console.error("Auth initialization failed:", error);
-                document.getElementById('auth-loading').textContent = 'Auth unavailable';
+                document.getElementById('auth-container').innerHTML = `
+                    <span style="color: #f59e0b; font-size: 0.875rem;">Auth error - check console</span>
+                `;
             }
         }
 
@@ -3594,6 +3605,11 @@ config:
 
         // Sign in
         async function signIn() {
+            if (!msalInstance) {
+                alert('Authentication not available. Please refresh the page and try again.');
+                console.error('MSAL not initialized. Check if the script loaded correctly.');
+                return;
+            }
             try {
                 const response = await msalInstance.loginPopup({
                     scopes: apiConfig.scopes
@@ -3603,7 +3619,7 @@ config:
             } catch (error) {
                 console.error("Login failed:", error);
                 if (error.errorCode !== 'user_cancelled') {
-                    alert('Sign in failed. Please try again.');
+                    alert('Sign in failed: ' + (error.message || 'Unknown error'));
                 }
             }
         }
