@@ -127,9 +127,11 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ github.event_name }}" == "workflow_call" ]; then
+          # Check if called from release workflow (workflow_call sets inputs.pattern_name)
+          if [ -n "${{ inputs.pattern_name }}" ]; then
             echo "Release validation for: ${{ inputs.pattern_name }}"
             echo "patterns_to_test=[\"${{ inputs.pattern_name }}\"]" >> $GITHUB_OUTPUT
+            # Skip module tests during release - they require Azure auth not available for tags
             echo "modules_to_test=[]" >> $GITHUB_OUTPUT
             echo "run_all=false" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
