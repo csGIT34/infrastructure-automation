@@ -5,6 +5,13 @@ All notable changes to the static-site pattern.
 
 ## [2.0.0] - 2026-01-25
 
+### Other Changes
+- chore(static-site): release v2.0.0 (43333e0)
+
+
+
+## [2.0.0] - 2026-01-25
+
 No notable changes in this release.
 
 
