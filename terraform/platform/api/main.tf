@@ -4,8 +4,9 @@
 # Provisions:
 #   - Resource Group
 #   - Storage Account (for Function App)
-#   - App Service Plan (Consumption/Y1)
+#   - App Service Plan (Flex Consumption FC1)
 #   - Azure Function App (Python)
+#   - Entra ID App Registrations (API + Portal)
 #   - Security Groups (api-users, api-admins)
 #   - RBAC Assignments
 
@@ -42,6 +43,12 @@ provider "azuread" {
 }
 
 # -----------------------------------------------------------------------------
+# Data Sources
+# -----------------------------------------------------------------------------
+
+data "azuread_client_config" "current" {}
+
+# -----------------------------------------------------------------------------
 # Locals
 # -----------------------------------------------------------------------------
 
@@ -52,6 +59,9 @@ locals {
     BusinessUnit = var.business_unit
     ManagedBy    = "Terraform-Platform"
   }
+
+  # API identifier URI
+  api_identifier_uri = "api://infra-platform-dry-run-api"
 }
 
 # -----------------------------------------------------------------------------
@@ -76,6 +86,106 @@ module "func_naming" {
   resource_type = "function_app"
   name          = "dryrun"
   business_unit = var.business_unit
+}
+
+# -----------------------------------------------------------------------------
+# Entra ID App Registration - API
+# -----------------------------------------------------------------------------
+
+resource "azuread_application" "api" {
+  display_name     = "Infrastructure Platform - Dry Run API"
+  identifier_uris  = [local.api_identifier_uri]
+  sign_in_audience = "AzureADMyOrg"
+
+  api {
+    requested_access_token_version = 2
+
+    oauth2_permission_scope {
+      admin_consent_description  = "Allow the application to validate infrastructure patterns"
+      admin_consent_display_name = "Validate Patterns"
+      enabled                    = true
+      id                         = random_uuid.api_scope_id.result
+      type                       = "User"
+      user_consent_description   = "Allow the application to validate infrastructure patterns on your behalf"
+      user_consent_display_name  = "Validate Patterns"
+      value                      = "Patterns.Validate"
+    }
+  }
+
+  web {
+    implicit_grant {
+      access_token_issuance_enabled = false
+      id_token_issuance_enabled     = true
+    }
+  }
+
+  required_resource_access {
+    resource_app_id = "00000003-0000-0000-c000-000000000000" # Microsoft Graph
+
+    resource_access {
+      id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d" # User.Read
+      type = "Scope"
+    }
+  }
+
+  tags = ["Infrastructure", "Platform", "API"]
+}
+
+resource "random_uuid" "api_scope_id" {}
+
+resource "azuread_service_principal" "api" {
+  client_id                    = azuread_application.api.client_id
+  app_role_assignment_required = false
+
+  tags = ["Infrastructure", "Platform", "API"]
+}
+
+# -----------------------------------------------------------------------------
+# Entra ID App Registration - Portal (SPA)
+# -----------------------------------------------------------------------------
+
+resource "azuread_application" "portal" {
+  display_name     = "Infrastructure Platform - Portal"
+  sign_in_audience = "AzureADMyOrg"
+
+  single_page_application {
+    redirect_uris = var.portal_redirect_uris
+  }
+
+  required_resource_access {
+    resource_app_id = "00000003-0000-0000-c000-000000000000" # Microsoft Graph
+
+    resource_access {
+      id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d" # User.Read
+      type = "Scope"
+    }
+  }
+
+  # Permission to call the Dry Run API
+  required_resource_access {
+    resource_app_id = azuread_application.api.client_id
+
+    resource_access {
+      id   = random_uuid.api_scope_id.result # Patterns.Validate scope
+      type = "Scope"
+    }
+  }
+
+  tags = ["Infrastructure", "Platform", "Portal"]
+}
+
+resource "azuread_service_principal" "portal" {
+  client_id                    = azuread_application.portal.client_id
+  app_role_assignment_required = false
+
+  tags = ["Infrastructure", "Platform", "Portal"]
+}
+
+# Pre-authorize the portal to call the API (no consent prompt)
+resource "azuread_application_pre_authorized" "portal_to_api" {
+  application_id       = azuread_application.api.id
+  authorized_client_id = azuread_application.portal.client_id
+  permission_ids       = [random_uuid.api_scope_id.result]
 }
 
 # -----------------------------------------------------------------------------
@@ -163,6 +273,25 @@ resource "azurerm_function_app_flex_consumption" "api" {
 
   identity {
     type = "SystemAssigned"
+  }
+
+  # ---------------------------------------------------------------------------
+  # Entra ID Authentication
+  # ---------------------------------------------------------------------------
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = true
+    unauthenticated_action = "Return401"
+
+    active_directory_v2 {
+      client_id            = azuread_application.api.client_id
+      tenant_auth_endpoint = "https://login.microsoftonline.com/${data.azuread_client_config.current.tenant_id}/v2.0"
+      allowed_audiences    = [local.api_identifier_uri, azuread_application.api.client_id]
+    }
+
+    login {
+      token_store_enabled = true
+    }
   }
 
   tags = local.tags
@@ -259,6 +388,40 @@ output "storage_account" {
   value       = azurerm_storage_account.func.name
 }
 
+output "entra_auth" {
+  description = "Entra ID authentication configuration"
+  value = {
+    tenant_id         = data.azuread_client_config.current.tenant_id
+    api_client_id     = azuread_application.api.client_id
+    api_scope         = "${local.api_identifier_uri}/Patterns.Validate"
+    portal_client_id  = azuread_application.portal.client_id
+    authority         = "https://login.microsoftonline.com/${data.azuread_client_config.current.tenant_id}"
+  }
+}
+
+output "portal_msal_config" {
+  description = "MSAL configuration for portal integration (copy to portal JavaScript)"
+  value       = <<-EOT
+    // MSAL Configuration for Portal
+    const msalConfig = {
+      auth: {
+        clientId: "${azuread_application.portal.client_id}",
+        authority: "https://login.microsoftonline.com/${data.azuread_client_config.current.tenant_id}",
+        redirectUri: window.location.origin
+      },
+      cache: {
+        cacheLocation: "sessionStorage",
+        storeAuthStateInCookie: false
+      }
+    };
+
+    const apiConfig = {
+      endpoint: "https://${azurerm_function_app_flex_consumption.api.default_hostname}/api/dry-run",
+      scopes: ["${local.api_identifier_uri}/Patterns.Validate"]
+    };
+  EOT
+}
+
 output "deployment_instructions" {
   description = "Instructions for deploying the API"
   value       = <<-EOT
@@ -267,15 +430,16 @@ output "deployment_instructions" {
     Function App: ${azurerm_function_app_flex_consumption.api.name}
     API Endpoint: https://${azurerm_function_app_flex_consumption.api.default_hostname}/api/dry-run
 
+    AUTHENTICATION:
+    The API now uses Entra ID authentication (no more API keys needed).
+
+    Portal Client ID: ${azuread_application.portal.client_id}
+    API Scope: ${local.api_identifier_uri}/Patterns.Validate
+    Authority: https://login.microsoftonline.com/${data.azuread_client_config.current.tenant_id}
+
     To deploy the function code:
     1. Navigate to terraform/platform/api/functions
     2. Run: func azure functionapp publish ${azurerm_function_app_flex_consumption.api.name}
-
-    Or use GitHub Actions:
-    - The workflow will automatically deploy on push to main
-
-    To get the function key (for API auth):
-    - az functionapp keys list -g ${azurerm_resource_group.api.name} -n ${azurerm_function_app_flex_consumption.api.name}
 
     Security Groups:
     - API Users: ${module.security_groups.group_names["api-users"]}

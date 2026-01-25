@@ -62,13 +62,54 @@ config:
 
 ## Authentication
 
-The API uses function key authentication. Include the function key as a query parameter:
+The API uses Entra ID (Azure AD) authentication with OAuth 2.0 bearer tokens.
+
+### Portal Integration (Recommended)
+
+The portal uses MSAL.js for browser-based authentication. See the `portal_msal_config`
+Terraform output for the complete configuration:
+
+```javascript
+// Get configuration from: terraform output portal_msal_config
+const msalConfig = {
+  auth: {
+    clientId: "<portal_client_id>",
+    authority: "https://login.microsoftonline.com/<tenant_id>",
+    redirectUri: window.location.origin
+  }
+};
+
+const apiConfig = {
+  endpoint: "https://<func>.azurewebsites.net/api/dry-run",
+  scopes: ["api://infra-platform-dry-run-api/Patterns.Validate"]
+};
+```
+
+### CLI Testing with az cli
+
+For testing, you can obtain a token using the Azure CLI:
 
 ```bash
-curl -X POST "https://<func>.azurewebsites.net/api/dry-run?code=<function_key>" \
+# Get an access token for the API
+TOKEN=$(az account get-access-token \
+  --resource "api://infra-platform-dry-run-api" \
+  --query accessToken -o tsv)
+
+# Call the API with the bearer token
+curl -X POST "https://<func>.azurewebsites.net/api/dry-run" \
   -H "Content-Type: text/yaml" \
+  -H "Authorization: Bearer $TOKEN" \
   -d @infrastructure.yaml
 ```
+
+### Entra ID Configuration
+
+| Setting | Value |
+|---------|-------|
+| API Client ID | See `terraform output entra_auth` |
+| Portal Client ID | See `terraform output entra_auth` |
+| Scope | `api://infra-platform-dry-run-api/Patterns.Validate` |
+| Authority | `https://login.microsoftonline.com/<tenant_id>` |
 
 ## Local Development
 
@@ -201,4 +242,5 @@ Response includes execution order (destroy actions first):
 |------|-------------|
 | 200 | All patterns valid |
 | 400 | Validation errors or invalid YAML |
+| 401 | Unauthorized - missing or invalid Entra ID token |
 | 500 | Internal server error |
