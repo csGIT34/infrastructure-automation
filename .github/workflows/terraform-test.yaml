@@ -335,6 +335,11 @@ jobs:
       - name: Run module test
         if: steps.check-test.outputs.exists == 'true'
         working-directory: terraform/tests/modules/${{ matrix.module }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_dev }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           terraform init
           terraform test -var-file=../../setup/terraform.tfvars
@@ -404,6 +409,11 @@ jobs:
       - name: Run pattern test
         if: steps.check-test.outputs.exists == 'true'
         working-directory: terraform/tests/patterns/${{ matrix.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_dev }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           terraform init
           terraform test -var-file=../../setup/terraform.tfvars
