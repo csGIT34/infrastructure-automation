@@ -180,6 +180,7 @@ metadata:
   location: eastus
 
 pattern: keyvault
+pattern_version: "1.0.0"  # Required - pin to specific version
 config:
   name: secrets
   size: small  # Optional, defaults based on environment
@@ -532,6 +533,71 @@ The GitHub App (`INFRA_APP_ID`) must be installed on **both** infrastructure-aut
 4. Install the app on each consuming repo
 5. Add `INFRA_APP_ID` and `INFRA_APP_PRIVATE_KEY` to both repos' secrets
 
+## Pattern Versioning
+
+The platform uses **per-pattern versioning** with semantic versioning (semver). Each pattern has its own independent version lifecycle.
+
+### Version Format
+
+Tags follow the format: `{pattern}/v{major}.{minor}.{patch}`
+
+Examples:
+- `keyvault/v1.0.0` - Initial release
+- `keyvault/v1.1.0` - New feature (minor bump)
+- `keyvault/v2.0.0` - Breaking change (major bump)
+
+### Creating a Release
+
+Platform developers use git tags to create releases:
+
+```bash
+# Check current version
+cat terraform/patterns/keyvault/VERSION
+
+# Create release using helper script
+./scripts/create-release.sh keyvault 1.2.0
+
+# Or manually
+git tag keyvault/v1.2.0
+git push origin keyvault/v1.2.0
+```
+
+The release workflow (`.github/workflows/release.yaml`) automatically:
+1. Validates tests pass for the pattern
+2. Generates changelog from commits
+3. Creates GitHub release
+4. Updates VERSION and CHANGELOG files
+
+### Version Pinning (Consumers)
+
+Consumers **must** pin to a specific version in their `infrastructure.yaml`:
+
+```yaml
+pattern: keyvault
+pattern_version: "1.2.0"  # Required
+```
+
+### Update Checker (Consumers)
+
+Consumers can use the update checker workflow (`templates/update-checker-workflow.yaml`) to get Dependabot-style PRs when new versions are available.
+
+### Development Workflow
+
+1. Create feature branch
+2. Make changes to patterns/modules
+3. Open PR (CI runs tests for affected patterns)
+4. Merge to main (tests must pass)
+5. Create release tag when ready to ship
+
+### Related Files
+
+- `docs/versioning-strategy.md` - Full versioning strategy documentation
+- `.github/workflows/terraform-test.yaml` - Smart test detection for PRs
+- `.github/workflows/release.yaml` - Tag-triggered release workflow
+- `templates/update-checker-workflow.yaml` - Consumer update checker
+- `scripts/create-release.sh` - Helper script for creating releases
+
 ## Key Documentation
 
 - `infrastructure-platform-guide.md` - Comprehensive platform guide
+- `docs/versioning-strategy.md` - Pattern versioning strategy

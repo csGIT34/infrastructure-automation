@@ -9,6 +9,7 @@
 # - Destroy actions are executed FIRST, then create actions
 # - Each document is processed sequentially
 # - Partial failures are reported (remaining patterns still process)
+# - pattern_version is REQUIRED for all patterns (version pinning)
 #
 # Use case: Replacing an old database with a new one
 # 1. Destroy the old PostgreSQL database
@@ -29,6 +30,7 @@ metadata:
   location: eastus
 
 pattern: postgresql
+pattern_version: "1.0.0"              # Version that was used to create the resource
 config:
   name: olddb
 
@@ -46,6 +48,7 @@ metadata:
   location: eastus
 
 pattern: keyvault
+pattern_version: "1.0.0"              # Pin to specific version
 config:
   name: secrets
   size: small
@@ -63,6 +66,7 @@ metadata:
   location: eastus
 
 pattern: storage
+pattern_version: "1.0.0"              # Pin to specific version
 config:
   name: data
   size: small

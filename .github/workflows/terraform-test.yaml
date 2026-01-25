@@ -1,12 +1,17 @@
-# Terraform Module Tests
+# Terraform Tests with Smart Detection
 #
-# Runs terraform test for all modules and patterns.
+# Runs terraform tests for changed modules and patterns.
 # Tests create real Azure resources and clean up automatically.
+#
+# Smart detection:
+# - Detects which patterns/modules changed in the PR
+# - Runs only affected tests (not all tests)
+# - Shared modules (naming, security-groups, rbac) trigger all dependent patterns
 
 name: Terraform Tests
 
 on:
-  # Manual trigger for local development workflow
+  # Manual trigger for development and release validation
   workflow_dispatch:
     inputs:
       test_type:
@@ -18,8 +23,13 @@ on:
           - all
           - modules
           - patterns
+          - changed-only
       specific_test:
         description: 'Specific module/pattern name (leave empty for all)'
+        required: false
+        type: string
+      validate_release:
+        description: 'Validate for release (pattern name, e.g., keyvault)'
         required: false
         type: string
 
@@ -27,21 +37,221 @@ on:
   pull_request:
     paths:
       - 'terraform/**'
+      - 'config/patterns/**'
+      - 'scripts/resolve-pattern.py'
       - '.github/workflows/terraform-test.yaml'
 
-  # Scheduled run to catch regressions
+  # Scheduled run to catch regressions and Azure API changes
   schedule:
     - cron: '0 6 * * 1'  # Every Monday at 6 AM UTC
+
+  # Called by release workflow to validate before release
+  workflow_call:
+    inputs:
+      pattern_name:
+        description: 'Pattern to validate for release'
+        required: true
+        type: string
+    outputs:
+      test_passed:
+        description: 'Whether tests passed'
+        value: ${{ jobs.summary.outputs.test_passed }}
 
 env:
   TERRAFORM_VERSION: '1.6.0'
   TF_IN_AUTOMATION: 'true'
 
 jobs:
-  # Quick validation - naming module only (no Azure resources)
+  # Detect what changed and determine which tests to run
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed_modules: ${{ steps.detect.outputs.changed_modules }}
+      changed_patterns: ${{ steps.detect.outputs.changed_patterns }}
+      modules_to_test: ${{ steps.detect.outputs.modules_to_test }}
+      patterns_to_test: ${{ steps.detect.outputs.patterns_to_test }}
+      run_all: ${{ steps.detect.outputs.run_all }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff
+
+      - name: Detect changed files and determine tests
+        id: detect
+        run: |
+          # Pattern -> Module dependencies
+          # Maps each pattern to the modules it uses
+          declare -A PATTERN_MODULES=(
+            ["keyvault"]="naming keyvault security-groups rbac-assignments access-review diagnostic-settings private-endpoint"
+            ["postgresql"]="naming postgresql keyvault security-groups rbac-assignments access-review diagnostic-settings private-endpoint"
+            ["mongodb"]="naming mongodb keyvault security-groups rbac-assignments diagnostic-settings private-endpoint"
+            ["storage"]="naming storage-account security-groups rbac-assignments diagnostic-settings private-endpoint"
+            ["function-app"]="naming function-app keyvault storage-account security-groups rbac-assignments diagnostic-settings"
+            ["sql-database"]="naming azure-sql keyvault security-groups rbac-assignments diagnostic-settings private-endpoint"
+            ["eventhub"]="naming eventhub keyvault security-groups rbac-assignments diagnostic-settings private-endpoint"
+            ["aks-namespace"]="naming aks-namespace security-groups rbac-assignments"
+            ["linux-vm"]="naming linux-vm keyvault security-groups rbac-assignments diagnostic-settings"
+            ["static-site"]="naming static-web-app security-groups rbac-assignments"
+            ["web-app"]="naming static-web-app function-app postgresql keyvault storage-account security-groups rbac-assignments diagnostic-settings"
+            ["api-backend"]="naming function-app azure-sql keyvault storage-account security-groups rbac-assignments diagnostic-settings"
+            ["microservice"]="naming aks-namespace eventhub storage-account keyvault security-groups rbac-assignments diagnostic-settings"
+            ["data-pipeline"]="naming eventhub function-app storage-account mongodb keyvault security-groups rbac-assignments diagnostic-settings"
+          )
+
+          # Shared modules that affect all patterns
+          SHARED_MODULES="naming security-groups rbac-assignments"
+
+          # Determine test scope based on trigger
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ -n "${{ inputs.validate_release }}" ]; then
+              echo "Release validation for: ${{ inputs.validate_release }}"
+              echo "patterns_to_test=[\"${{ inputs.validate_release }}\"]" >> $GITHUB_OUTPUT
+              echo "modules_to_test=[]" >> $GITHUB_OUTPUT
+              echo "run_all=false" >> $GITHUB_OUTPUT
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              exit 0
+            elif [ "${{ inputs.test_type }}" == "all" ]; then
+              echo "run_all=true" >> $GITHUB_OUTPUT
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "Scheduled run - testing all"
+            echo "run_all=true" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" == "workflow_call" ]; then
+            echo "Release validation for: ${{ inputs.pattern_name }}"
+            echo "patterns_to_test=[\"${{ inputs.pattern_name }}\"]" >> $GITHUB_OUTPUT
+            echo "modules_to_test=[]" >> $GITHUB_OUTPUT
+            echo "run_all=false" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For PRs, detect changed files
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="HEAD~1"
+          fi
+
+          CHANGED_FILES=$(git diff --name-only $BASE_SHA HEAD 2>/dev/null || echo "")
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changes detected"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Check for changes that require all tests
+          if echo "$CHANGED_FILES" | grep -qE "scripts/resolve-pattern.py|\.github/workflows/terraform-test\.yaml"; then
+            echo "Core file changed - running all tests"
+            echo "run_all=true" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Detect changed modules
+          CHANGED_MODULES=""
+          for file in $CHANGED_FILES; do
+            if [[ "$file" =~ terraform/modules/([^/]+)/ ]]; then
+              module="${BASH_REMATCH[1]}"
+              if [[ ! "$CHANGED_MODULES" =~ "$module" ]]; then
+                CHANGED_MODULES="$CHANGED_MODULES $module"
+              fi
+            fi
+          done
+          CHANGED_MODULES=$(echo $CHANGED_MODULES | xargs)  # Trim
+
+          # Detect changed patterns
+          CHANGED_PATTERNS=""
+          for file in $CHANGED_FILES; do
+            if [[ "$file" =~ terraform/patterns/([^/]+)/ ]] || [[ "$file" =~ config/patterns/([^/]+)\.yaml ]]; then
+              pattern="${BASH_REMATCH[1]}"
+              if [[ ! "$CHANGED_PATTERNS" =~ "$pattern" ]]; then
+                CHANGED_PATTERNS="$CHANGED_PATTERNS $pattern"
+              fi
+            fi
+          done
+          CHANGED_PATTERNS=$(echo $CHANGED_PATTERNS | xargs)  # Trim
+
+          echo "Changed modules: $CHANGED_MODULES"
+          echo "Changed patterns: $CHANGED_PATTERNS"
+
+          # Check if shared modules changed -> test all patterns
+          RUN_ALL=false
+          for shared in $SHARED_MODULES; do
+            if [[ "$CHANGED_MODULES" =~ "$shared" ]]; then
+              echo "Shared module $shared changed - will test all patterns using it"
+              RUN_ALL=true
+              break
+            fi
+          done
+
+          if [ "$RUN_ALL" == "true" ]; then
+            echo "run_all=true" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Build list of patterns to test based on module changes
+          PATTERNS_TO_TEST="$CHANGED_PATTERNS"
+          for module in $CHANGED_MODULES; do
+            for pattern in "${!PATTERN_MODULES[@]}"; do
+              if [[ "${PATTERN_MODULES[$pattern]}" =~ "$module" ]]; then
+                if [[ ! "$PATTERNS_TO_TEST" =~ "$pattern" ]]; then
+                  PATTERNS_TO_TEST="$PATTERNS_TO_TEST $pattern"
+                  echo "Module $module changed - adding pattern $pattern to tests"
+                fi
+              fi
+            done
+          done
+          PATTERNS_TO_TEST=$(echo $PATTERNS_TO_TEST | xargs)
+
+          # Build list of modules to test (direct module tests)
+          MODULES_TO_TEST="$CHANGED_MODULES"
+
+          # Convert to JSON arrays
+          if [ -n "$MODULES_TO_TEST" ]; then
+            MODULES_JSON=$(echo $MODULES_TO_TEST | tr ' ' '\n' | jq -R . | jq -sc .)
+          else
+            MODULES_JSON="[]"
+          fi
+
+          if [ -n "$PATTERNS_TO_TEST" ]; then
+            PATTERNS_JSON=$(echo $PATTERNS_TO_TEST | tr ' ' '\n' | jq -R . | jq -sc .)
+          else
+            PATTERNS_JSON="[]"
+          fi
+
+          echo "Modules to test: $MODULES_JSON"
+          echo "Patterns to test: $PATTERNS_JSON"
+
+          echo "changed_modules=$MODULES_JSON" >> $GITHUB_OUTPUT
+          echo "changed_patterns=$PATTERNS_JSON" >> $GITHUB_OUTPUT
+          echo "modules_to_test=$MODULES_JSON" >> $GITHUB_OUTPUT
+          echo "patterns_to_test=$PATTERNS_JSON" >> $GITHUB_OUTPUT
+          echo "run_all=false" >> $GITHUB_OUTPUT
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+
+  # Quick validation - always runs (no Azure resources)
   validate:
     name: Quick Validation
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+
     steps:
       - uses: actions/checkout@v4
 
@@ -50,21 +260,27 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-      - name: Test naming module (no Azure)
+      - name: Validate naming module (no Azure)
         working-directory: terraform/tests/modules/naming
         run: |
           terraform init
           terraform test
 
-  # Module tests - run in parallel
+      - name: Validate pattern resolution script
+        run: |
+          pip install pyyaml
+          python3 scripts/resolve-pattern.py examples/keyvault-pattern.yaml --validate
+          python3 scripts/resolve-pattern.py examples/multi-pattern.yaml --validate
+
+  # Module tests - run in parallel for changed modules
   test-modules:
     name: Test Module - ${{ matrix.module }}
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [detect-changes, validate]
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.test_type == 'all' ||
-      github.event.inputs.test_type == 'modules'
+      needs.detect-changes.outputs.has_changes == 'true' &&
+      (needs.detect-changes.outputs.run_all == 'true' ||
+       needs.detect-changes.outputs.modules_to_test != '[]')
 
     permissions:
       id-token: write
@@ -73,25 +289,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module:
-          - keyvault
-          - storage-account
-          - security-groups
-          - rbac-assignments
-          - postgresql
-        exclude:
-          # Skip if specific test requested and doesn't match
-          - module: ${{ github.event.inputs.specific_test != '' && github.event.inputs.specific_test != matrix.module && matrix.module || '' }}
+        module: ${{ needs.detect-changes.outputs.run_all == 'true' && fromJSON('["keyvault", "storage-account", "security-groups", "rbac-assignments", "postgresql", "eventhub", "azure-sql", "mongodb", "function-app", "static-web-app", "linux-vm"]') || fromJSON(needs.detect-changes.outputs.modules_to_test) }}
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check if test exists
+        id: check-test
+        run: |
+          if [ -d "terraform/tests/modules/${{ matrix.module }}" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::warning::No test found for module ${{ matrix.module }}"
+          fi
+
       - name: Setup Terraform
+        if: steps.check-test.outputs.exists == 'true'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Azure Login (OIDC)
+        if: steps.check-test.outputs.exists == 'true'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID_dev }}
@@ -99,6 +319,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Create test config
+        if: steps.check-test.outputs.exists == 'true'
         working-directory: terraform/tests/setup
         run: |
           cat > terraform.tfvars <<EOF
@@ -109,21 +330,25 @@ jobs:
           EOF
 
       - name: Run module test
+        if: steps.check-test.outputs.exists == 'true'
         working-directory: terraform/tests/modules/${{ matrix.module }}
         run: |
           terraform init
           terraform test -var-file=../../setup/terraform.tfvars
         timeout-minutes: 30
 
-  # Pattern tests - run after module tests
+  # Pattern tests - run for changed patterns
   test-patterns:
     name: Test Pattern - ${{ matrix.pattern }}
     runs-on: ubuntu-latest
-    needs: test-modules
+    needs: [detect-changes, validate, test-modules]
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.test_type == 'all' ||
-      github.event.inputs.test_type == 'patterns'
+      always() &&
+      needs.validate.result == 'success' &&
+      (needs.test-modules.result == 'success' || needs.test-modules.result == 'skipped') &&
+      needs.detect-changes.outputs.has_changes == 'true' &&
+      (needs.detect-changes.outputs.run_all == 'true' ||
+       needs.detect-changes.outputs.patterns_to_test != '[]')
 
     permissions:
       id-token: write
@@ -132,20 +357,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pattern:
-          - keyvault
-        exclude:
-          - pattern: ${{ github.event.inputs.specific_test != '' && github.event.inputs.specific_test != matrix.pattern && matrix.pattern || '' }}
+        pattern: ${{ needs.detect-changes.outputs.run_all == 'true' && fromJSON('["keyvault", "postgresql", "storage", "api-backend", "function-app", "sql-database", "eventhub", "mongodb", "static-site", "linux-vm"]') || fromJSON(needs.detect-changes.outputs.patterns_to_test) }}
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check if test exists
+        id: check-test
+        run: |
+          if [ -d "terraform/tests/patterns/${{ matrix.pattern }}" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::warning::No test found for pattern ${{ matrix.pattern }}"
+          fi
+
       - name: Setup Terraform
+        if: steps.check-test.outputs.exists == 'true'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Azure Login (OIDC)
+        if: steps.check-test.outputs.exists == 'true'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID_dev }}
@@ -153,6 +387,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Create test config
+        if: steps.check-test.outputs.exists == 'true'
         working-directory: terraform/tests/setup
         run: |
           cat > terraform.tfvars <<EOF
@@ -163,11 +398,97 @@ jobs:
           EOF
 
       - name: Run pattern test
+        if: steps.check-test.outputs.exists == 'true'
         working-directory: terraform/tests/patterns/${{ matrix.pattern }}
         run: |
           terraform init
           terraform test -var-file=../../setup/terraform.tfvars
         timeout-minutes: 45
+
+  # Summary job - aggregates results
+  summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [detect-changes, validate, test-modules, test-patterns]
+    if: always()
+    outputs:
+      test_passed: ${{ steps.result.outputs.passed }}
+
+    steps:
+      - name: Determine test result
+        id: result
+        run: |
+          echo "Validate: ${{ needs.validate.result }}"
+          echo "Modules: ${{ needs.test-modules.result }}"
+          echo "Patterns: ${{ needs.test-patterns.result }}"
+
+          if [ "${{ needs.detect-changes.outputs.has_changes }}" != "true" ]; then
+            echo "No changes detected - skipping tests"
+            echo "passed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "${{ needs.validate.result }}" != "success" ]; then
+            echo "Validation failed"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Modules can be skipped if none changed
+          if [ "${{ needs.test-modules.result }}" != "success" ] && [ "${{ needs.test-modules.result }}" != "skipped" ]; then
+            echo "Module tests failed"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Patterns can be skipped if none changed
+          if [ "${{ needs.test-patterns.result }}" != "success" ] && [ "${{ needs.test-patterns.result }}" != "skipped" ]; then
+            echo "Pattern tests failed"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "All tests passed"
+          echo "passed=true" >> $GITHUB_OUTPUT
+
+      - name: Create summary
+        run: |
+          echo "## Terraform Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.detect-changes.outputs.has_changes }}" != "true" ]; then
+            echo "No terraform changes detected." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          echo "### Test Scope" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.detect-changes.outputs.run_all }}" == "true" ]; then
+            echo "Running all tests (shared module changed or full test requested)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Running targeted tests for changed components" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ needs.detect-changes.outputs.modules_to_test }}" != "[]" ]; then
+              echo "**Modules:** ${{ needs.detect-changes.outputs.modules_to_test }}" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ "${{ needs.detect-changes.outputs.patterns_to_test }}" != "[]" ]; then
+              echo "**Patterns:** ${{ needs.detect-changes.outputs.patterns_to_test }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Validation | ${{ needs.validate.result == 'success' && '✅' || '❌' }} ${{ needs.validate.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Module Tests | ${{ needs.test-modules.result == 'success' && '✅' || needs.test-modules.result == 'skipped' && '⏭️' || '❌' }} ${{ needs.test-modules.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pattern Tests | ${{ needs.test-patterns.result == 'success' && '✅' || needs.test-patterns.result == 'skipped' && '⏭️' || '❌' }} ${{ needs.test-patterns.result }} |" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.result.outputs.passed }}" == "true" ]; then
+            echo "### Overall: ✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Overall: ❌ Tests failed" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # Cleanup orphaned resources (runs on schedule only)
   cleanup:

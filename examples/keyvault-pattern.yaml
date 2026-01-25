@@ -22,6 +22,7 @@ metadata:
   location: eastus
 
 pattern: keyvault
+pattern_version: "1.0.0"              # Required - pin to specific version
 config:
   name: secrets
   size: small                         # small, medium, large (optional)

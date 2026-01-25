@@ -166,10 +166,16 @@ jobs:
               doc = documents[pattern['index']]
               metadata = doc.get('metadata', {})
 
+              # Get pattern version for versioned checkout
+              pattern_version = doc.get('pattern_version', '')
+              version_tag = f"{pattern['pattern']}/v{pattern_version}" if pattern_version else ''
+
               patterns_for_matrix.append({
                   'index': pattern['index'],
                   'action': pattern['action'],
                   'pattern': pattern['pattern'],
+                  'pattern_version': pattern_version,
+                  'version_tag': version_tag,
                   'state_key': pattern['state_key'],
                   'environment': metadata.get('environment', 'dev'),
                   'project': metadata.get('project', 'unknown'),
@@ -233,9 +239,22 @@ jobs:
         run: |
           echo "Processing pattern ${{ matrix.pattern.index }}: ${{ matrix.pattern.pattern }}"
           echo "  Action: ${{ matrix.pattern.action }}"
+          echo "  Version: ${{ matrix.pattern.pattern_version }}"
+          echo "  Version Tag: ${{ matrix.pattern.version_tag }}"
           echo "  Environment: ${{ matrix.pattern.environment }}"
           echo "  Project: ${{ matrix.pattern.project }}"
           echo "  State Key: ${{ matrix.pattern.state_key }}"
+
+      # Checkout the specific version of the pattern
+      - name: Checkout versioned pattern
+        if: matrix.pattern.version_tag != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.pattern.version_tag }}
+          path: versioned-pattern
+          sparse-checkout: |
+            terraform/patterns/${{ matrix.pattern.pattern }}
+            terraform/modules
 
       - name: Azure Login
         uses: azure/login@v2
@@ -248,12 +267,28 @@ jobs:
         run: |
           PATTERN="${{ matrix.pattern.pattern }}"
           INDEX="${{ matrix.pattern.index }}"
+          VERSION_TAG="${{ matrix.pattern.version_tag }}"
 
           # Preserve directory structure so ../../modules/ paths work
           mkdir -p terraform-workspace/terraform/patterns
-          cp -r "terraform/patterns/$PATTERN" "terraform-workspace/terraform/patterns/$PATTERN"
-          cp -r terraform/modules terraform-workspace/terraform/
+
+          # Use versioned pattern if available, otherwise use main
+          if [ -n "$VERSION_TAG" ] && [ -d "versioned-pattern/terraform/patterns/$PATTERN" ]; then
+            echo "Using versioned pattern from $VERSION_TAG"
+            cp -r "versioned-pattern/terraform/patterns/$PATTERN" "terraform-workspace/terraform/patterns/$PATTERN"
+            cp -r versioned-pattern/terraform/modules terraform-workspace/terraform/
+          else
+            echo "Using pattern from main branch (no version specified or version not found)"
+            cp -r "terraform/patterns/$PATTERN" "terraform-workspace/terraform/patterns/$PATTERN"
+            cp -r terraform/modules terraform-workspace/terraform/
+          fi
+
           cp "terraform.tfvars.${INDEX}.json" "terraform-workspace/terraform/patterns/$PATTERN/terraform.tfvars.json"
+
+          # Show what version is being used
+          if [ -f "terraform-workspace/terraform/patterns/$PATTERN/VERSION" ]; then
+            echo "Pattern version: $(cat terraform-workspace/terraform/patterns/$PATTERN/VERSION)"
+          fi
 
       - name: Ensure Terraform plugin cache exists
         run: mkdir -p /tmp/terraform-plugin-cache
@@ -410,16 +445,17 @@ jobs:
           issue_body += "| Commit | `${{ needs.resolve-patterns.outputs.commit_sha }}` |\n"
           issue_body += "| Workflow Run | [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |\n\n"
           issue_body += "### Pattern Results\n\n"
-          issue_body += "| Doc | Action | Pattern | Name | Status |\n"
-          issue_body += "|-----|--------|---------|------|--------|\n"
+          issue_body += "| Doc | Action | Pattern | Version | Name | Status |\n"
+          issue_body += "|-----|--------|---------|---------|------|--------|\n"
 
           # Add pattern results
           for pattern in patterns:
               action_icon = "🗑️" if pattern['action'] == 'destroy' else "✨"
+              version = pattern.get('pattern_version', 'latest')
               # We'll mark all as success if the job succeeded, otherwise unknown
               # In a real scenario, you'd track individual pattern results
               status_icon = "✅" if provision_result == 'success' else "⚠️"
-              issue_body += f"| {pattern['index']} | {action_icon} {pattern['action']} | `{pattern['pattern']}` | `{pattern['name']}` | {status_icon} |\n"
+              issue_body += f"| {pattern['index']} | {action_icon} {pattern['action']} | `{pattern['pattern']}` | `{version}` | `{pattern['name']}` | {status_icon} |\n"
 
           issue_body += "\n"
 

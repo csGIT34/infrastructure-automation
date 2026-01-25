@@ -1,0 +1,384 @@
+# Pattern Release Workflow
+#
+# Creates a versioned release for a pattern when a tag is pushed.
+# Tag format: {pattern}/v{major}.{minor}.{patch}
+# Example: keyvault/v1.2.0, postgresql/v2.0.0
+#
+# The workflow:
+# 1. Validates the tag format
+# 2. Runs tests for the pattern
+# 3. Generates changelog from commits since last release
+# 4. Creates GitHub release with release notes
+# 5. Updates VERSION file in pattern directory
+
+name: Pattern Release
+
+on:
+  push:
+    tags:
+      - '*/v*'  # Matches keyvault/v1.0.0, postgresql/v2.1.0, etc.
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  TERRAFORM_VERSION: '1.6.0'
+
+jobs:
+  # Parse and validate the tag
+  parse-tag:
+    name: Parse Tag
+    runs-on: ubuntu-latest
+    outputs:
+      pattern: ${{ steps.parse.outputs.pattern }}
+      version: ${{ steps.parse.outputs.version }}
+      major: ${{ steps.parse.outputs.major }}
+      minor: ${{ steps.parse.outputs.minor }}
+      patch: ${{ steps.parse.outputs.patch }}
+      previous_tag: ${{ steps.parse.outputs.previous_tag }}
+      is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for changelog
+
+      - name: Parse tag
+        id: parse
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "Processing tag: $TAG"
+
+          # Parse pattern and version from tag
+          if [[ "$TAG" =~ ^([a-z][a-z0-9-]+)/v([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-z0-9]+)?$ ]]; then
+            PATTERN="${BASH_REMATCH[1]}"
+            MAJOR="${BASH_REMATCH[2]}"
+            MINOR="${BASH_REMATCH[3]}"
+            PATCH="${BASH_REMATCH[4]}"
+            PRERELEASE="${BASH_REMATCH[5]}"
+            VERSION="${MAJOR}.${MINOR}.${PATCH}${PRERELEASE}"
+
+            echo "Pattern: $PATTERN"
+            echo "Version: $VERSION"
+            echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
+            if [ -n "$PRERELEASE" ]; then
+              echo "Pre-release: $PRERELEASE"
+            fi
+          else
+            echo "::error::Invalid tag format: $TAG"
+            echo "Expected format: {pattern}/v{major}.{minor}.{patch}"
+            echo "Example: keyvault/v1.2.0"
+            exit 1
+          fi
+
+          # Validate pattern exists
+          if [ ! -d "terraform/patterns/$PATTERN" ]; then
+            echo "::error::Pattern directory not found: terraform/patterns/$PATTERN"
+            exit 1
+          fi
+
+          # Find previous tag for this pattern
+          PREVIOUS_TAG=$(git tag -l "${PATTERN}/v*" | grep -v "$TAG" | sort -V | tail -1 || echo "")
+          echo "Previous tag: ${PREVIOUS_TAG:-none}"
+
+          # Determine if pre-release
+          IS_PRERELEASE="false"
+          if [ -n "$PRERELEASE" ]; then
+            IS_PRERELEASE="true"
+          fi
+
+          # Set outputs
+          echo "pattern=$PATTERN" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "major=$MAJOR" >> $GITHUB_OUTPUT
+          echo "minor=$MINOR" >> $GITHUB_OUTPUT
+          echo "patch=$PATCH" >> $GITHUB_OUTPUT
+          echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+
+  # Run tests for the pattern
+  test-pattern:
+    name: Test Pattern
+    needs: parse-tag
+    uses: ./.github/workflows/terraform-test.yaml
+    with:
+      pattern_name: ${{ needs.parse-tag.outputs.pattern }}
+    secrets: inherit
+
+  # Generate changelog
+  generate-changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    needs: parse-tag
+    outputs:
+      changelog: ${{ steps.changelog.outputs.changelog }}
+      release_notes: ${{ steps.changelog.outputs.release_notes }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PATTERN="${{ needs.parse-tag.outputs.pattern }}"
+          VERSION="${{ needs.parse-tag.outputs.version }}"
+          PREVIOUS_TAG="${{ needs.parse-tag.outputs.previous_tag }}"
+
+          echo "Generating changelog for $PATTERN v$VERSION"
+
+          # Determine commit range
+          if [ -n "$PREVIOUS_TAG" ]; then
+            RANGE="$PREVIOUS_TAG..HEAD"
+            echo "Comparing $PREVIOUS_TAG to HEAD"
+          else
+            # First release - get all commits affecting this pattern
+            RANGE="HEAD"
+            echo "First release - getting all relevant commits"
+          fi
+
+          # Get commits affecting this pattern
+          COMMITS=$(git log $RANGE --oneline -- \
+            "terraform/patterns/$PATTERN/**" \
+            "terraform/modules/**" \
+            "config/patterns/$PATTERN.yaml" \
+            2>/dev/null || git log --oneline -- \
+            "terraform/patterns/$PATTERN/**" \
+            "terraform/modules/**" \
+            "config/patterns/$PATTERN.yaml" | head -50)
+
+          echo "Commits found:"
+          echo "$COMMITS"
+
+          # Categorize commits by conventional commit prefix
+          FEATURES=""
+          FIXES=""
+          BREAKING=""
+          OTHER=""
+
+          while IFS= read -r line; do
+            if [ -z "$line" ]; then continue; fi
+
+            HASH=$(echo "$line" | cut -d' ' -f1)
+            MSG=$(echo "$line" | cut -d' ' -f2-)
+
+            # Categorize by prefix
+            if [[ "$MSG" =~ ^feat(\(.+\))?!?: ]]; then
+              if [[ "$MSG" =~ ! ]]; then
+                BREAKING="$BREAKING- $MSG ($HASH)\n"
+              else
+                FEATURES="$FEATURES- $MSG ($HASH)\n"
+              fi
+            elif [[ "$MSG" =~ ^fix(\(.+\))?!?: ]]; then
+              if [[ "$MSG" =~ ! ]]; then
+                BREAKING="$BREAKING- $MSG ($HASH)\n"
+              else
+                FIXES="$FIXES- $MSG ($HASH)\n"
+              fi
+            elif [[ "$MSG" =~ ^(BREAKING|breaking) ]]; then
+              BREAKING="$BREAKING- $MSG ($HASH)\n"
+            elif [[ "$MSG" =~ ^(docs|chore|refactor|test|ci|style): ]]; then
+              # Skip non-user-facing changes
+              continue
+            else
+              OTHER="$OTHER- $MSG ($HASH)\n"
+            fi
+          done <<< "$COMMITS"
+
+          # Build changelog
+          CHANGELOG=""
+
+          if [ -n "$BREAKING" ]; then
+            CHANGELOG="$CHANGELOG### Breaking Changes\n$BREAKING\n"
+          fi
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG="$CHANGELOG### Features\n$FEATURES\n"
+          fi
+          if [ -n "$FIXES" ]; then
+            CHANGELOG="$CHANGELOG### Bug Fixes\n$FIXES\n"
+          fi
+          if [ -n "$OTHER" ]; then
+            CHANGELOG="$CHANGELOG### Other Changes\n$OTHER\n"
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="No notable changes in this release.\n"
+          fi
+
+          echo "Generated changelog:"
+          echo -e "$CHANGELOG"
+
+          # Build release notes
+          RELEASE_NOTES="## $PATTERN v$VERSION\n\n"
+          RELEASE_NOTES="$RELEASE_NOTES$CHANGELOG"
+
+          # Add upgrade guide for major versions
+          if [ "${{ needs.parse-tag.outputs.patch }}" == "0" ] && [ "${{ needs.parse-tag.outputs.minor }}" == "0" ]; then
+            RELEASE_NOTES="$RELEASE_NOTES### Upgrade Guide\n"
+            RELEASE_NOTES="${RELEASE_NOTES}This is a major version release. Please review the breaking changes above.\n\n"
+          fi
+
+          # Add comparison link
+          if [ -n "$PREVIOUS_TAG" ]; then
+            REPO="${{ github.repository }}"
+            RELEASE_NOTES="${RELEASE_NOTES}### Full Changelog\n"
+            RELEASE_NOTES="${RELEASE_NOTES}https://github.com/$REPO/compare/$PREVIOUS_TAG...${{ github.ref_name }}\n"
+          fi
+
+          # Write to file for artifact
+          echo -e "$CHANGELOG" > changelog.md
+          echo -e "$RELEASE_NOTES" > release_notes.md
+
+          # Set outputs (escape newlines)
+          {
+            echo "changelog<<EOFCHANGELOG"
+            echo -e "$CHANGELOG"
+            echo "EOFCHANGELOG"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "release_notes<<EOFNOTES"
+            echo -e "$RELEASE_NOTES"
+            echo "EOFNOTES"
+          } >> $GITHUB_OUTPUT
+
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: |
+            changelog.md
+            release_notes.md
+
+  # Create the release
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [parse-tag, test-pattern, generate-changelog]
+    if: needs.test-pattern.outputs.test_passed == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update VERSION file
+        run: |
+          PATTERN="${{ needs.parse-tag.outputs.pattern }}"
+          VERSION="${{ needs.parse-tag.outputs.version }}"
+
+          echo "$VERSION" > "terraform/patterns/$PATTERN/VERSION"
+          echo "Updated terraform/patterns/$PATTERN/VERSION to $VERSION"
+
+      - name: Update pattern CHANGELOG
+        run: |
+          PATTERN="${{ needs.parse-tag.outputs.pattern }}"
+          VERSION="${{ needs.parse-tag.outputs.version }}"
+          DATE=$(date +%Y-%m-%d)
+
+          CHANGELOG_FILE="terraform/patterns/$PATTERN/CHANGELOG.md"
+
+          # Create changelog header if file doesn't exist
+          if [ ! -f "$CHANGELOG_FILE" ]; then
+            echo "# Changelog" > "$CHANGELOG_FILE"
+            echo "" >> "$CHANGELOG_FILE"
+            echo "All notable changes to the $PATTERN pattern." >> "$CHANGELOG_FILE"
+            echo "" >> "$CHANGELOG_FILE"
+          fi
+
+          # Prepare new entry
+          NEW_ENTRY="## [$VERSION] - $DATE\n\n${{ needs.generate-changelog.outputs.changelog }}"
+
+          # Insert after the header (line 4)
+          head -4 "$CHANGELOG_FILE" > changelog_new.md
+          echo -e "\n$NEW_ENTRY" >> changelog_new.md
+          tail -n +5 "$CHANGELOG_FILE" >> changelog_new.md 2>/dev/null || true
+          mv changelog_new.md "$CHANGELOG_FILE"
+
+          echo "Updated $CHANGELOG_FILE"
+
+      - name: Commit VERSION and CHANGELOG updates
+        run: |
+          PATTERN="${{ needs.parse-tag.outputs.pattern }}"
+          VERSION="${{ needs.parse-tag.outputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add "terraform/patterns/$PATTERN/VERSION"
+          git add "terraform/patterns/$PATTERN/CHANGELOG.md"
+
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore($PATTERN): release v$VERSION"
+            git push origin HEAD:main
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "${{ needs.parse-tag.outputs.pattern }} v${{ needs.parse-tag.outputs.version }}"
+          body: ${{ needs.generate-changelog.outputs.release_notes }}
+          prerelease: ${{ needs.parse-tag.outputs.is_prerelease == 'true' }}
+          generate_release_notes: false
+
+      - name: Create summary
+        run: |
+          PATTERN="${{ needs.parse-tag.outputs.pattern }}"
+          VERSION="${{ needs.parse-tag.outputs.version }}"
+
+          cat << EOF >> $GITHUB_STEP_SUMMARY
+          ## Release Created
+
+          | Property | Value |
+          |----------|-------|
+          | Pattern | \`$PATTERN\` |
+          | Version | \`v$VERSION\` |
+          | Tag | \`${{ github.ref_name }}\` |
+          | Pre-release | ${{ needs.parse-tag.outputs.is_prerelease }} |
+
+          ### Changelog
+
+          ${{ needs.generate-changelog.outputs.changelog }}
+
+          ### Consumer Usage
+
+          Update your \`infrastructure.yaml\`:
+
+          \`\`\`yaml
+          pattern: $PATTERN
+          pattern_version: "$VERSION"
+          \`\`\`
+          EOF
+
+  # Notify on failure
+  notify-failure:
+    name: Notify Failure
+    runs-on: ubuntu-latest
+    needs: [parse-tag, test-pattern, create-release]
+    if: failure()
+
+    steps:
+      - name: Create failure summary
+        run: |
+          cat << EOF >> $GITHUB_STEP_SUMMARY
+          ## Release Failed
+
+          | Property | Value |
+          |----------|-------|
+          | Tag | \`${{ github.ref_name }}\` |
+          | Pattern | \`${{ needs.parse-tag.outputs.pattern }}\` |
+          | Version | \`${{ needs.parse-tag.outputs.version }}\` |
+
+          ### Failure Details
+
+          - Parse: ${{ needs.parse-tag.result }}
+          - Tests: ${{ needs.test-pattern.result }}
+          - Release: ${{ needs.create-release.result }}
+
+          Please fix the issues and push a new tag to retry.
+          EOF
+
+          echo "::error::Release failed for ${{ github.ref_name }}"
