@@ -407,6 +407,8 @@ jobs:
     needs: [resolve-patterns, provision-pattern]
     if: always()
     runs-on: ubuntu-latest
+    env:
+      INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
 
     steps:
       - name: Checkout infrastructure-automation
@@ -431,20 +433,20 @@ jobs:
       # Infracost Integration - Real Azure cost estimates
       # -----------------------------------------------------------------------
       - name: Setup Infracost
-        if: needs.provision-pattern.result == 'success' && secrets.INFRACOST_API_KEY != ''
+        if: needs.provision-pattern.result == 'success' && env.INFRACOST_API_KEY != ''
         uses: infracost/actions/setup@v3
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
       - name: Setup Terraform for Infracost
-        if: needs.provision-pattern.result == 'success' && secrets.INFRACOST_API_KEY != ''
+        if: needs.provision-pattern.result == 'success' && env.INFRACOST_API_KEY != ''
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.14.3"
           terraform_wrapper: false
 
       - name: Download tfvars artifacts for cost estimation
-        if: needs.provision-pattern.result == 'success' && secrets.INFRACOST_API_KEY != ''
+        if: needs.provision-pattern.result == 'success' && env.INFRACOST_API_KEY != ''
         uses: actions/download-artifact@v4
         with:
           name: tfvars-files
@@ -453,7 +455,7 @@ jobs:
 
       - name: Estimate costs for provisioned patterns
         id: costs
-        if: needs.provision-pattern.result == 'success' && secrets.INFRACOST_API_KEY != ''
+        if: needs.provision-pattern.result == 'success' && env.INFRACOST_API_KEY != ''
         run: |
           python3 << 'PYTHON_SCRIPT'
           import json

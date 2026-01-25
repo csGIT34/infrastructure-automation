@@ -21,7 +21,7 @@ variable "environment" {
 variable "location" {
   description = "Azure region"
   type        = string
-  default     = "eastus2"
+  default     = "westus2"
 }
 
 variable "business_unit" {
