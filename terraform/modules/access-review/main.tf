@@ -85,7 +85,14 @@ locals {
 
     scope = {
       "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
-      query         = "/groups/${var.group_id}/members"
+      query         = "/groups/${var.group_id}/transitiveMembers"
+      queryType     = "MicrosoftGraph"
+    }
+
+    # This links the review to the group resource (required for group blade visibility)
+    instanceEnumerationScope = {
+      "@odata.type" = "#microsoft.graph.accessReviewQueryScope"
+      query         = "/groups/${var.group_id}"
       queryType     = "MicrosoftGraph"
     }
 
