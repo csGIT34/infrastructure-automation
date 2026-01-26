@@ -158,6 +158,43 @@ Curated infrastructure compositions that developers request:
 | `terraform-test.yaml` | Test runner |
 | `validate-module-sync.yaml` | Sync validation gate |
 
+### 5. Platform Services (`terraform/platform/`)
+
+| Service | Purpose |
+|---------|---------|
+| `api/` | Dry Run API - validates pattern requests before provisioning |
+| `portal/` | Self-service portal infrastructure (Azure Static Web App) |
+
+### 6. Self-Service Portal (`web/`)
+
+The portal provides a web interface for developers to:
+- Browse available patterns and their configurations
+- Generate `infrastructure.yaml` files
+- **Validate configurations** before downloading (requires sign-in)
+
+**Portal Authentication:**
+- Uses Entra ID (Azure AD) with MSAL.js
+- Sign in to enable the "Validate Configuration" button
+- Validation calls the Dry Run API to check patterns before commit
+
+**Portal URL:** Deployed to Azure Static Web Apps (see `terraform output -state=terraform/platform/portal/terraform.tfstate`)
+
+### 7. Dry Run API (`terraform/platform/api/`)
+
+Pre-commit validation API that validates pattern requests without provisioning.
+
+**Features:**
+- Validates `infrastructure.yaml` syntax and schema
+- Shows what components will be provisioned
+- Provides estimated monthly costs
+- Returns environment-specific features
+
+**Authentication:** Entra ID OAuth 2.0 bearer tokens (EasyAuth)
+
+**Endpoint:** `POST /api/dry-run`
+
+See [`terraform/platform/api/README.md`](terraform/platform/api/README.md) for full API documentation.
+
 ---
 
 ## Creating a New Terraform Module
