@@ -665,7 +665,33 @@ Consumers can use the update checker workflow (`templates/update-checker-workflo
 - `templates/update-checker-workflow.yaml` - Consumer update checker
 - `scripts/create-release.sh` - Helper script for creating releases
 
+## Dry Run API & Portal
+
+### Self-Service Portal (`web/`)
+
+The portal at `web/index.html` provides:
+- Pattern browsing and configuration
+- `infrastructure.yaml` generation
+- **Validate Configuration** button (requires Entra ID sign-in)
+
+Portal authentication uses MSAL.js with Entra ID OAuth 2.0.
+
+### Dry Run API (`terraform/platform/api/`)
+
+Pre-commit validation API that validates pattern requests without provisioning.
+
+**Endpoint:** `POST /api/dry-run`
+**Authentication:** Entra ID OAuth 2.0 bearer tokens (EasyAuth)
+
+Key files:
+- `terraform/platform/api/main.tf` - Function App + Entra ID app registrations
+- `terraform/platform/api/functions/dry-run/__init__.py` - API logic
+- `terraform/platform/api/README.md` - Full API documentation
+
+The Function App uses `authLevel: anonymous` with EasyAuth handling authentication.
+
 ## Key Documentation
 
 - `infrastructure-platform-guide.md` - Comprehensive platform guide
 - `docs/versioning-strategy.md` - Pattern versioning strategy
+- `terraform/platform/api/README.md` - Dry Run API documentation
