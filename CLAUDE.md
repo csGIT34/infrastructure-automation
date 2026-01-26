@@ -166,6 +166,9 @@ The provision workflow reports back to the source repository:
 - `INFRA_APP_ID` - GitHub App ID (same app as consuming repos)
 - `INFRA_APP_PRIVATE_KEY` - GitHub App private key (PEM format)
 
+**Cost Estimation (optional):**
+- `INFRACOST_API_KEY` - Infracost API key for Azure cost estimates (free tier at infracost.io)
+
 ### Required Secrets (consuming repos)
 
 **GitHub App for Cross-Repo Dispatch:**

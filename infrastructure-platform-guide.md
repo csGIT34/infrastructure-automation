@@ -661,7 +661,20 @@ TF_VAR_owner_email=your-email@company.com
 2. Resolve patterns using `scripts/resolve-pattern.py`
 3. Run `terraform init` with remote state
 4. Run `terraform plan` and `terraform apply`
-5. Report status back to source repo
+5. Estimate costs with Infracost (if `INFRACOST_API_KEY` is configured)
+6. Report status back to source repo (creates issue with results)
+
+**Infracost Integration:**
+
+When `INFRACOST_API_KEY` is configured, the workflow estimates Azure costs for provisioned patterns. Results appear in the provisioning result issue:
+- Per-pattern cost column in the summary table
+- "Cost Estimate" section with total monthly cost
+
+To enable:
+1. Get a free API key at [infracost.io](https://www.infracost.io/)
+2. Add `INFRACOST_API_KEY` secret to the infrastructure-automation repo
+
+If the secret is not configured, cost estimation is skipped silently.
 
 ### Deploy Portal Workflow (`deploy-portal.yaml`)
 
