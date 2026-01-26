@@ -16,6 +16,87 @@ The platform uses **per-pattern versioning** with semantic versioning (semver). 
 
 ---
 
+## Git Tag Basics
+
+If you're new to git tags, this section covers the fundamentals before diving into the platform's versioning system.
+
+### What Are Git Tags?
+
+Git tags are permanent markers that point to a specific commit. Unlike branches (which move forward as you add commits), tags stay fixed—they permanently mark a point in history.
+
+```
+commit A → commit B → commit C → commit D (main branch HEAD moves here)
+                ↑
+            tag: v1.0.0 (stays here forever)
+```
+
+Tags are ideal for marking releases because they provide a stable reference point that never changes.
+
+### Tag Types
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| **Lightweight** | Just a name pointing to a commit | Temporary or local markers |
+| **Annotated** | Includes metadata (author, date, message) | Releases (what we use) |
+
+### Common Git Tag Commands
+
+```bash
+# List all tags
+git tag
+
+# List tags matching a pattern
+git tag -l "keyvault/*"
+
+# View tag details (commit, date, message)
+git show keyvault/v1.0.0
+
+# See which commit a tag points to
+git rev-list -n 1 keyvault/v1.0.0
+
+# Create an annotated tag at current commit
+git tag -a keyvault/v1.0.0 -m "Initial keyvault release"
+
+# Create tag at a specific commit
+git tag -a keyvault/v1.0.0 abc1234 -m "Release message"
+
+# Push a single tag to remote
+git push origin keyvault/v1.0.0
+
+# Push all tags (use sparingly)
+git push --tags
+
+# Delete a local tag
+git tag -d keyvault/v1.0.0
+
+# Delete a remote tag
+git push origin --delete keyvault/v1.0.0
+```
+
+### Tags vs Branches
+
+| Aspect | Branches | Tags |
+|--------|----------|------|
+| **Purpose** | Active development | Mark releases |
+| **Movement** | Moves with new commits | Fixed forever |
+| **Naming** | `main`, `feature/xyz` | `keyvault/v1.0.0` |
+| **Checkout** | For making changes | For viewing/building |
+
+### How Tags Trigger Releases
+
+When you push a tag to GitHub, it can trigger workflows. Our release workflow (`.github/workflows/release.yaml`) watches for tags matching `*/v*`:
+
+```yaml
+on:
+  push:
+    tags:
+      - '*/v*'  # Matches: keyvault/v1.0.0, postgresql/v2.1.0, etc.
+```
+
+This is why creating a tag automatically creates a release—no manual GitHub Release creation needed.
+
+---
+
 ## Version Scheme
 
 ### Tag Format
