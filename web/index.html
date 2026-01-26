@@ -3532,8 +3532,7 @@ config:
 
         const apiConfig = {
             endpoint: "https://func-infra-api-dryrun-prod.azurewebsites.net/api/dry-run",
-            // Use .default to get all permissions for the API
-            scopes: ["api://infra-platform-dry-run-api/.default"]
+            scopes: ["api://infra-platform-dry-run-api/Patterns.Validate"]
         };
 
         let msalInstance = null;

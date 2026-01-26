@@ -295,9 +295,10 @@ resource "azurerm_function_app_flex_consumption" "api" {
     unauthenticated_action = "Return401"
 
     active_directory_v2 {
-      client_id            = azuread_application.api.client_id
-      tenant_auth_endpoint = "https://login.microsoftonline.com/${data.azuread_client_config.current.tenant_id}/v2.0"
-      allowed_audiences    = [local.api_identifier_uri, azuread_application.api.client_id]
+      client_id                       = azuread_application.api.client_id
+      tenant_auth_endpoint            = "https://login.microsoftonline.com/${data.azuread_client_config.current.tenant_id}/v2.0"
+      allowed_audiences               = [local.api_identifier_uri, azuread_application.api.client_id]
+      jwt_allowed_client_applications = [azuread_application.portal.client_id]
     }
 
     login {
