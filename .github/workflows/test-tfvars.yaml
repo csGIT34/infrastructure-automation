@@ -5,11 +5,11 @@ on:
   workflow_dispatch:
     inputs:
       pattern:
-        description: 'Pattern to test (leave empty for all)'
+        description: 'Pattern to test'
         required: false
         type: choice
         options:
-          - ''
+          - all
           - keyvault
           - postgresql
           - storage
@@ -25,11 +25,11 @@ on:
           - api-backend
           - data-pipeline
       size:
-        description: 'Size to test (leave empty for all sizes)'
+        description: 'Size to test'
         required: false
         type: choice
         options:
-          - ''
+          - all
           - small
           - medium
           - large
@@ -68,7 +68,10 @@ jobs:
         id: detect
         run: |
           # Determine patterns to test
-          if [ -n "${{ inputs.pattern }}" ]; then
+          if [ "${{ inputs.pattern }}" == "all" ] || [ -z "${{ inputs.pattern }}" ]; then
+            # Test all patterns
+            PATTERNS='["keyvault","postgresql","storage","eventhub","function-app","sql-database","mongodb","linux-vm","static-site","aks-namespace","microservice","web-app","api-backend","data-pipeline"]'
+          elif [ -n "${{ inputs.pattern }}" ]; then
             # Manual trigger with specific pattern
             PATTERNS='["${{ inputs.pattern }}"]'
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
@@ -98,16 +101,13 @@ jobs:
             else
               PATTERNS=$(echo $PATTERNS_LIST | tr ' ' '\n' | jq -R . | jq -sc .)
             fi
-          else
-            # Manual trigger without pattern - test all
-            PATTERNS='["keyvault","postgresql","storage","eventhub","function-app","sql-database","mongodb","linux-vm","static-site","aks-namespace","microservice","web-app","api-backend","data-pipeline"]'
           fi
 
           # Determine sizes to test
-          if [ -n "${{ inputs.size }}" ]; then
-            SIZES='["${{ inputs.size }}"]'
-          else
+          if [ "${{ inputs.size }}" == "all" ] || [ -z "${{ inputs.size }}" ]; then
             SIZES='["small","medium","large"]'
+          else
+            SIZES='["${{ inputs.size }}"]'
           fi
 
           echo "patterns=$PATTERNS" >> $GITHUB_OUTPUT
