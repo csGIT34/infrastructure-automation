@@ -7,7 +7,7 @@
 project       = "myapp"
 name          = "app"
 business_unit = "engineering"
-owners        = ["alice@company.com", "bob@company.com"]
+owners = ["sa_scottc1@azureskylab.com"]
 
 # AKS Cluster (existing shared cluster)
 aks_cluster_name    = "aks-shared-prod"

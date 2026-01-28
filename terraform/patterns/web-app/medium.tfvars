@@ -8,7 +8,7 @@
 project       = "myapp"
 name          = "webapp"
 business_unit = "engineering"
-owners        = ["alice@company.com", "bob@company.com"]
+owners = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Database selection
