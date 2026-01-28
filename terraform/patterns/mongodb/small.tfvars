@@ -1,0 +1,25 @@
+# MongoDB (Cosmos DB) - Small T-Shirt Size
+# Use case: Development/testing environments
+# - 400 RU/s minimum throughput
+# - 4,000 RU/s max with autoscale
+# - Session consistency
+# - Single region
+
+project       = "myapp"
+name          = "docdb"
+business_unit = "engineering"
+owners        = ["alice@company.com", "bob@company.com"]
+location      = "eastus"
+
+# Sizing
+throughput                = 400
+max_throughput            = 4000
+enable_automatic_failover = false
+consistency_level         = "Session"
+
+# Features (always enabled)
+enable_diagnostics   = true
+enable_access_review = true
+
+# Supporting infrastructure
+log_analytics_workspace_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-monitoring/providers/Microsoft.OperationalInsights/workspaces/law-main"
