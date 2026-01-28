@@ -1,0 +1,135 @@
+name: Terraform Apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      pattern:
+        description: 'Pattern to provision'
+        required: true
+        type: choice
+        options:
+          - keyvault
+          - postgresql
+          - storage
+          - eventhub
+          - function-app
+          - sql-database
+          - mongodb
+          - linux-vm
+          - static-site
+          - aks-namespace
+          - microservice
+          - web-app
+          - api-backend
+          - data-pipeline
+      size:
+        description: 'T-shirt size'
+        required: true
+        type: choice
+        options:
+          - small
+          - medium
+          - large
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        default: plan
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Determine environment from branch
+        id: env
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          if [[ "$BRANCH" == "main" ]]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == "staging" ]]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.env.outputs.environment)] }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.env.outputs.environment)] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          terraform init \
+            -backend-config="storage_account_name=${{ secrets.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.TF_STATE_CONTAINER }}" \
+            -backend-config="key=${{ inputs.pattern }}-${{ inputs.size }}.tfstate"
+
+      - name: Terraform Plan
+        if: inputs.action == 'plan' || inputs.action == 'apply'
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.env.outputs.environment)] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          terraform plan \
+            -var-file=${{ inputs.size }}.tfvars \
+            -out=tfplan
+
+      - name: Terraform Apply
+        if: inputs.action == 'apply'
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.env.outputs.environment)] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: inputs.action == 'destroy'
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.env.outputs.environment)] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          terraform destroy \
+            -var-file=${{ inputs.size }}.tfvars \
+            -auto-approve
+
+      - name: Terraform Output
+        if: inputs.action == 'apply'
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets[format('AZURE_CLIENT_ID_{0}', steps.env.outputs.environment)] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: terraform output -json
