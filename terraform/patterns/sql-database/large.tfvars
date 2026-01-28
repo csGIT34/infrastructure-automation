@@ -7,13 +7,13 @@
 project       = "myapp"
 name          = "appdb"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
 sku_name       = "P2"
 max_size_gb    = 500
-zone_redundant = true  # HA across 3 availability zones
+zone_redundant = true # HA across 3 availability zones
 
 # Features (always enabled)
 enable_diagnostics   = true

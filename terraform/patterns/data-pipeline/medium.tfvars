@@ -8,13 +8,13 @@
 project       = "myapp"
 name          = "datapipe"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
 eventhub_sku        = "Standard"
 eventhub_capacity   = 2
-function_sku        = "EP1"  # Premium Plan: 1 vCore
+function_sku        = "EP1" # Premium Plan: 1 vCore
 storage_replication = "ZRS"
 
 # Pipeline configuration

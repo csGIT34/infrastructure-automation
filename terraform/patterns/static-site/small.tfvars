@@ -6,8 +6,8 @@
 project       = "myapp"
 name          = "webapp"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
-location      = "eastus2"  # Static Web Apps have specific regions
+owners        = ["sa_scottc1@azureskylab.com"]
+location      = "eastus2" # Static Web Apps have specific regions
 
 # Sizing
 sku_tier = "Free"

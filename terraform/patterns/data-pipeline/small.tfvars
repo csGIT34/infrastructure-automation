@@ -8,13 +8,13 @@
 project       = "myapp"
 name          = "datapipe"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
-eventhub_sku      = "Basic"
-eventhub_capacity = 1
-function_sku      = "Y1"    # Consumption Plan
+eventhub_sku        = "Basic"
+eventhub_capacity   = 1
+function_sku        = "Y1" # Consumption Plan
 storage_replication = "LRS"
 
 # Pipeline configuration

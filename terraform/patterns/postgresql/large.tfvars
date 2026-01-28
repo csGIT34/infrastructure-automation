@@ -8,15 +8,15 @@
 project       = "myapp"
 name          = "appdb"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
-sku                   = "MO_Standard_E8s_v3"  # Memory Optimized: 8 vCores, 64GB RAM
-storage_mb            = 524288                # 512GB
+sku                   = "MO_Standard_E8s_v3" # Memory Optimized: 8 vCores, 64GB RAM
+storage_mb            = 524288               # 512GB
 version               = "14"
 backup_retention_days = 35
-geo_redundant_backup  = true                  # Multi-region HA (automatic failover to paired region)
+geo_redundant_backup  = true # Multi-region HA (automatic failover to paired region)
 
 # Features (always enabled)
 enable_diagnostics      = true

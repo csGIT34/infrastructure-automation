@@ -7,11 +7,11 @@
 project       = "myapp"
 name          = "appserver"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
-vm_size         = "Standard_D2s_v3"  # General Purpose: 2 vCPUs, 8GB RAM
+vm_size         = "Standard_D2s_v3" # General Purpose: 2 vCPUs, 8GB RAM
 os_disk_size_gb = 128
 os_disk_type    = "StandardSSD_LRS"
 

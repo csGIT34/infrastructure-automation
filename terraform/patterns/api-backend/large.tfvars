@@ -7,19 +7,19 @@
 project       = "myapp"
 name          = "api"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Database selection
-database_type = "azure_sql"  # Options: azure_sql, postgresql, mongodb, none
+database_type = "azure_sql" # Options: azure_sql, postgresql, mongodb, none
 
 # Sizing
-function_sku = "EP3"  # Premium Plan: 4 vCores
-db_sku       = "P2"   # Premium P2 (250 DTUs), or MO_Standard_E8s_v3 for PostgreSQL
+function_sku = "EP3" # Premium Plan: 4 vCores
+db_sku       = "P2"  # Premium P2 (250 DTUs), or MO_Standard_E8s_v3 for PostgreSQL
 
 # Function runtime
 runtime         = "python"
-runtime_version = ""  # Empty = use module default
+runtime_version = "" # Empty = use module default
 
 # Features (always enabled)
 enable_diagnostics   = true

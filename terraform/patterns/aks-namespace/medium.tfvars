@@ -7,11 +7,11 @@
 project       = "myapp"
 name          = "app"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 
 # AKS Cluster (existing shared cluster)
-aks_cluster_name    = "aks-shared-staging"
-aks_resource_group  = "rg-aks-shared"
+aks_cluster_name   = "aks-shared-staging"
+aks_resource_group = "rg-aks-shared"
 
 # Resource Quotas
 cpu_limit    = "4"

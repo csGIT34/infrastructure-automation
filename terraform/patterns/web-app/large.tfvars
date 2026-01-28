@@ -8,16 +8,16 @@
 project       = "myapp"
 name          = "webapp"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Database selection
-database_type = "postgresql"  # Options: postgresql, azure_sql, none
+database_type = "postgresql" # Options: postgresql, azure_sql, none
 
 # Sizing
 swa_sku_tier = "Standard"
-function_sku = "EP3"                 # Premium Plan: 4 vCores
-db_sku       = "MO_Standard_E8s_v3"  # Memory Optimized: 8 vCores
+function_sku = "EP3"                # Premium Plan: 4 vCores
+db_sku       = "MO_Standard_E8s_v3" # Memory Optimized: 8 vCores
 
 # Function runtime
 runtime         = "python"

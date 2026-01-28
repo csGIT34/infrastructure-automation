@@ -7,11 +7,11 @@
 project       = "myapp"
 name          = "api"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
-sku             = "EP1"  # Premium Plan: 1 vCore, 3.5GB RAM
+sku             = "EP1" # Premium Plan: 1 vCore, 3.5GB RAM
 runtime         = "python"
 runtime_version = "3.11"
 os_type         = "Linux"

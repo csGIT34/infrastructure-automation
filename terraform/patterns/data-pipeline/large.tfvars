@@ -8,14 +8,14 @@
 project       = "myapp"
 name          = "datapipe"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
 eventhub_sku        = "Standard"
 eventhub_capacity   = 4
-function_sku        = "EP3"   # Premium Plan: 4 vCores
-storage_replication = "GZRS"  # Geo-zone-redundant
+function_sku        = "EP3"  # Premium Plan: 4 vCores
+storage_replication = "GZRS" # Geo-zone-redundant
 
 # Pipeline configuration
 partition_count   = 16

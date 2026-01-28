@@ -8,16 +8,16 @@
 project       = "myapp"
 name          = "webapp"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Database selection
-database_type = "postgresql"  # Options: postgresql, azure_sql, none
+database_type = "postgresql" # Options: postgresql, azure_sql, none
 
 # Sizing
 swa_sku_tier = "Free"
-function_sku = "Y1"                  # Consumption Plan
-db_sku       = "B_Standard_B1ms"     # Burstable: 1 vCore
+function_sku = "Y1"              # Consumption Plan
+db_sku       = "B_Standard_B1ms" # Burstable: 1 vCore
 
 # Function runtime
 runtime         = "python"

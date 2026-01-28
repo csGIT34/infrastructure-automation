@@ -8,12 +8,12 @@
 project       = "myapp"
 name          = "data"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
 account_tier     = "Standard"
-replication_type = "GZRS"  # Geo-Zone-Redundant Storage (3 zones + geo-replication to paired region)
+replication_type = "GZRS" # Geo-Zone-Redundant Storage (3 zones + geo-replication to paired region)
 access_tier      = "Hot"
 
 # Containers

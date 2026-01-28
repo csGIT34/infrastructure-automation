@@ -8,15 +8,15 @@
 project       = "myapp"
 name          = "appdb"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
-sku                   = "B_Standard_B1ms"  # Burstable: 1 vCore, 2GB RAM
-storage_mb            = 32768              # 32GB
+sku                   = "B_Standard_B1ms" # Burstable: 1 vCore, 2GB RAM
+storage_mb            = 32768             # 32GB
 version               = "14"
 backup_retention_days = 7
-geo_redundant_backup  = false              # Single region
+geo_redundant_backup  = false # Single region
 
 # Features (always enabled)
 enable_diagnostics      = true

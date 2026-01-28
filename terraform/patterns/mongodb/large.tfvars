@@ -8,13 +8,13 @@
 project       = "myapp"
 name          = "docdb"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
 throughput                = 4000
 max_throughput            = 40000
-enable_automatic_failover = true   # Multi-region automatic failover
+enable_automatic_failover = true # Multi-region automatic failover
 consistency_level         = "Strong"
 
 # Features (always enabled)

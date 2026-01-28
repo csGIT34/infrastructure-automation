@@ -8,15 +8,15 @@
 project       = "myapp"
 name          = "appdb"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
-sku                   = "GP_Standard_D4s_v3"  # General Purpose: 4 vCores, 16GB RAM
-storage_mb            = 131072                # 128GB
+sku                   = "GP_Standard_D4s_v3" # General Purpose: 4 vCores, 16GB RAM
+storage_mb            = 131072               # 128GB
 version               = "14"
 backup_retention_days = 14
-geo_redundant_backup  = false                 # Single region
+geo_redundant_backup  = false # Single region
 
 # Features (always enabled)
 enable_diagnostics      = true

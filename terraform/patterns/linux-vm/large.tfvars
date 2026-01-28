@@ -7,13 +7,13 @@
 project       = "myapp"
 name          = "prodserver"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
-vm_size         = "Standard_D4s_v3"  # General Purpose: 4 vCPUs, 16GB RAM
+vm_size         = "Standard_D4s_v3" # General Purpose: 4 vCPUs, 16GB RAM
 os_disk_size_gb = 512
-os_disk_type    = "Premium_LRS"      # Premium SSD for better IOPS
+os_disk_type    = "Premium_LRS" # Premium SSD for better IOPS
 
 # OS Image
 admin_username  = "azureuser"

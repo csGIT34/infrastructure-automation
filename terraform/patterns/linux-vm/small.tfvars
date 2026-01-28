@@ -7,11 +7,11 @@
 project       = "myapp"
 name          = "jumpbox"
 business_unit = "engineering"
-owners = ["sa_scottc1@azureskylab.com"]
+owners        = ["sa_scottc1@azureskylab.com"]
 location      = "eastus"
 
 # Sizing
-vm_size         = "Standard_B1s"  # Burstable: 1 vCPU, 1GB RAM
+vm_size         = "Standard_B1s" # Burstable: 1 vCPU, 1GB RAM
 os_disk_size_gb = 30
 os_disk_type    = "Standard_LRS"
 
