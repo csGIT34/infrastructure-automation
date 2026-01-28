@@ -1,171 +1,100 @@
 # Platform Infrastructure
 
-This folder contains Terraform configurations for infrastructure that supports the Infrastructure Self-Service Platform itself.
-
-## Components
-
-| Folder | Description | Dependencies |
-|--------|-------------|--------------|
-| `state-storage/` | Terraform state storage (bootstrap) | None - apply first |
-| `portal/` | Self-service portal (Azure Static Web App) | state-storage |
-
-## Deployment Order
-
-1. **state-storage** - Must be deployed first (uses local state initially)
-2. **portal** - Depends on state-storage for remote state
-
----
+Bootstrap infrastructure for the simplified platform.
 
 ## State Storage (Bootstrap)
 
-The state-storage configuration creates the foundational infrastructure for storing Terraform state.
+The state-storage configuration creates Azure Storage for storing Terraform state files.
 
 ### Resources Created
 
-- **Resource Group**: `rg-terraform-state-prod`
-- **Storage Account**: With GRS replication, versioning, and soft delete
+- **Resource Group**: For state storage
+- **Storage Account**: GRS replication, versioning, soft delete
 - **Container**: `tfstate` for state files
-- **Security Groups**: For state readers and admins
+- **Security Groups**: State readers and admins
+- **RBAC Assignments**: Least-privilege access
 
 ### Initial Deployment
 
+This is the first thing you need to deploy. It uses LOCAL state initially.
+
 ```bash
 cd terraform/platform/state-storage
+
+# Create a tfvars file
+cat > terraform.tfvars <<EOF
+subscription_id = "00000000-0000-0000-0000-000000000000"
+project         = "terraform-state"
+environment     = "prod"
+location        = "eastus"
+business_unit   = "platform"
+owners          = ["admin@company.com"]
+replication_type = "GRS"
+EOF
 
 # Initialize with LOCAL state (no remote backend yet)
 terraform init
 
-# Review the plan
-terraform plan -var-file=terraform.tfvars.json
-
-# Create the state storage
-terraform apply -var-file=terraform.tfvars.json
+# Review and apply
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
 ```
 
-### Migrate to Remote State (Optional)
+### Outputs
 
-After creation, you can migrate this config to use its own remote state:
+After creation, you'll get:
 
-1. Uncomment the `backend "azurerm"` block in main.tf
-2. Run:
-   ```bash
-   terraform init -migrate-state -backend-config=backend.tfvars
-   ```
+- **storage_account_name**: Use this for `TF_STATE_STORAGE_ACCOUNT` secret
+- **container_name**: Use this for `TF_STATE_CONTAINER` secret (default: `tfstate`)
+- **security_groups**: Groups for managing state access
+
+### GitHub Secrets
+
+Add these secrets to your GitHub repository:
+
+```
+TF_STATE_STORAGE_ACCOUNT=<storage_account_name from output>
+TF_STATE_CONTAINER=tfstate
+```
 
 ### State Paths
 
-Use these paths for different components:
-
-| Component | State Key |
-|-----------|-----------|
-| state-storage | `platform/state-storage/terraform.tfstate` |
-| portal | `platform/portal/terraform.tfstate` |
-| Pattern instances | `{business_unit}/{env}/{project}/{pattern}/terraform.tfstate` |
-
----
-
-## Portal Infrastructure
-
-The portal infrastructure provisions the Azure Static Web App that hosts the self-service portal.
-
-### Prerequisites
-
-- State storage must exist (deploy state-storage first)
-
-### Resources Created
-
-- **Resource Group**: `rg-infra-portal-prod`
-- **Azure Static Web App**: Hosts the self-service portal
-- **Security Groups**: For portal developers and admins
-- **RBAC Assignments**: Reader/Contributor access
-
-### Deployment
-
-```bash
-cd terraform/platform/portal
-
-# Initialize with remote backend
-terraform init -backend-config=backend.tfvars
-
-# Review the plan
-terraform plan -var-file=terraform.tfvars.json
-
-# Apply
-terraform apply -var-file=terraform.tfvars.json
-
-# Get the deployment token for GitHub Actions
-terraform output -raw static_web_app_api_key
+The workflow uses state paths in this format:
+```
+{pattern}-{size}.tfstate
 ```
 
-### GitHub Actions Setup
+Examples:
+- `postgresql-small.tfstate`
+- `keyvault-large.tfstate`
+- `web-app-medium.tfstate`
 
-After deploying, add the API key as a GitHub secret:
+### Migrate to Remote State (Optional)
 
-1. Get the key: `terraform output -raw static_web_app_api_key`
-2. Go to repository Settings → Secrets → Actions
-3. Add secret: `AZURE_STATIC_WEB_APPS_TOKEN`
+After creation, you can optionally migrate this config to use its own remote state:
 
-### Configuration
+1. Uncomment the `backend "azurerm"` block in `main.tf`
+2. Create `backend.tfvars`:
+   ```hcl
+   resource_group_name  = "<from output>"
+   storage_account_name = "<from output>"
+   container_name       = "tfstate"
+   key                  = "platform/state-storage/terraform.tfstate"
+   ```
+3. Run: `terraform init -migrate-state -backend-config=backend.tfvars`
 
-Edit `terraform.tfvars.json` to customize:
+### Security Groups
 
-```json
-{
-  "project": "infra-portal",
-  "environment": "prod",
-  "location": "eastus2",
-  "business_unit": "platform",
-  "owners": ["admin@company.com"],
-  "sku_tier": "Standard",
-  "sku_size": "Standard"
-}
-```
-
-### SKU Options
-
-| Tier | Features | Cost |
-|------|----------|------|
-| Free | 100GB bandwidth, 2 custom domains | $0 |
-| Standard | 100GB bandwidth, 5 custom domains, password protection | $9/month |
-
----
-
-## Security Groups
-
-### State Storage Groups
-
-| Group | Purpose |
-|-------|---------|
-| `sg-terraform-state-prod-state-readers` | Read Terraform state |
-| `sg-terraform-state-prod-state-admins` | Full access to state storage |
-
-### Portal Groups
-
-| Group | Purpose |
-|-------|---------|
-| `sg-infra-portal-prod-portal-developers` | View portal resources |
-| `sg-infra-portal-prod-portal-admins` | Manage portal and resources |
+| Group | Purpose | RBAC Role |
+|-------|---------|-----------|
+| `*-state-readers` | Read Terraform state | Storage Blob Data Reader |
+| `*-state-admins` | Full access to state | Storage Blob Data Contributor |
 
 Add users to these groups in Entra ID to grant access.
 
----
+## Notes
 
-## Quick Start
-
-```bash
-# 1. Deploy state storage (first time only)
-cd terraform/platform/state-storage
-terraform init
-terraform apply -var-file=terraform.tfvars.json
-
-# 2. Deploy portal
-cd ../portal
-terraform init -backend-config=backend.tfvars
-terraform apply -var-file=terraform.tfvars.json
-
-# 3. Get deployment token
-terraform output -raw static_web_app_api_key
-
-# 4. Add AZURE_STATIC_WEB_APPS_TOKEN secret to GitHub
-# 5. Push code to trigger portal deployment
-```
+- **State Locking**: Azure Storage provides built-in state locking via blob leases
+- **Versioning**: Enabled on the storage account (30-day soft delete)
+- **Replication**: GRS (geo-redundant) by default for disaster recovery
+- **Access**: All access via RBAC (no storage account keys needed)
