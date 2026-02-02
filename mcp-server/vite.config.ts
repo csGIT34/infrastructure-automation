@@ -1,0 +1,17 @@
+import { defineConfig } from "vite";
+import { viteSingleFile } from "vite-plugin-singlefile";
+
+export default defineConfig({
+  plugins: [viteSingleFile()],
+  build: {
+    outDir: "dist/ui",
+    rollupOptions: {
+      input: process.env.INPUT || "ui/pattern-generator.html",
+    },
+  },
+  resolve: {
+    alias: {
+      "@": "/ui/src",
+    },
+  },
+});

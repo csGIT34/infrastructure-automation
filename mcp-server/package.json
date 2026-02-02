@@ -1,18 +1,20 @@
 {
-  "name": "infrastructure-mcp-server",
-  "version": "1.0.0",
-  "description": "MCP server for AI-powered infrastructure generation",
+  "name": "infrastructure-mcp-app",
+  "version": "2.0.0",
+  "description": "MCP app for AI-powered infrastructure generation with interactive UI",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "bin": {
-    "infrastructure-mcp": "./dist/index.js"
+    "infrastructure-mcp": "./dist/server.js"
   },
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "start:sse": "MCP_TRANSPORT=sse node dist/index.js",
-    "dev": "tsc && node dist/index.js",
-    "dev:sse": "tsc && MCP_TRANSPORT=sse node dist/index.js"
+    "build": "tsc && npm run build:ui && npm run build:copy",
+    "build:ui": "vite build",
+    "build:copy": "node -e \"require('fs').copyFileSync('src/patterns.generated.json','dist/patterns.generated.json')\"",
+    "start": "node dist/server.js",
+    "start:stdio": "cross-env MCP_TRANSPORT=stdio node dist/server.js",
+    "dev": "npm run build && npm run start",
+    "dev:stdio": "npm run build && npm run start:stdio"
   },
   "keywords": [
     "mcp",
@@ -22,15 +24,20 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "yaml": "^2.3.4",
-    "glob": "^10.3.10",
+    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "glob": "^10.3.10",
+    "yaml": "^2.3.4",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@types/express": "^4.17.21",
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@types/cors": "^2.8.17",
-    "typescript": "^5.3.0"
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "cross-env": "^10.1.0",
+    "typescript": "^5.3.0",
+    "vite": "^7.3.1",
+    "vite-plugin-singlefile": "^2.3.0"
   }
 }

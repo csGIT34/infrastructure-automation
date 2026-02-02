@@ -1,425 +1,389 @@
-# Infrastructure MCP Server
+# Infrastructure MCP App
 
-An MCP (Model Context Protocol) server that enables AI assistants to analyze codebases and generate infrastructure configurations. Deployed on Azure Container Apps with API key authentication.
+An MCP App (Model Context Protocol Application) that provides an **interactive UI for infrastructure pattern generation**, rendering directly within Claude conversations. Built with the MCP SDK and `@modelcontextprotocol/ext-apps`.
 
-## Quick Start
+## What is an MCP App?
 
-### For Developers Using Claude Code
+MCP Apps extend the Model Context Protocol by adding interactive UI capabilities that render directly in the Claude conversation. Unlike traditional MCP servers that only provide text-based tools, MCP Apps can display rich forms, visualizations, and interactive elements.
 
-Add this to your project's `.mcp.json` file:
-
-```json
-{
-  "mcpServers": {
-    "infrastructure": {
-      "type": "sse",
-      "url": "https://ca-mcp-prod.mangoflower-3bcf53fc.centralus.azurecontainerapps.io/sse?api_key=YOUR_API_KEY"
-    }
-  }
-}
-```
-
-Contact your platform team to get an API key.
-
-### Getting the API Key (Platform Team)
-
-```bash
-# From Terraform state
-cd terraform/mcp-server
-terraform output -raw api_key
-
-# Or from Azure directly
-az containerapp secret show \
-  --name ca-mcp-prod \
-  --resource-group rg-mcp-prod \
-  --secret-name api-key \
-  --query value -o tsv
-```
-
-## Available Tools
-
-Once connected, Claude Code can use these tools:
-
-### `list_available_modules`
-
-List all available Terraform modules with their configuration options.
-
-```
-Use list_available_modules to see what infrastructure I can provision
-```
-
-### `analyze_codebase`
-
-Analyze a codebase to detect what infrastructure resources it needs. Scans for database connections, storage usage, frameworks, and environment variables.
-
-> **⚠️ Important**: This tool only works in **local mode** (stdio). When using the hosted SSE server, the server cannot access your local filesystem. Use `analyze_files` instead.
-
-```
-Analyze my codebase at /path/to/project to determine what infrastructure it needs
-```
-
-### `analyze_files`
-
-Analyze file contents to detect infrastructure needs. **Works with the remote SSE server** - Claude Code reads your local files and passes the contents to this tool for pattern analysis.
-
-**Recommended files to include:**
-- `package.json` or `requirements.txt` (dependencies)
-- `host.json` (Azure Functions)
-- `staticwebapp.config.json` (Static Web Apps)
-- Source files with imports (database connections, SDK usage)
-
-```
-Read my package.json, host.json, and database.ts files, then use analyze_files to detect what infrastructure I need
-```
-
-### `generate_infrastructure_yaml`
-
-Generate an `infrastructure.yaml` configuration file based on detected or specified resources.
-
-```
-Generate an infrastructure.yaml for my project with a PostgreSQL database and Key Vault
-```
-
-### `validate_infrastructure_yaml`
-
-Validate an infrastructure configuration against the schema and available modules.
-
-```
-Validate this infrastructure.yaml file
-```
-
-### `get_module_details`
-
-Get detailed information about a specific module including all config options and examples.
-
-```
-Show me the details for the postgresql module
-```
-
-### `generate_workflow`
-
-Generate a GitHub Actions workflow file that processes `infrastructure.yaml` and triggers the provisioning pipeline. Save this in your repo as `.github/workflows/infrastructure.yaml`.
-
-```
-Generate a workflow file for my infrastructure provisioning
-```
-
-## Supported Resource Types
-
-| Resource Type | Description | Key Options |
-|--------------|-------------|-------------|
-| `postgresql` | Azure Database for PostgreSQL Flexible Server | version, sku, storage_mb, backup_retention_days |
-| `mongodb` | Azure Cosmos DB with MongoDB API | serverless, consistency_level, throughput |
-| `keyvault` | Azure Key Vault for secrets and keys | sku, soft_delete_days, purge_protection, rbac_enabled |
-| `storage_account` | Azure Storage Account | tier, replication, versioning, containers |
-| `function_app` | Azure Functions | runtime, runtime_version, sku, app_settings |
-| `eventhub` | Azure Event Hubs | sku, capacity, partition_count, message_retention |
-| `aks_namespace` | Kubernetes namespace in shared AKS | cpu_limit, memory_limit, rbac_groups |
-| `linux_vm` | Azure Linux Virtual Machine | size, image, os_disk_type, public_ip |
-| `azure_sql` | Azure SQL Database | sku, version, databases, firewall_rules |
-| `static_web_app` | Azure Static Web App | sku_tier |
-
-## Module Management (Single Source of Truth)
-
-The `MODULE_DEFINITIONS` object in `src/index.ts` serves as the **single source of truth** for all supported resource types. This ensures consistency between:
-
-- The MCP server tools (`list_available_modules`, `analyze_files`, etc.)
-- The `generate_workflow` tool output
-- The GitOps workflow template (`templates/infrastructure-workflow.yaml`)
-
-### How It Works
-
-```
-┌─────────────────────────────────────────┐
-│  MODULE_DEFINITIONS (src/index.ts)      │  ◀── Single Source of Truth
-└─────────────────────────────────────────┘
-              │
-              ▼
-    ┌─────────────────────┐
-    │ getValidResourceTypes() │
-    └─────────────────────┘
-              │
-    ┌─────────┴─────────┐
-    │                   │
-    ▼                   ▼
-┌─────────────┐   ┌─────────────────────────┐
-│ MCP Tools   │   │ /schema/modules API     │
-│ (runtime)   │   │ (for external sync)     │
-└─────────────┘   └─────────────────────────┘
-                            │
-                            ▼
-                  ┌─────────────────────────┐
-                  │ sync-workflow-template.sh│
-                  │ (updates template YAML) │
-                  └─────────────────────────┘
-```
-
-### Adding a New Module
-
-1. **Add the module definition** to `MODULE_DEFINITIONS` in `src/index.ts`:
-
-```typescript
-const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
-  // ... existing modules ...
-
-  new_resource: {
-    name: "new_resource",
-    description: "Description of the new resource",
-    required_fields: ["field1", "field2"],
-    config_options: {
-      option1: {
-        type: "string",
-        required: false,
-        default: "default_value",
-        description: "Description of option1"
-      }
-    },
-    azure_resource: "Microsoft.ResourceType/resources",
-    example: {
-      type: "new_resource",
-      name: "my-resource",
-      config: {
-        option1: "value"
-      }
-    }
-  }
-};
-```
-
-2. **Deploy the MCP server** - The CI/CD pipeline will build and deploy automatically on push to main.
-
-3. **Sync the workflow template**:
-
-```bash
-# Automatically updates templates/infrastructure-workflow.yaml
-./scripts/sync-workflow-template.sh
-
-# Or specify a different MCP server URL
-./scripts/sync-workflow-template.sh https://your-mcp-server.com
-```
-
-4. **Commit both changes** together to keep everything in sync.
-
-### Schema API Endpoint
-
-The MCP server exposes a public endpoint for fetching the current module schema:
-
-```bash
-curl https://ca-mcp-prod.mangoflower-3bcf53fc.centralus.azurecontainerapps.io/schema/modules
-```
-
-Response:
-```json
-{
-  "valid_types": ["aks_namespace", "azure_sql", "eventhub", ...],
-  "modules": {
-    "postgresql": {
-      "name": "postgresql",
-      "description": "Azure Database for PostgreSQL Flexible Server",
-      "config_options": ["version", "sku", "storage_mb", ...]
-    }
-  },
-  "generated_at": "2026-01-19T12:00:00.000Z"
-}
-```
-
-### CI Validation
-
-The `.github/workflows/validate-module-sync.yaml` workflow automatically validates that `MODULE_DEFINITIONS` and the workflow template stay in sync:
-
-- **Triggers**: On PRs or pushes that modify `mcp-server/src/index.ts` or `templates/infrastructure-workflow.yaml`
-- **Action**: Extracts module names from both sources and compares them
-- **On failure**: Shows which modules are missing and provides fix instructions
-
-If the CI check fails:
-```bash
-# Option 1: Run the sync script
-./scripts/sync-workflow-template.sh
-
-# Option 2: Manually update the template
-# Edit templates/infrastructure-workflow.yaml and update the valid_types list
-```
+This app provides:
+- **Interactive pattern selection** with live configuration forms
+- **T-shirt sizing** (small/medium/large) based on environment
+- **Real-time YAML generation** and validation
+- **Cost estimation** for infrastructure patterns
+- **Pattern recommendations** based on codebase analysis
 
 ## Architecture
 
 ```
-┌─────────────────┐         ┌──────────────────────────┐
-│  Claude Code    │◀──SSE──▶│  MCP Server              │
-│  (Developer)    │         │  (Azure Container Apps)  │
-└─────────────────┘         └──────────────────────────┘
-        │                              │
-        │                              ▼
-        │                   ┌──────────────────────────┐
-        │                   │  Codebase Analysis       │
-        │                   │  Pattern Detection       │
-        │                   │  YAML Generation         │
-        │                   └──────────────────────────┘
-        │
-        ▼
 ┌─────────────────────────────────────────────────────┐
-│  GitOps Workflow                                     │
-│  CLI/API → Service Bus → GitHub Actions → Terraform │
+│                   Claude Desktop                     │
+│  ┌────────────────────────────────────────────────┐ │
+│  │  Interactive UI (rendered in conversation)     │ │
+│  │  - Pattern selection dropdown                  │ │
+│  │  - Configuration form with validation          │ │
+│  │  - Generate button                             │ │
+│  └────────────────────────────────────────────────┘ │
+│                        ▲                             │
+│                        │ App.sendMessage()           │
+│                        │ App.callServerTool()        │
+│                        ▼                             │
+│  ┌────────────────────────────────────────────────┐ │
+│  │          MCP App Server (HTTP/stdio)           │ │
+│  │  - registerAppTool (generate_pattern_request)  │ │
+│  │  - registerAppResource (UI HTML)               │ │
+│  │  - Standard tools (list_patterns, etc.)        │ │
+│  └────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
 ```
 
-## Authentication
+## Available Tools
 
-The MCP server uses API key authentication:
+### UI-Enabled Tool
 
-- **SSE Endpoint**: Pass API key as query parameter: `/sse?api_key=YOUR_KEY`
-- **Messages Endpoint**: API key is automatically included by the SSE transport
+#### `generate_pattern_request` (Interactive)
 
-The API key is:
-- Generated by Terraform using `random_password`
-- Stored as a secret in Azure Container Apps
-- Required for all connections (no anonymous access)
+Opens an interactive UI form in Claude for configuring and generating infrastructure pattern requests.
 
-## API Endpoints
+**UI Features:**
+- Pattern dropdown with descriptions
+- Project name, environment, location inputs
+- Business unit and owners (comma-separated emails)
+- Dynamic configuration fields based on selected pattern
+- Real-time YAML preview
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/health` | GET | No | Health check (returns server status) |
-| `/sse` | GET | Yes | SSE endpoint for MCP connections |
-| `/messages` | POST | Yes | Message endpoint for MCP protocol |
+### Standard Tools
+
+#### `list_patterns`
+
+List all available infrastructure patterns with optional category filtering.
+
+Arguments:
+- `verbose` (boolean, optional): Include full pattern details
+- `category` (string, optional): Filter by "single" or "composite"
+
+#### `analyze_files`
+
+Analyze file contents to detect infrastructure patterns. Pass file contents from your codebase to get pattern recommendations.
+
+Arguments:
+- `files` (array, required): Array of `{path, content}` objects
+- `project_name` (string, optional): Project name for context
+
+**Recommended files:**
+- `package.json` or `requirements.txt`
+- `host.json` (Azure Functions)
+- `staticwebapp.config.json` (Static Web Apps)
+- Source files with database/storage imports
+
+#### `validate_pattern_request`
+
+Validate a pattern request YAML configuration.
+
+Arguments:
+- `yaml_content` (string, required): The YAML content to validate
+
+#### `get_pattern_details`
+
+Get detailed information about a specific pattern including config options, sizing, components, and cost estimates.
+
+Arguments:
+- `pattern_name` (string, required): Name of the pattern (e.g., "keyvault", "postgresql")
+
+#### `estimate_cost`
+
+Estimate monthly cost for a pattern deployment.
+
+Arguments:
+- `pattern` (string, required): Pattern name
+- `environment` (string, optional): "dev", "staging", or "prod"
+- `size` (string, optional): "small", "medium", or "large"
+
+#### `generate_workflow`
+
+Generate a GitHub Actions workflow file for GitOps-based provisioning.
+
+Arguments:
+- `infra_repo` (string, optional): Infrastructure automation repo name
+- `github_org` (string, optional): GitHub organization
+
+## Supported Patterns
+
+### Single-Resource Patterns
+
+| Pattern | Description | Components |
+|---------|-------------|------------|
+| `keyvault` | Key Vault with RBAC and access reviews | Key Vault, Security Groups, RBAC, Access Review |
+| `postgresql` | PostgreSQL Flexible Server | PostgreSQL, Key Vault, Security Groups, RBAC |
+| `mongodb` | Cosmos DB with MongoDB API | Cosmos DB, Security Groups, RBAC |
+| `storage` | Storage Account with containers | Storage Account, Security Groups, RBAC |
+| `function-app` | Azure Functions with dependencies | Function App, Storage, Key Vault, Security Groups |
+| `sql-database` | Azure SQL Database | SQL Database, Security Groups, RBAC |
+| `eventhub` | Event Hubs namespace | Event Hub, Security Groups, RBAC |
+| `aks-namespace` | Kubernetes namespace in shared AKS | Namespace, Security Groups, RBAC |
+| `linux-vm` | Linux Virtual Machine | VM, Managed Disks, Security Groups |
+| `static-site` | Static Web App for SPAs | Static Web App, Security Groups |
+
+### Composite Patterns
+
+| Pattern | Description | Includes |
+|---------|-------------|----------|
+| `microservice` | Complete microservice stack | AKS Namespace + Event Hub + Storage |
+| `web-app` | Full-stack web application | Static Site + Function App + PostgreSQL |
+| `api-backend` | API backend with database | Function App + SQL Database + Key Vault |
+| `data-pipeline` | Event-driven data pipeline | Event Hub + Function App + Storage + MongoDB |
+
+## Pattern Configuration
+
+### T-Shirt Sizing
+
+Patterns use t-shirt sizing (small/medium/large) that resolves to environment-specific configurations:
+
+| Size | Dev | Staging | Prod |
+|------|-----|---------|------|
+| small | Minimal resources | Basic resources | Production-ready |
+| medium | Basic resources | Production-ready | High performance |
+| large | Production-ready | High performance | Enterprise scale |
+
+**Default sizes by environment:**
+- dev → small
+- staging → medium
+- prod → medium
+
+### Conditional Features
+
+Features automatically enabled based on environment:
+- **Diagnostics**: staging, prod
+- **Access Reviews**: prod only
+- **High Availability**: prod only
+- **Geo-Redundant Backup**: prod only
 
 ## Local Development
 
-### Running Locally (stdio mode)
+### Running in HTTP Mode (for remote Claude connection)
 
 ```bash
 cd mcp-server
 npm install
 npm run build
-npm start
+npm run start
+
+# Server starts on http://0.0.0.0:3001
+# MCP endpoint: http://0.0.0.0:3001/mcp
+# Health check: http://0.0.0.0:3001/health
 ```
 
-Configure Claude Code for local testing:
+Expose via cloudflared tunnel:
+```bash
+npx cloudflared tunnel --url http://localhost:3001
+```
+
+Add to Claude settings as a custom connector with the cloudflared URL.
+
+### Running in stdio Mode (for local Claude Code)
+
+```bash
+npm run start:stdio
+```
+
+Configure in Claude Code's `.mcp.json`:
 ```json
 {
   "mcpServers": {
     "infrastructure": {
       "command": "node",
-      "args": ["/path/to/mcp-server/dist/index.js"]
+      "args": ["C:\\path\\to\\mcp-server\\dist\\server.js"],
+      "env": {
+        "MCP_TRANSPORT": "stdio"
+      }
     }
   }
 }
 ```
 
-### Running Locally (SSE mode)
+### Development Scripts
 
 ```bash
-# Without authentication
-npm run start:sse
-
-# With authentication
-API_KEY=test-key npm run start:sse
+npm run build          # TypeScript compile + UI build + copy patterns.json
+npm run build:ui       # Vite build (bundles UI to single HTML file)
+npm run build:copy     # Copy patterns.generated.json to dist/
+npm run dev            # Build and start in HTTP mode
+npm run dev:stdio      # Build and start in stdio mode
 ```
 
-Test the connection:
-```bash
-# Health check
-curl http://localhost:3000/health
+## Project Structure
 
-# SSE connection (without auth)
-curl -N http://localhost:3000/sse
-
-# SSE connection (with auth)
-curl -N "http://localhost:3000/sse?api_key=test-key"
+```
+mcp-server/
+├── src/
+│   ├── server.ts                    # Main MCP app server
+│   └── patterns.generated.json      # Auto-generated pattern definitions
+├── ui/
+│   ├── pattern-generator.html       # UI entry point
+│   └── src/
+│       └── pattern-generator.ts     # UI logic (App class)
+├── dist/                            # Build output
+│   ├── server.js                    # Compiled server
+│   ├── patterns.generated.json      # Copied pattern data
+│   └── ui/ui/pattern-generator.html # Bundled UI (single file)
+├── package.json
+├── tsconfig.json
+├── vite.config.ts                   # Vite config (singlefile plugin)
+└── README.md
 ```
 
-## Deployment
+## Pattern Management (Single Source of Truth)
 
-### Automatic Deployment (GitHub Actions)
-
-The MCP server deploys automatically when:
-- Changes are pushed to `main` branch in the `mcp-server/` directory
-- Manual workflow dispatch via GitHub Actions
-
-### Required GitHub Secrets
-
-| Secret | Description |
-|--------|-------------|
-| `AZURE_CLIENT_ID` | Azure AD app registration client ID |
-| `AZURE_TENANT_ID` | Azure AD tenant ID |
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-
-### Required GitHub Variables
-
-| Variable | Description |
-|----------|-------------|
-| `TF_STATE_RESOURCE_GROUP` | Resource group containing Terraform state storage |
-| `TF_STATE_STORAGE_ACCOUNT` | Storage account for Terraform state |
-| `TF_STATE_CONTAINER` | Blob container for state files |
-
-### Manual Deployment
+Pattern definitions live in `config/patterns/*.yaml` (repository root). The MCP server loads auto-generated `patterns.generated.json` created by:
 
 ```bash
-# Build and push Docker image
-cd mcp-server
-docker build -t ghcr.io/your-org/infrastructure-mcp-server:latest .
-docker push ghcr.io/your-org/infrastructure-mcp-server:latest
-
-# Deploy with Terraform
-cd ../terraform/mcp-server
-terraform init \
-  -backend-config="resource_group_name=your-rg" \
-  -backend-config="storage_account_name=yourstorageaccount" \
-  -backend-config="container_name=tfstate" \
-  -backend-config="key=mcp/prod/terraform.tfstate"
-
-terraform apply -var="container_registry=ghcr.io/your-org"
-
-# Get the API key
-terraform output -raw api_key
+# From repository root
+python3 scripts/generate-schema.py
 ```
+
+This generates:
+- `schemas/infrastructure.yaml.json` - JSON Schema for IDE validation
+- `web/index.html` - Portal PATTERNS_DATA
+- `templates/infrastructure-workflow.yaml` - Workflow valid_patterns list
+- `mcp-server/src/patterns.generated.json` - MCP pattern data
+
+**Never edit `patterns.generated.json` manually.** Always update `config/patterns/*.yaml` and regenerate.
+
+## UI Implementation Details
+
+The UI uses the `@modelcontextprotocol/ext-apps` SDK:
+
+**Server-side** (`src/server.ts`):
+```typescript
+import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
+
+// Register UI-enabled tool
+registerAppTool(
+  server,
+  "generate_pattern_request",
+  {
+    title: "Generate Infrastructure Pattern",
+    description: "Interactive form...",
+    inputSchema: {...},
+    _meta: { ui: { resourceUri: "ui://pattern-generator/pattern-generator.html" } }
+  },
+  async (args) => {
+    // Tool handler
+  }
+);
+
+// Register UI resource
+registerAppResource(
+  server,
+  "ui://pattern-generator/pattern-generator.html",
+  "ui://pattern-generator/pattern-generator.html",
+  { mimeType: RESOURCE_MIME_TYPE },
+  async () => {
+    const html = await fs.readFile(path.join(__dirname, "ui", "ui", "pattern-generator.html"), "utf-8");
+    return { contents: [{ uri: "...", mimeType: RESOURCE_MIME_TYPE, text: html }] };
+  }
+);
+```
+
+**Client-side** (`ui/src/pattern-generator.ts`):
+```typescript
+import { App } from "@modelcontextprotocol/ext-apps";
+
+const app = new App({ name: "Infrastructure Pattern Generator", version: "1.0.0" });
+
+await app.connect();
+
+// Call server tool
+const result = await app.callServerTool({
+  name: "generate_pattern_request",
+  arguments: { pattern, project_name, ... }
+});
+
+// Send message back to Claude
+await app.sendMessage({
+  role: "user",
+  content: { type: "text", text: `Generated YAML:\n\n\`\`\`yaml\n${yaml}\n\`\`\`` }
+});
+```
+
+## Build Process
+
+1. **TypeScript Compilation**: `tsc` compiles `src/server.ts` to `dist/server.js`
+2. **UI Build**: `vite build` bundles `ui/pattern-generator.html` and `ui/src/pattern-generator.ts` into a single HTML file at `dist/ui/ui/pattern-generator.html` using `vite-plugin-singlefile`
+3. **Pattern Copy**: Copies `src/patterns.generated.json` to `dist/patterns.generated.json`
+
+The single-file UI bundle includes all JavaScript and CSS inline, making it easy to serve via the MCP resource API.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio` or `sse` |
-| `PORT` | `3000` | HTTP port for SSE mode |
-| `NODE_ENV` | `development` | Node environment |
-| `API_KEY` | (none) | API key for authentication (SSE mode only) |
+| `MCP_TRANSPORT` | `http` | Transport mode: "http" or "stdio" |
+| `PORT` | `3001` | HTTP port (http mode only) |
+
+## API Endpoints (HTTP Mode)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check (returns `{status, mode, version}`) |
+| `/mcp` | POST | MCP protocol endpoint (StreamableHTTPServerTransport) |
 
 ## Troubleshooting
 
-### "Session not found" error
+### Build fails with "Failed to resolve /src/pattern-generator.ts"
 
-This was fixed in the current version. If you see this error, ensure you're running the latest image:
-
-```bash
-az containerapp update --name ca-mcp-prod --resource-group rg-mcp-prod \
-  --image "ghcr.io/your-org/infrastructure-mcp-server:latest" \
-  --revision-suffix "v$(date +%s)"
+Check that `ui/pattern-generator.html` uses a relative path:
+```html
+<script type="module" src="./src/pattern-generator.ts"></script>
 ```
 
-### Connection closes immediately
+### Runtime error: "patternsData.patterns.reduce is not a function"
 
-Check that:
-1. The API key is correct
-2. The URL includes the `?api_key=` parameter
-3. The container is healthy: `curl https://your-server/health`
+The `patterns.generated.json` has patterns as an object (not array). Ensure server code uses:
+```typescript
+const PATTERN_DEFINITIONS = patternsData.patterns; // Not .reduce()
+```
 
-### Tools not appearing in Claude Code
+### UI doesn't render in Claude
 
-1. Restart Claude Code after adding `.mcp.json`
-2. Check the MCP server status in Claude Code settings
-3. Verify the SSE connection with curl:
-   ```bash
-   curl -N "https://your-server/sse?api_key=YOUR_KEY"
-   ```
+1. Verify the tool has `_meta: { ui: { resourceUri: "ui://..." } }`
+2. Check that `registerAppResource` is called with the same URI
+3. Ensure the HTML file exists at `dist/ui/ui/pattern-generator.html`
+4. Test with `curl http://localhost:3001/health` to verify server is running
 
-## Cost
+### Port 3001 already in use
 
-Azure Container Apps with scale-to-zero:
-- **Idle**: ~$0/month (scales to 0 when not in use)
-- **Active**: ~$0.000024/vCPU-second + $0.000003/GiB-second
-- **Typical usage**: $1-5/month for light usage
+Kill existing process:
+```bash
+# Windows
+taskkill /F /IM node.exe
+
+# Linux/Mac
+pkill -f "node dist/server.js"
+```
+
+## Cost Estimates
+
+Pattern costs vary by size and environment. Use the `estimate_cost` tool for accurate estimates based on Azure pricing.
+
+**Example monthly costs (USD):**
+- Key Vault (small/dev): ~$10
+- PostgreSQL (medium/prod): ~$200
+- Function App (small/dev): ~$30
+- Composite patterns: Sum of component costs
 
 ## Security Notes
 
-- API keys should be rotated periodically
-- Use project-specific `.mcp.json` files (not global)
-- The `.mcp.json` file may contain secrets - add to `.gitignore` if needed
-- Consider using Azure Key Vault for API key management in production
+- Pattern requests include owner emails for RBAC delegation
+- Security groups created per pattern with automatic owner assignment
+- Access reviews enabled for prod environments
+- Secrets stored in Key Vault, not in YAML files
+- No authentication required for local/stdio mode
+- HTTP mode intended for local development or tunneled connections
+
+## Related Documentation
+
+- **Platform Guide**: `infrastructure-platform-guide.md` (repository root)
+- **Pattern Definitions**: `config/patterns/*.yaml`
+- **MCP Apps**: https://modelcontextprotocol.io/docs/extensions/apps
+- **MCP SDK**: https://github.com/modelcontextprotocol/typescript-sdk

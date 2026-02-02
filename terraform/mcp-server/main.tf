@@ -16,12 +16,6 @@ terraform {
   }
 }
 
-# Generate a secure API key
-resource "random_password" "api_key" {
-  length  = 32
-  special = false
-}
-
 provider "azurerm" {
   features {}
   use_oidc = true
@@ -93,11 +87,6 @@ resource "azurerm_container_app" "mcp_server" {
   revision_mode                = "Single"
   tags                         = local.common_tags
 
-  secret {
-    name  = "api-key"
-    value = random_password.api_key.result
-  }
-
   template {
     min_replicas = 0
     max_replicas = 3
@@ -110,12 +99,12 @@ resource "azurerm_container_app" "mcp_server" {
 
       env {
         name  = "MCP_TRANSPORT"
-        value = "sse"
+        value = "http"
       }
 
       env {
         name  = "PORT"
-        value = "3000"
+        value = "3001"
       }
 
       env {
@@ -123,28 +112,23 @@ resource "azurerm_container_app" "mcp_server" {
         value = "production"
       }
 
-      env {
-        name        = "API_KEY"
-        secret_name = "api-key"
-      }
-
       liveness_probe {
         transport = "HTTP"
         path      = "/health"
-        port      = 3000
+        port      = 3001
       }
 
       readiness_probe {
         transport = "HTTP"
         path      = "/health"
-        port      = 3000
+        port      = 3001
       }
     }
   }
 
   ingress {
     external_enabled = true
-    target_port      = 3000
+    target_port      = 3001
     transport        = "http"
 
     traffic_weight {
@@ -160,9 +144,9 @@ output "mcp_server_url" {
   value       = "https://${azurerm_container_app.mcp_server.ingress[0].fqdn}"
 }
 
-output "mcp_sse_endpoint" {
-  description = "MCP SSE endpoint for Claude Code"
-  value       = "https://${azurerm_container_app.mcp_server.ingress[0].fqdn}/sse"
+output "mcp_endpoint" {
+  description = "MCP endpoint for Claude"
+  value       = "https://${azurerm_container_app.mcp_server.ingress[0].fqdn}/mcp"
 }
 
 output "health_endpoint" {
@@ -170,25 +154,7 @@ output "health_endpoint" {
   value       = "https://${azurerm_container_app.mcp_server.ingress[0].fqdn}/health"
 }
 
-output "api_key" {
-  description = "API key for MCP server authentication"
-  value       = random_password.api_key.result
-  sensitive   = true
-}
-
-output "claude_code_config" {
-  description = "Claude Code MCP configuration (use 'terraform output -raw api_key' to get the key)"
-  value = jsonencode({
-    mcpServers = {
-      infrastructure = {
-        type = "sse"
-        url  = "https://${azurerm_container_app.mcp_server.ingress[0].fqdn}/sse"
-        requestInit = {
-          headers = {
-            Authorization = "Bearer <API_KEY>"
-          }
-        }
-      }
-    }
-  })
+output "claude_config" {
+  description = "Add this URL as a custom connector in Claude settings"
+  value       = "https://${azurerm_container_app.mcp_server.ingress[0].fqdn}/mcp"
 }
