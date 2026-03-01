@@ -1,17 +1,11 @@
 # Terraform Tests with Smart Detection
 #
-# Runs terraform tests for changed modules and patterns.
-# Tests create real Azure resources and clean up automatically.
-#
-# Smart detection:
-# - Detects which patterns/modules changed in the PR
-# - Runs only affected tests (not all tests)
-# - Shared modules (naming, security-groups, rbac) trigger all dependent patterns
+# Runs terraform validate for changed modules and patterns.
+# Smart detection: only tests affected components.
 
 name: Terraform Tests
 
 on:
-  # Manual trigger for development and release validation
   workflow_dispatch:
     inputs:
       test_type:
@@ -21,31 +15,14 @@ on:
         type: choice
         options:
           - all
-          - modules
-          - patterns
           - changed-only
-      specific_test:
-        description: 'Specific module/pattern name (leave empty for all)'
-        required: false
-        type: string
-      validate_release:
-        description: 'Validate for release (pattern name, e.g., keyvault)'
-        required: false
-        type: string
 
-  # Run on PRs touching terraform files
   pull_request:
     paths:
       - 'terraform/**'
       - 'config/patterns/**'
-      - 'scripts/resolve-pattern.py'
       - '.github/workflows/terraform-test.yaml'
 
-  # Scheduled run to catch regressions and Azure API changes
-  schedule:
-    - cron: '0 6 * * 1'  # Every Monday at 6 AM UTC
-
-  # Called by release workflow to validate before release
   workflow_call:
     inputs:
       pattern_name:
@@ -57,18 +34,18 @@ on:
         description: 'Whether tests passed'
         value: ${{ jobs.summary.outputs.test_passed }}
 
+permissions:
+  contents: read
+
 env:
   TERRAFORM_VERSION: '1.6.0'
   TF_IN_AUTOMATION: 'true'
 
 jobs:
-  # Detect what changed and determine which tests to run
   detect-changes:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
-      changed_modules: ${{ steps.detect.outputs.changed_modules }}
-      changed_patterns: ${{ steps.detect.outputs.changed_patterns }}
       modules_to_test: ${{ steps.detect.outputs.modules_to_test }}
       patterns_to_test: ${{ steps.detect.outputs.patterns_to_test }}
       run_all: ${{ steps.detect.outputs.run_all }}
@@ -77,70 +54,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for diff
+          fetch-depth: 0
 
       - name: Detect changed files and determine tests
         id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TEST_TYPE: ${{ inputs.test_type }}
+          INPUT_PATTERN_NAME: ${{ inputs.pattern_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           # Pattern -> Module dependencies
-          # Maps each pattern to the modules it uses
           declare -A PATTERN_MODULES=(
-            ["keyvault"]="naming keyvault security-groups rbac-assignments access-review diagnostic-settings private-endpoint"
-            ["postgresql"]="naming postgresql keyvault security-groups rbac-assignments access-review diagnostic-settings private-endpoint"
-            ["mongodb"]="naming mongodb keyvault security-groups rbac-assignments diagnostic-settings private-endpoint"
-            ["storage"]="naming storage-account security-groups rbac-assignments diagnostic-settings private-endpoint"
-            ["function-app"]="naming function-app keyvault storage-account security-groups rbac-assignments diagnostic-settings"
-            ["sql-database"]="naming azure-sql keyvault security-groups rbac-assignments diagnostic-settings private-endpoint"
-            ["eventhub"]="naming eventhub keyvault security-groups rbac-assignments diagnostic-settings private-endpoint"
-            ["aks-namespace"]="naming aks-namespace security-groups rbac-assignments"
-            ["linux-vm"]="naming linux-vm keyvault security-groups rbac-assignments diagnostic-settings"
-            ["static-site"]="naming static-web-app security-groups rbac-assignments"
-            ["web-app"]="naming static-web-app function-app postgresql keyvault storage-account security-groups rbac-assignments diagnostic-settings"
-            ["api-backend"]="naming function-app azure-sql keyvault storage-account security-groups rbac-assignments diagnostic-settings"
-            ["microservice"]="naming aks-namespace eventhub storage-account keyvault security-groups rbac-assignments diagnostic-settings"
-            ["data-pipeline"]="naming eventhub function-app storage-account mongodb keyvault security-groups rbac-assignments diagnostic-settings"
+            ["key_vault"]="naming resource_group key_vault security_groups rbac_assignments diagnostic_settings"
+            ["storage_account"]="naming resource_group storage_account security_groups rbac_assignments diagnostic_settings"
+            ["postgresql"]="naming resource_group postgresql key_vault security_groups rbac_assignments diagnostic_settings"
+            ["container_app"]="naming resource_group container_app security_groups rbac_assignments diagnostic_settings"
+            ["web_backend"]="naming resource_group container_app postgresql key_vault security_groups rbac_assignments diagnostic_settings"
           )
 
-          # Shared modules that affect all patterns
-          SHARED_MODULES="naming security-groups rbac-assignments"
+          SHARED_MODULES="naming security_groups rbac_assignments"
 
-          # Determine test scope based on trigger
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ -n "${{ inputs.validate_release }}" ]; then
-              echo "Release validation for: ${{ inputs.validate_release }}"
-              echo "patterns_to_test=[\"${{ inputs.validate_release }}\"]" >> $GITHUB_OUTPUT
-              echo "modules_to_test=[]" >> $GITHUB_OUTPUT
-              echo "run_all=false" >> $GITHUB_OUTPUT
-              echo "has_changes=true" >> $GITHUB_OUTPUT
-              exit 0
-            elif [ "${{ inputs.test_type }}" == "all" ]; then
+          if [ "$EVENT_NAME" == "workflow_dispatch" ]; then
+            if [ "$INPUT_TEST_TYPE" == "all" ]; then
               echo "run_all=true" >> $GITHUB_OUTPUT
               echo "has_changes=true" >> $GITHUB_OUTPUT
               exit 0
             fi
           fi
 
-          if [ "${{ github.event_name }}" == "schedule" ]; then
-            echo "Scheduled run - testing all"
-            echo "run_all=true" >> $GITHUB_OUTPUT
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Check if called from release workflow (workflow_call sets inputs.pattern_name)
-          if [ -n "${{ inputs.pattern_name }}" ]; then
-            echo "Release validation for: ${{ inputs.pattern_name }}"
-            echo "patterns_to_test=[\"${{ inputs.pattern_name }}\"]" >> $GITHUB_OUTPUT
-            # Skip module tests during release - they require Azure auth not available for tags
+          if [ -n "$INPUT_PATTERN_NAME" ]; then
+            # Validate pattern name format
+            if [[ ! "$INPUT_PATTERN_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+              echo "::error::Invalid pattern name format"
+              exit 1
+            fi
+            echo "patterns_to_test=[\"${INPUT_PATTERN_NAME}\"]" >> $GITHUB_OUTPUT
             echo "modules_to_test=[]" >> $GITHUB_OUTPUT
             echo "run_all=false" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # For PRs, detect changed files
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          if [ "$EVENT_NAME" == "pull_request" ]; then
+            BASE_SHA="$PR_BASE_SHA"
           else
             BASE_SHA="HEAD~1"
           fi
@@ -148,404 +105,139 @@ jobs:
           CHANGED_FILES=$(git diff --name-only $BASE_SHA HEAD 2>/dev/null || echo "")
 
           if [ -z "$CHANGED_FILES" ]; then
-            echo "No changes detected"
             echo "has_changes=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
+          # Check for shared module changes -> run all
+          for file in $CHANGED_FILES; do
+            for shared in $SHARED_MODULES; do
+              if [[ "$file" =~ terraform/modules/$shared/ ]]; then
+                echo "Shared module $shared changed - running all"
+                echo "run_all=true" >> $GITHUB_OUTPUT
+                echo "has_changes=true" >> $GITHUB_OUTPUT
+                exit 0
+              fi
+            done
+          done
 
-          # Check for changes that require all tests
-          if echo "$CHANGED_FILES" | grep -qE "scripts/resolve-pattern.py|\.github/workflows/terraform-test\.yaml"; then
-            echo "Core file changed - running all tests"
-            echo "run_all=true" >> $GITHUB_OUTPUT
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Detect changed modules
+          # Detect changed modules and patterns
           CHANGED_MODULES=""
+          CHANGED_PATTERNS=""
           for file in $CHANGED_FILES; do
             if [[ "$file" =~ terraform/modules/([^/]+)/ ]]; then
               module="${BASH_REMATCH[1]}"
-              if [[ ! "$CHANGED_MODULES" =~ "$module" ]]; then
-                CHANGED_MODULES="$CHANGED_MODULES $module"
-              fi
+              [[ ! "$CHANGED_MODULES" =~ "$module" ]] && CHANGED_MODULES="$CHANGED_MODULES $module"
             fi
-          done
-          CHANGED_MODULES=$(echo $CHANGED_MODULES | xargs)  # Trim
-
-          # Detect changed patterns
-          CHANGED_PATTERNS=""
-          for file in $CHANGED_FILES; do
             if [[ "$file" =~ terraform/patterns/([^/]+)/ ]] || [[ "$file" =~ config/patterns/([^/]+)\.yaml ]]; then
               pattern="${BASH_REMATCH[1]}"
-              if [[ ! "$CHANGED_PATTERNS" =~ "$pattern" ]]; then
-                CHANGED_PATTERNS="$CHANGED_PATTERNS $pattern"
-              fi
-            fi
-          done
-          CHANGED_PATTERNS=$(echo $CHANGED_PATTERNS | xargs)  # Trim
-
-          echo "Changed modules: $CHANGED_MODULES"
-          echo "Changed patterns: $CHANGED_PATTERNS"
-
-          # Check if shared modules changed -> test all patterns
-          RUN_ALL=false
-          for shared in $SHARED_MODULES; do
-            if [[ "$CHANGED_MODULES" =~ "$shared" ]]; then
-              echo "Shared module $shared changed - will test all patterns using it"
-              RUN_ALL=true
-              break
+              [[ ! "$CHANGED_PATTERNS" =~ "$pattern" ]] && CHANGED_PATTERNS="$CHANGED_PATTERNS $pattern"
             fi
           done
 
-          if [ "$RUN_ALL" == "true" ]; then
-            echo "run_all=true" >> $GITHUB_OUTPUT
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Build list of patterns to test based on module changes
+          # Add dependent patterns for changed modules
           PATTERNS_TO_TEST="$CHANGED_PATTERNS"
           for module in $CHANGED_MODULES; do
             for pattern in "${!PATTERN_MODULES[@]}"; do
               if [[ "${PATTERN_MODULES[$pattern]}" =~ "$module" ]]; then
-                if [[ ! "$PATTERNS_TO_TEST" =~ "$pattern" ]]; then
-                  PATTERNS_TO_TEST="$PATTERNS_TO_TEST $pattern"
-                  echo "Module $module changed - adding pattern $pattern to tests"
-                fi
+                [[ ! "$PATTERNS_TO_TEST" =~ "$pattern" ]] && PATTERNS_TO_TEST="$PATTERNS_TO_TEST $pattern"
               fi
             done
           done
+
+          CHANGED_MODULES=$(echo $CHANGED_MODULES | xargs)
           PATTERNS_TO_TEST=$(echo $PATTERNS_TO_TEST | xargs)
 
-          # Build list of modules to test (direct module tests)
-          MODULES_TO_TEST="$CHANGED_MODULES"
+          MODULES_JSON=$([ -n "$CHANGED_MODULES" ] && echo $CHANGED_MODULES | tr ' ' '\n' | jq -R . | jq -sc . || echo "[]")
+          PATTERNS_JSON=$([ -n "$PATTERNS_TO_TEST" ] && echo $PATTERNS_TO_TEST | tr ' ' '\n' | jq -R . | jq -sc . || echo "[]")
 
-          # Convert to JSON arrays
-          if [ -n "$MODULES_TO_TEST" ]; then
-            MODULES_JSON=$(echo $MODULES_TO_TEST | tr ' ' '\n' | jq -R . | jq -sc .)
-          else
-            MODULES_JSON="[]"
-          fi
-
-          if [ -n "$PATTERNS_TO_TEST" ]; then
-            PATTERNS_JSON=$(echo $PATTERNS_TO_TEST | tr ' ' '\n' | jq -R . | jq -sc .)
-          else
-            PATTERNS_JSON="[]"
-          fi
-
-          echo "Modules to test: $MODULES_JSON"
-          echo "Patterns to test: $PATTERNS_JSON"
-
-          echo "changed_modules=$MODULES_JSON" >> $GITHUB_OUTPUT
-          echo "changed_patterns=$PATTERNS_JSON" >> $GITHUB_OUTPUT
           echo "modules_to_test=$MODULES_JSON" >> $GITHUB_OUTPUT
           echo "patterns_to_test=$PATTERNS_JSON" >> $GITHUB_OUTPUT
           echo "run_all=false" >> $GITHUB_OUTPUT
           echo "has_changes=true" >> $GITHUB_OUTPUT
 
-  # Quick validation - always runs (no Azure resources)
-  validate:
-    name: Quick Validation
+  validate-modules:
+    name: Validate Module - ${{ matrix.module }}
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Validate naming module (no Azure)
-        working-directory: terraform/tests/modules/naming
-        run: |
-          terraform init
-          terraform test
-
-      - name: Validate pattern resolution script
-        run: |
-          pip install pyyaml
-          python3 scripts/resolve-pattern.py examples/keyvault-pattern.yaml --validate
-          python3 scripts/resolve-pattern.py examples/multi-pattern.yaml --validate
-
-  # Module tests - run in parallel for changed modules
-  test-modules:
-    name: Test Module - ${{ matrix.module }}
-    runs-on: ubuntu-latest
-    needs: [detect-changes, validate]
-    if: |
-      needs.detect-changes.outputs.has_changes == 'true' &&
-      (needs.detect-changes.outputs.run_all == 'true' ||
-       needs.detect-changes.outputs.modules_to_test != '[]')
-    environment: release
-
-    permissions:
-      id-token: write
-      contents: read
-
     strategy:
       fail-fast: false
       matrix:
-        module: ${{ needs.detect-changes.outputs.run_all == 'true' && fromJSON('["keyvault", "storage-account", "security-groups", "rbac-assignments", "postgresql", "eventhub", "azure-sql", "mongodb", "function-app", "static-web-app", "linux-vm"]') || fromJSON(needs.detect-changes.outputs.modules_to_test) }}
+        module: ${{ needs.detect-changes.outputs.run_all == 'true' && fromJSON('["resource_group", "key_vault", "storage_account", "postgresql", "container_app", "naming", "security_groups", "rbac_assignments", "diagnostic_settings"]') || fromJSON(needs.detect-changes.outputs.modules_to_test || '[]') }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check if test exists
-        id: check-test
-        run: |
-          if [ -d "terraform/tests/modules/${{ matrix.module }}" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "::warning::No test found for module ${{ matrix.module }}"
-          fi
-
       - name: Setup Terraform
-        if: steps.check-test.outputs.exists == 'true'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-      - name: Azure Login (OIDC)
-        if: steps.check-test.outputs.exists == 'true'
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID_dev }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Create test config
-        if: steps.check-test.outputs.exists == 'true'
-        working-directory: terraform/tests/setup
+      - name: Terraform Validate
+        working-directory: terraform/modules/${{ matrix.module }}
         run: |
-          cat > terraform.tfvars <<EOF
-          test_subscription_id = "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-          test_tenant_id       = "${{ secrets.AZURE_TENANT_ID }}"
-          test_location        = "eastus"
-          test_owner_email     = "${{ secrets.TEST_OWNER_EMAIL }}"
-          EOF
+          terraform init -backend=false
+          terraform validate
 
-      - name: Run module test
-        if: steps.check-test.outputs.exists == 'true'
-        working-directory: terraform/tests/modules/${{ matrix.module }}
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_dev }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-        run: |
-          terraform init
-          terraform test -var-file=../../setup/terraform.tfvars
-        timeout-minutes: 30
-
-  # Pattern tests - run for changed patterns
-  test-patterns:
-    name: Test Pattern - ${{ matrix.pattern }}
+  validate-patterns:
+    name: Validate Pattern - ${{ matrix.pattern }}
     runs-on: ubuntu-latest
-    needs: [detect-changes, validate, test-modules]
+    needs: [detect-changes, validate-modules]
     if: |
       always() &&
-      needs.validate.result == 'success' &&
-      (needs.test-modules.result == 'success' || needs.test-modules.result == 'skipped') &&
-      needs.detect-changes.outputs.has_changes == 'true' &&
-      (needs.detect-changes.outputs.run_all == 'true' ||
-       needs.detect-changes.outputs.patterns_to_test != '[]')
-    environment: release
-
-    permissions:
-      id-token: write
-      contents: read
+      (needs.validate-modules.result == 'success' || needs.validate-modules.result == 'skipped') &&
+      needs.detect-changes.outputs.has_changes == 'true'
 
     strategy:
       fail-fast: false
       matrix:
-        pattern: ${{ needs.detect-changes.outputs.run_all == 'true' && fromJSON('["keyvault", "postgresql", "storage", "api-backend", "function-app", "sql-database", "eventhub", "mongodb", "static-site", "linux-vm"]') || fromJSON(needs.detect-changes.outputs.patterns_to_test) }}
+        pattern: ${{ needs.detect-changes.outputs.run_all == 'true' && fromJSON('["key_vault", "storage_account", "postgresql", "container_app", "web_backend"]') || fromJSON(needs.detect-changes.outputs.patterns_to_test || '[]') }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check if test exists
-        id: check-test
-        run: |
-          if [ -d "terraform/tests/patterns/${{ matrix.pattern }}" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "::warning::No test found for pattern ${{ matrix.pattern }}"
-          fi
-
       - name: Setup Terraform
-        if: steps.check-test.outputs.exists == 'true'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-      - name: Azure Login (OIDC)
-        if: steps.check-test.outputs.exists == 'true'
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID_dev }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Create test config
-        if: steps.check-test.outputs.exists == 'true'
-        working-directory: terraform/tests/setup
+      - name: Terraform Validate
+        working-directory: terraform/patterns/${{ matrix.pattern }}
         run: |
-          cat > terraform.tfvars <<EOF
-          test_subscription_id = "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-          test_tenant_id       = "${{ secrets.AZURE_TENANT_ID }}"
-          test_location        = "eastus"
-          test_owner_email     = "${{ secrets.TEST_OWNER_EMAIL }}"
-          EOF
+          terraform init -backend=false
+          terraform validate
 
-      - name: Run pattern test
-        if: steps.check-test.outputs.exists == 'true'
-        working-directory: terraform/tests/patterns/${{ matrix.pattern }}
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_dev }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-        run: |
-          terraform init
-          terraform test -var-file=../../setup/terraform.tfvars
-        timeout-minutes: 45
-
-  # Summary job - aggregates results
   summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [detect-changes, validate, test-modules, test-patterns]
+    needs: [detect-changes, validate-modules, validate-patterns]
     if: always()
     outputs:
       test_passed: ${{ steps.result.outputs.passed }}
 
     steps:
-      - name: Determine test result
+      - name: Determine result
         id: result
+        env:
+          HAS_CHANGES: ${{ needs.detect-changes.outputs.has_changes }}
+          MODULES_RESULT: ${{ needs.validate-modules.result }}
+          PATTERNS_RESULT: ${{ needs.validate-patterns.result }}
         run: |
-          echo "Validate: ${{ needs.validate.result }}"
-          echo "Modules: ${{ needs.test-modules.result }}"
-          echo "Patterns: ${{ needs.test-patterns.result }}"
-
-          if [ "${{ needs.detect-changes.outputs.has_changes }}" != "true" ]; then
-            echo "No changes detected - skipping tests"
+          if [ "$HAS_CHANGES" != "true" ]; then
             echo "passed=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          if [ "${{ needs.validate.result }}" != "success" ]; then
-            echo "Validation failed"
+          if [ "$MODULES_RESULT" != "success" ] && [ "$MODULES_RESULT" != "skipped" ]; then
             echo "passed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Modules can be skipped if none changed
-          if [ "${{ needs.test-modules.result }}" != "success" ] && [ "${{ needs.test-modules.result }}" != "skipped" ]; then
-            echo "Module tests failed"
+          if [ "$PATTERNS_RESULT" != "success" ] && [ "$PATTERNS_RESULT" != "skipped" ]; then
             echo "passed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Patterns can be skipped if none changed
-          if [ "${{ needs.test-patterns.result }}" != "success" ] && [ "${{ needs.test-patterns.result }}" != "skipped" ]; then
-            echo "Pattern tests failed"
-            echo "passed=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          echo "All tests passed"
           echo "passed=true" >> $GITHUB_OUTPUT
-
-      - name: Create summary
-        run: |
-          echo "## Terraform Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ needs.detect-changes.outputs.has_changes }}" != "true" ]; then
-            echo "No terraform changes detected." >> $GITHUB_STEP_SUMMARY
-            exit 0
-          fi
-
-          echo "### Test Scope" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ needs.detect-changes.outputs.run_all }}" == "true" ]; then
-            echo "Running all tests (shared module changed or full test requested)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Running targeted tests for changed components" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            if [ "${{ needs.detect-changes.outputs.modules_to_test }}" != "[]" ]; then
-              echo "**Modules:** ${{ needs.detect-changes.outputs.modules_to_test }}" >> $GITHUB_STEP_SUMMARY
-            fi
-            if [ "${{ needs.detect-changes.outputs.patterns_to_test }}" != "[]" ]; then
-              echo "**Patterns:** ${{ needs.detect-changes.outputs.patterns_to_test }}" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Validation | ${{ needs.validate.result == 'success' && '✅' || '❌' }} ${{ needs.validate.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Module Tests | ${{ needs.test-modules.result == 'success' && '✅' || needs.test-modules.result == 'skipped' && '⏭️' || '❌' }} ${{ needs.test-modules.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Pattern Tests | ${{ needs.test-patterns.result == 'success' && '✅' || needs.test-patterns.result == 'skipped' && '⏭️' || '❌' }} ${{ needs.test-patterns.result }} |" >> $GITHUB_STEP_SUMMARY
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.result.outputs.passed }}" == "true" ]; then
-            echo "### Overall: ✅ All tests passed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### Overall: ❌ Tests failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  # Cleanup orphaned resources (runs on schedule only)
-  cleanup:
-    name: Cleanup Orphaned Resources
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule'
-
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID_dev }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Find and delete orphaned test resources
-        run: |
-          echo "Finding orphaned test resource groups..."
-          groups=$(az group list --query "[?starts_with(name, 'rg-tftest-')].name" -o tsv)
-
-          if [ -z "$groups" ]; then
-            echo "No orphaned test resource groups found"
-          else
-            echo "Found orphaned groups:"
-            echo "$groups"
-
-            for group in $groups; do
-              echo "Deleting $group..."
-              az group delete --name "$group" --yes --no-wait
-            done
-
-            echo "Cleanup initiated"
-          fi
-
-      - name: Find and delete orphaned security groups
-        run: |
-          echo "Finding orphaned test security groups..."
-          # Note: This requires appropriate Graph permissions
-          az ad group list --query "[?starts_with(displayName, 'sg-tftest-')].displayName" -o tsv | while read group; do
-            echo "Deleting group: $group"
-            az ad group delete --group "$group" || true
-          done

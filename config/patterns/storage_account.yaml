@@ -1,0 +1,54 @@
+name: storage_account
+description: |
+  Azure Storage Account with blob containers, security groups, and optional diagnostics.
+  Supports versioning, soft delete, and multiple replication types.
+category: single-resource
+components:
+  - resource-group
+  - storage-account
+  - security-groups
+  - rbac-assignments
+  - diagnostic-settings
+use_cases:
+  - Blob storage for applications
+  - Static file hosting
+  - Data lake storage
+  - Backup and archival
+sizing:
+  small:
+    dev: { account_tier: "Standard", replication_type: "LRS", access_tier: "Hot" }
+    staging: { account_tier: "Standard", replication_type: "GRS", access_tier: "Hot", enable_versioning: true, soft_delete_days: 7, enable_diagnostics: true }
+    prod: { account_tier: "Standard", replication_type: "RAGRS", access_tier: "Hot", enable_versioning: true, soft_delete_days: 30, enable_diagnostics: true }
+  medium:
+    dev: { account_tier: "Standard", replication_type: "LRS", access_tier: "Hot", enable_versioning: true }
+    staging: { account_tier: "Standard", replication_type: "GRS", access_tier: "Hot", enable_versioning: true, soft_delete_days: 14, enable_diagnostics: true }
+    prod: { account_tier: "Standard", replication_type: "RAGRS", access_tier: "Hot", enable_versioning: true, soft_delete_days: 30, enable_diagnostics: true }
+  large:
+    dev: { account_tier: "Standard", replication_type: "GRS", access_tier: "Hot", enable_versioning: true, soft_delete_days: 7 }
+    staging: { account_tier: "Standard", replication_type: "RAGRS", access_tier: "Hot", enable_versioning: true, soft_delete_days: 30, enable_diagnostics: true }
+    prod: { account_tier: "Premium", replication_type: "ZRS", access_tier: "Hot", enable_versioning: true, soft_delete_days: 30, enable_diagnostics: true }
+config:
+  required:
+    - name
+  optional:
+    - containers:
+        type: list
+        default: []
+        description: List of blob container names to create
+    - replication_type:
+        type: string
+        default: "LRS"
+        description: Replication type (LRS, GRS, ZRS, RAGRS)
+estimated_costs:
+  small:
+    dev: 2
+    staging: 10
+    prod: 25
+  medium:
+    dev: 5
+    staging: 20
+    prod: 50
+  large:
+    dev: 20
+    staging: 50
+    prod: 100

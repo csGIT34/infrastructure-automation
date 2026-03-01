@@ -51,6 +51,8 @@ locals {
     eventhub         = "evh"
     static_web_app   = "swa"
     aks_namespace    = "ns"
+    container_app    = "ca"
+    container_env    = "cae"
     linux_vm         = "vm"
     private_endpoint = "pe"
     log_analytics    = "log"

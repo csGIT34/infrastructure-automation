@@ -1,0 +1,49 @@
+name: key_vault
+description: |
+  Azure Key Vault with RBAC authorization, security groups, and optional diagnostics.
+  Stores secrets with Secrets User/Officer role assignments.
+category: single-resource
+components:
+  - resource-group
+  - key-vault
+  - security-groups
+  - rbac-assignments
+  - diagnostic-settings
+use_cases:
+  - Application secret management
+  - Certificate storage
+  - Encryption key management
+sizing:
+  small:
+    dev: { sku_name: "standard" }
+    staging: { sku_name: "standard", enable_diagnostics: true }
+    prod: { sku_name: "standard", enable_diagnostics: true }
+  medium:
+    dev: { sku_name: "standard" }
+    staging: { sku_name: "premium", enable_diagnostics: true }
+    prod: { sku_name: "premium", enable_diagnostics: true }
+  large:
+    dev: { sku_name: "premium" }
+    staging: { sku_name: "premium", enable_diagnostics: true }
+    prod: { sku_name: "premium", enable_diagnostics: true }
+config:
+  required:
+    - name
+  optional:
+    - sku_name:
+        type: string
+        default: "standard"
+        description: Key Vault SKU (standard or premium)
+estimated_costs:
+  small:
+    dev: 1
+    staging: 5
+    prod: 10
+  medium:
+    dev: 5
+    staging: 15
+    prod: 25
+  large:
+    dev: 15
+    staging: 25
+    prod: 50

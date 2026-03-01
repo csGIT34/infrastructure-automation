@@ -5,6 +5,7 @@
 *.tfvars
 *.tfvars.json
 *.backup
+tfplan
 
 # Python
 __pycache__/
@@ -34,29 +35,13 @@ Thumbs.db
 # Local env files
 .env
 .env.local
-terraform/tests/setup/.env
-
-# Terraform test artifacts
-terraform/tests/**/.test-suffix
-terraform/tests/**/tfplan
-terraform/tests/**/.terraform/
-terraform/tests/**/.terraform.lock.hcl
-terraform/tests/**/terraform.tfstate*
 
 # Claude temp files
 *-cwd
 tmpclaude-*
 
 # MCP Server
-mcp-server/node_modules/
-mcp-server/dist/
 .mcp.json
 
-# Node
-node_modules/
-package-lock.json
-!mcp-server/package-lock.json
-*.tgz
+# Claude local settings
 .claude/settings.local.json
-.claude/settings.local.json
-docs/notes.txt

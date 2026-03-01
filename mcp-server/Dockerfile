@@ -1,48 +1,20 @@
-# Build stage
-FROM node:20-alpine AS builder
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+COPY mcp-server/pyproject.toml pyproject.toml
+COPY mcp-server/src/ src/
+RUN pip install --no-cache-dir .
 
-# Install all dependencies (including devDependencies for build)
-RUN npm ci
+COPY config/patterns/ config/patterns/
 
-# Cache bust arg - changes with each commit to invalidate source cache
-ARG CACHE_BUST=unknown
+RUN adduser --disabled-password --no-create-home appuser
+USER appuser
 
-# Copy source code and UI
-COPY tsconfig.json vite.config.ts ./
-COPY src/ ./src/
-COPY ui/ ./ui/
+EXPOSE 8000
 
-# Build TypeScript + UI + copy patterns
-RUN npm run build
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD python -c "import socket; s=socket.create_connection(('localhost',8000),timeout=5); s.close()"
 
-# Production stage
-FROM node:20-alpine
-
-WORKDIR /app
-
-# Copy package files and install production dependencies only
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
-
-# Set environment variables
-ENV NODE_ENV=production
-ENV MCP_TRANSPORT=http
-ENV PORT=3001
-
-# Expose port
-EXPOSE 3001
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
-
-# Run the server
-CMD ["node", "dist/server.js"]
+ENV MCP_HOST=0.0.0.0
+CMD ["python", "-m", "src.server"]

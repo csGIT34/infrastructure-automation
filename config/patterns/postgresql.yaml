@@ -1,134 +1,50 @@
-# Pattern: postgresql
-# Managed PostgreSQL database with RBAC and secrets management
-
 name: postgresql
 description: |
-  Azure Database for PostgreSQL Flexible Server with automatic secret management.
-  Connection strings stored in Key Vault with security group-based access.
-
+  PostgreSQL Flexible Server with Key Vault for connection secrets,
+  security groups, and optional diagnostics.
 category: single-resource
 components:
+  - resource-group
   - postgresql
-  - keyvault
+  - key-vault
   - security-groups
   - rbac-assignments
-  - diagnostic-settings (staging/prod)
-  - private-endpoint (optional)
-  - network-rules (optional)
-
+  - diagnostic-settings
 use_cases:
-  - Application databases
-  - Analytics data stores
-  - Multi-tenant applications
-  - Microservice backends
-
-# T-shirt sizing matrix
+  - Relational database for web applications
+  - Backend data store
+  - Reporting and analytics database
 sizing:
   small:
-    dev:
-      sku: B_Standard_B1ms
-      storage_mb: 32768
-      backup_retention_days: 7
-      geo_redundant_backup: false
-      enable_diagnostics: false
-    staging:
-      sku: B_Standard_B1ms
-      storage_mb: 32768
-      backup_retention_days: 14
-      geo_redundant_backup: false
-      enable_diagnostics: true
-    prod:
-      sku: GP_Standard_D2s_v3
-      storage_mb: 65536
-      backup_retention_days: 35
-      geo_redundant_backup: true
-      enable_diagnostics: true
-
+    dev: { sku_name: "B_Standard_B1ms", storage_mb: 32768, backup_retention_days: 7 }
+    staging: { sku_name: "B_Standard_B2s", storage_mb: 65536, backup_retention_days: 14, enable_diagnostics: true }
+    prod: { sku_name: "GP_Standard_D2s_v3", storage_mb: 131072, backup_retention_days: 30, geo_redundant_backup: true, enable_diagnostics: true }
   medium:
-    dev:
-      sku: B_Standard_B2s
-      storage_mb: 32768
-      backup_retention_days: 7
-      geo_redundant_backup: false
-      enable_diagnostics: false
-    staging:
-      sku: GP_Standard_D2s_v3
-      storage_mb: 65536
-      backup_retention_days: 21
-      geo_redundant_backup: false
-      enable_diagnostics: true
-    prod:
-      sku: GP_Standard_D4s_v3
-      storage_mb: 131072
-      backup_retention_days: 35
-      geo_redundant_backup: true
-      enable_diagnostics: true
-
+    dev: { sku_name: "B_Standard_B2s", storage_mb: 65536, backup_retention_days: 7 }
+    staging: { sku_name: "GP_Standard_D2s_v3", storage_mb: 131072, backup_retention_days: 14, enable_diagnostics: true }
+    prod: { sku_name: "GP_Standard_D4s_v3", storage_mb: 262144, backup_retention_days: 30, geo_redundant_backup: true, enable_diagnostics: true }
   large:
-    dev:
-      sku: GP_Standard_D2s_v3
-      storage_mb: 65536
-      backup_retention_days: 7
-      geo_redundant_backup: false
-      enable_diagnostics: true
-    staging:
-      sku: GP_Standard_D4s_v3
-      storage_mb: 131072
-      backup_retention_days: 35
-      geo_redundant_backup: true
-      enable_diagnostics: true
-    prod:
-      sku: GP_Standard_D8s_v3
-      storage_mb: 262144
-      backup_retention_days: 35
-      geo_redundant_backup: true
-      enable_diagnostics: true
-
-# Configuration schema
+    dev: { sku_name: "GP_Standard_D2s_v3", storage_mb: 131072, backup_retention_days: 7 }
+    staging: { sku_name: "GP_Standard_D4s_v3", storage_mb: 262144, backup_retention_days: 30, enable_diagnostics: true }
+    prod: { sku_name: "GP_Standard_D8s_v3", storage_mb: 524288, backup_retention_days: 30, geo_redundant_backup: true, enable_diagnostics: true }
 config:
   required:
     - name
   optional:
-    - version:
+    - postgresql_version:
         type: string
-        default: "14"
-        enum: ["12", "13", "14", "15", "16"]
+        default: "16"
         description: PostgreSQL version
-    - allowed_ips:
-        type: array
-        items: string
-        description: IP addresses allowed through firewall
-    - enable_private_endpoint:
-        type: boolean
-        default: false
-    - subnet_id:
-        type: string
-
-# Estimated costs (USD/month)
 estimated_costs:
   small:
-    dev: 25
-    staging: 50
-    prod: 200
+    dev: 15
+    staging: 40
+    prod: 150
   medium:
-    dev: 50
-    staging: 200
-    prod: 400
+    dev: 40
+    staging: 150
+    prod: 300
   large:
-    dev: 200
-    staging: 400
-    prod: 800
-
-example:
-  version: "1"
-  metadata:
-    project: myapp
-    environment: dev
-    business_unit: engineering
-    owners:
-      - alice@example.com
-  pattern: postgresql
-  config:
-    name: appdb
-    size: small
-    version: "14"
+    dev: 150
+    staging: 300
+    prod: 600

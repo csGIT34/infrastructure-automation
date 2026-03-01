@@ -1,0 +1,182 @@
+# Prototype Provisioning Workflow
+#
+# Triggered by MCP server via workflow_dispatch.
+# Runs terraform apply/destroy for a pattern with provided tfvars.
+
+name: Prototype Provision
+
+run-name: "${{ inputs.action }}: ${{ inputs.pattern }} (${{ inputs.environment }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pattern:
+        description: 'Pattern name'
+        required: true
+        type: choice
+        options:
+          - key_vault
+          - storage_account
+          - postgresql
+          - container_app
+          - web_backend
+      environment:
+        description: 'Target environment (dev, staging, prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      tfvars_json:
+        description: 'Base64-encoded terraform.tfvars.json content'
+        required: true
+        type: string
+      action:
+        description: 'Action to perform (create or destroy)'
+        required: true
+        default: 'create'
+        type: choice
+        options:
+          - create
+          - destroy
+      state_key:
+        description: 'Terraform state key path'
+        required: true
+        type: string
+
+env:
+  TERRAFORM_VERSION: '1.6.0'
+  TF_IN_AUTOMATION: 'true'
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: provision-${{ inputs.pattern }}-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    name: "${{ inputs.action }}: ${{ inputs.pattern }} (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    env:
+      INPUT_PATTERN: ${{ inputs.pattern }}
+      INPUT_ENVIRONMENT: ${{ inputs.environment }}
+      INPUT_ACTION: ${{ inputs.action }}
+      INPUT_TFVARS_JSON: ${{ inputs.tfvars_json }}
+      INPUT_STATE_KEY: ${{ inputs.state_key }}
+
+    steps:
+      - name: Validate inputs
+        run: |
+          # Validate state_key format (alphanumeric, hyphens, underscores, slashes, dots)
+          if [[ ! "$INPUT_STATE_KEY" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+            echo "::error::Invalid state_key format"
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Select Azure credentials
+        id: creds
+        run: |
+          case "$INPUT_ENVIRONMENT" in
+            dev)     echo "client_id=AZURE_CLIENT_ID_dev" >> $GITHUB_OUTPUT ;;
+            staging) echo "client_id=AZURE_CLIENT_ID_staging" >> $GITHUB_OUTPUT ;;
+            prod)    echo "client_id=AZURE_CLIENT_ID_prod" >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets[steps.creds.outputs.client_id] }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Decode tfvars
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        run: |
+          echo "$INPUT_TFVARS_JSON" | base64 -d > terraform.tfvars.json
+          echo "Decoded tfvars (keys only):"
+          cat terraform.tfvars.json | jq 'keys' 2>/dev/null || echo "(not valid JSON)"
+
+      - name: Terraform Init
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets[steps.creds.outputs.client_id] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+          TF_STATE_RG: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+          TF_STATE_SA: ${{ secrets.TF_STATE_STORAGE_ACCOUNT }}
+          TF_STATE_CONTAINER: ${{ vars.TF_STATE_CONTAINER }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${TF_STATE_RG}" \
+            -backend-config="storage_account_name=${TF_STATE_SA}" \
+            -backend-config="container_name=${TF_STATE_CONTAINER:-tfstate}" \
+            -backend-config="key=${INPUT_STATE_KEY}"
+
+      - name: Terraform Plan
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets[steps.creds.outputs.client_id] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          DESTROY_FLAG=""
+          if [ "$INPUT_ACTION" == "destroy" ]; then
+            DESTROY_FLAG="-destroy"
+          fi
+
+          terraform plan \
+            -var-file=terraform.tfvars.json \
+            $DESTROY_FLAG \
+            -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets[steps.creds.outputs.client_id] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: terraform apply -auto-approve tfplan
+        timeout-minutes: 45
+
+      - name: Capture outputs
+        if: inputs.action == 'create'
+        working-directory: terraform/patterns/${{ inputs.pattern }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets[steps.creds.outputs.client_id] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          echo "## Terraform Outputs" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          terraform output -json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Provisioning Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pattern | \`$INPUT_PATTERN\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | \`$INPUT_ENVIRONMENT\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Action | \`$INPUT_ACTION\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| State Key | \`$INPUT_STATE_KEY\` |" >> $GITHUB_STEP_SUMMARY

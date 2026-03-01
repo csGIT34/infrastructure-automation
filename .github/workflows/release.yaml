@@ -51,7 +51,7 @@ jobs:
           echo "Processing tag: $TAG"
 
           # Parse pattern and version from tag
-          if [[ "$TAG" =~ ^([a-z][a-z0-9-]+)/v([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-z0-9]+)?$ ]]; then
+          if [[ "$TAG" =~ ^([a-z][a-z0-9_-]+)/v([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-z0-9]+)?$ ]]; then
             PATTERN="${BASH_REMATCH[1]}"
             MAJOR="${BASH_REMATCH[2]}"
             MINOR="${BASH_REMATCH[3]}"

@@ -1,0 +1,59 @@
+name: container_app
+description: |
+  Azure Container App with Container App Environment, security groups,
+  and optional diagnostics. Supports HTTP ingress and scaling.
+category: single-resource
+components:
+  - resource-group
+  - container-app
+  - container-app-environment
+  - security-groups
+  - rbac-assignments
+  - diagnostic-settings
+use_cases:
+  - Microservice deployment
+  - API hosting
+  - Web application backend
+  - Background job processing
+sizing:
+  small:
+    dev: { cpu: 0.25, memory: "0.5Gi", min_replicas: 0, max_replicas: 1 }
+    staging: { cpu: 0.5, memory: "1Gi", min_replicas: 1, max_replicas: 2, enable_diagnostics: true }
+    prod: { cpu: 0.5, memory: "1Gi", min_replicas: 2, max_replicas: 5, enable_diagnostics: true }
+  medium:
+    dev: { cpu: 0.5, memory: "1Gi", min_replicas: 0, max_replicas: 2 }
+    staging: { cpu: 1.0, memory: "2Gi", min_replicas: 1, max_replicas: 5, enable_diagnostics: true }
+    prod: { cpu: 1.0, memory: "2Gi", min_replicas: 2, max_replicas: 10, enable_diagnostics: true }
+  large:
+    dev: { cpu: 1.0, memory: "2Gi", min_replicas: 0, max_replicas: 3 }
+    staging: { cpu: 2.0, memory: "4Gi", min_replicas: 2, max_replicas: 10, enable_diagnostics: true }
+    prod: { cpu: 2.0, memory: "4Gi", min_replicas: 3, max_replicas: 20, enable_diagnostics: true }
+config:
+  required:
+    - name
+  optional:
+    - container_image:
+        type: string
+        default: "mcr.microsoft.com/k8se/quickstart:latest"
+        description: Container image to deploy
+    - target_port:
+        type: number
+        default: 80
+        description: Target port for ingress
+    - external_ingress:
+        type: boolean
+        default: true
+        description: Allow external (internet) ingress
+estimated_costs:
+  small:
+    dev: 0
+    staging: 15
+    prod: 30
+  medium:
+    dev: 5
+    staging: 30
+    prod: 75
+  large:
+    dev: 20
+    staging: 75
+    prod: 200
