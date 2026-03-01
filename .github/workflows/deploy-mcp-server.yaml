@@ -93,6 +93,17 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Configure secrets
+        env:
+          DEPLOY_ENV: ${{ inputs.environment || 'prod' }}
+          APP_ID_VALUE: ${{ secrets.INFRA_APP_ID }}
+          APP_KEY_VALUE: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+        run: |
+          az containerapp secret set \
+            --name "ca-mcp-${DEPLOY_ENV}" \
+            --resource-group "rg-mcp-${DEPLOY_ENV}" \
+            --secrets "infra-app-id=${APP_ID_VALUE}" "infra-app-private-key=${APP_KEY_VALUE}"
+
       - name: Deploy Container App
         env:
           DEPLOY_ENV: ${{ inputs.environment || 'prod' }}
