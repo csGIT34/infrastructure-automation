@@ -89,6 +89,9 @@ config/patterns/                # Pattern definitions (YAML, source of truth)
 mcp-server/                     # Python MCP server (FastMCP)
   src/
     server.py                   # FastMCP entry point with all tools
+    auth/
+      __init__.py
+      provider.py               # EntraOAuthProvider (Entra ID OAuth proxy)
     tools/                      # Tool implementations
       patterns.py               # list_patterns, get_pattern_details, estimate_cost
       provision.py              # provision, destroy (prototype mode)
@@ -140,11 +143,28 @@ scripts/resolve-pattern.py      # Reference pattern resolver (ported to MCP serv
 3. Create `terraform/patterns/<name>/` with `main.tf`, `variables.tf`, `outputs.tf`, `VERSION`
 4. MCP server auto-discovers patterns from `config/patterns/`
 
+## Authentication
+
+The MCP server is secured with Entra ID OAuth when deployed remotely. Auth is **conditionally enabled** — only when `AZURE_TENANT_ID`, `MCP_ENTRA_CLIENT_ID`, and `MCP_SERVER_URL` env vars are set. Local stdio mode has no auth.
+
+**Flow:** Claude Code → MCP `/authorize` → Entra ID login → `/auth/callback` → Claude Code
+
+- **App Registration:** `Infrastructure MCP Server` (Web platform, confidential client + PKCE)
+- **Client ID:** `ff976387-aa84-43d3-a075-c8e292bb715c`
+- MCP server issues its own JWT access tokens (RSA-signed, 1hr lifetime, in-memory)
+- Dynamic Client Registration enabled for Claude Code auto-registration
+- Container restart clears all tokens (users re-auth via browser)
+
 ## Required Secrets
 
 **Azure:** `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_CLIENT_ID_dev/staging/prod`
 **Terraform State:** `TF_STATE_STORAGE_ACCOUNT`, `TF_STATE_CONTAINER`, `TF_STATE_RESOURCE_GROUP`
 **GitHub App:** `INFRA_APP_ID`, `INFRA_APP_PRIVATE_KEY`
+**Entra ID Auth:** `MCP_ENTRA_CLIENT_SECRET`
+
+## Required Variables
+
+**Entra ID Auth:** `MCP_ENTRA_CLIENT_ID`
 
 ## T-Shirt Sizing
 
