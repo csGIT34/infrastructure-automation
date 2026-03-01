@@ -29,12 +29,48 @@ transport = os.environ.get("MCP_TRANSPORT", "streamable-http")
 host = os.environ.get("MCP_HOST", "127.0.0.1")
 port = int(os.environ.get("MCP_PORT", "8000"))
 
+# --- Entra ID Authentication (enabled when env vars are set) ---
+
+_tenant_id = os.environ.get("AZURE_TENANT_ID")
+_entra_client_id = os.environ.get("MCP_ENTRA_CLIENT_ID")
+_server_url = os.environ.get("MCP_SERVER_URL")
+
+if all([_tenant_id, _entra_client_id, _server_url]):
+    from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
+    from pydantic import AnyHttpUrl
+
+    from .auth.provider import EntraOAuthProvider
+
+    _auth_provider = EntraOAuthProvider(_tenant_id, _entra_client_id, _server_url)
+    _auth_settings = AuthSettings(
+        issuer_url=AnyHttpUrl(_server_url),
+        resource_server_url=AnyHttpUrl(f"{_server_url.rstrip('/')}/mcp"),
+        client_registration_options=ClientRegistrationOptions(
+            enabled=True,
+            valid_scopes=["access"],
+            default_scopes=["access"],
+        ),
+    )
+    logger.info("Entra ID authentication enabled")
+else:
+    _auth_provider = None
+    _auth_settings = None
+
 mcp = FastMCP(
     "Infrastructure Self-Service",
     instructions="Provision and manage Azure infrastructure through patterns",
     host=host,
     port=port,
+    auth_server_provider=_auth_provider,
+    auth=_auth_settings,
 )
+
+# Register Entra ID callback route when auth is enabled
+if _auth_provider:
+
+    @mcp.custom_route("/auth/callback", methods=["GET"])
+    async def auth_callback(request):
+        return await _auth_provider.handle_callback(request)
 
 # Shared resolver instance (patterns are cached after first load)
 _resolver: PatternResolver | None = None

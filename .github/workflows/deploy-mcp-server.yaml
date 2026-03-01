@@ -121,6 +121,9 @@ jobs:
               "APP_INFRA_REPO=${{ github.repository_owner }}/app-infrastructure" \
               "INFRA_APP_ID=secretref:infra-app-id" \
               "INFRA_APP_PRIVATE_KEY=secretref:infra-app-private-key" \
+              "AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}" \
+              "MCP_ENTRA_CLIENT_ID=${{ vars.MCP_ENTRA_CLIENT_ID }}" \
+              "MCP_SERVER_URL=https://ca-mcp-${DEPLOY_ENV}.mangoflower-3bcf53fc.centralus.azurecontainerapps.io" \
             --remove-env-vars PORT NODE_ENV
 
       - name: Health Check
@@ -138,7 +141,7 @@ jobs:
           for i in {1..10}; do
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$MCP_URL/mcp" 2>/dev/null || echo "000")
             echo "Attempt $i/10... HTTP $HTTP_CODE"
-            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 500 ]; then
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -le 401 ]; then
               echo "Health check passed (HTTP $HTTP_CODE)"
               exit 0
             fi
