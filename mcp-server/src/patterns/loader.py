@@ -1,6 +1,7 @@
 """Load pattern definitions from config/patterns/*.yaml"""
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -9,8 +10,12 @@ import yaml
 logger = logging.getLogger(__name__)
 
 # Default: look for config relative to repo root
+# In Docker the layout is /app/src/... so REPO_ROOT resolves to /
+# Use PATTERNS_DIR env var to override (set in Dockerfile)
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
-PATTERNS_DIR = REPO_ROOT / "config" / "patterns"
+PATTERNS_DIR = Path(
+    os.environ.get("PATTERNS_DIR", str(REPO_ROOT / "config" / "patterns"))
+)
 
 # Module-level cache
 _patterns_cache: dict[str, dict[str, Any]] | None = None
