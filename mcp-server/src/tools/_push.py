@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from ..github.client import GitHubClient
@@ -64,7 +65,9 @@ async def push_pattern(
 
     # Generate backend.hcl (only the state key; storage account details
     # are provided by the CI workflow via -backend-config CLI flags)
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     backend_hcl = f"""# Auto-generated backend configuration
+# pushed: {timestamp}
 key = "{state_key}"
 """
 
