@@ -99,7 +99,7 @@ jobs:
         with:
           app-id: ${{ secrets.INFRA_APP_ID }}
           private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
-          repositories: ${{ steps.repo.outputs.repo }}
+          repositories: ${{ steps.repo.outputs.repo }},terraform-azurerm-naming,terraform-azurerm-resource-group,terraform-azurerm-key-vault,terraform-azurerm-postgresql,terraform-azurerm-container-app,terraform-azurerm-container-registry,terraform-azurerm-security-groups,terraform-azurerm-rbac-assignments
 
       - name: Checkout pattern repo
         uses: actions/checkout@v4
@@ -128,6 +128,12 @@ jobs:
           client-id: ${{ secrets[steps.creds.outputs.client_id] }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure git for private modules
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${APP_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Decode tfvars
         working-directory: ${{ steps.repo.outputs.tf_dir }}
