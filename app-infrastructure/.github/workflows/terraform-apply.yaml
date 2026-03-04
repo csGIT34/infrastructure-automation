@@ -1,133 +1,163 @@
-# Terraform Apply Workflow
+# Terraform Apply Workflow (Folder-Based GitOps)
 #
-# Triggered on push to non-main branches in app-infrastructure repo.
-# Branch format: {app}/{env} (e.g., myapp/dev, myapp/prod)
+# Triggered on push to main when terraform.tfvars.json files change.
+# Folder structure: {app_id}/{app_name}/{environment}/{pattern}/terraform.tfvars.json
 #
 # For each changed tfvars file:
-# 1. Checks out infrastructure-automation for pattern terraform
-# 2. terraform init with backend config
-# 3. terraform plan -var-file=terraform.tfvars.json
-# 4. terraform apply (auto-approve for dev/staging, manual approval for prod)
+# 1. Parses the 4-part path to determine app, env, and pattern
+# 2. Checks out the pattern repo (terraform-azurerm-{pattern}//pattern or terraform-pattern-{pattern})
+# 3. terraform init with backend config
+# 4. terraform plan + apply
 
 name: Terraform Apply
 
-run-name: "apply: ${{ github.ref_name }}"
+run-name: "apply: ${{ github.sha }}"
 
 on:
   push:
-    branches-ignore:
+    branches:
       - main
     paths:
-      - '*/terraform.tfvars.json'
-      - '*/backend.hcl'
+      - '**/terraform.tfvars.json'
 
 env:
   TERRAFORM_VERSION: '1.6.0'
   TF_IN_AUTOMATION: 'true'
-  INFRA_REPO: 'infrastructure-automation'
 
 permissions:
   id-token: write
   contents: read
 
-concurrency:
-  group: apply-${{ github.ref_name }}
-  cancel-in-progress: false
-
 jobs:
-  parse-branch:
-    name: Parse Branch
+  parse-changes:
+    name: Parse Changes
     runs-on: ubuntu-latest
     outputs:
-      app_id: ${{ steps.parse.outputs.app_id }}
-      environment: ${{ steps.parse.outputs.environment }}
-      changed_patterns: ${{ steps.detect.outputs.changed_patterns }}
+      matrix: ${{ steps.detect.outputs.matrix }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Parse branch name
-        id: parse
-        env:
-          BRANCH_NAME: ${{ github.ref_name }}
-        run: |
-          # Extract app_id and environment from branch name
-          APP_ID=$(echo "$BRANCH_NAME" | cut -d'/' -f1)
-          ENV=$(echo "$BRANCH_NAME" | cut -d'/' -f2)
-
-          if [ -z "$APP_ID" ] || [ -z "$ENV" ]; then
-            echo "::error::Invalid branch format. Expected: {app}/{env}"
-            exit 1
-          fi
-
-          # Validate app_id format
-          if [[ ! "$APP_ID" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-            echo "::error::Invalid app_id format: $APP_ID"
-            exit 1
-          fi
-
-          VALID_ENVS="dev staging prod"
-          if [[ ! " $VALID_ENVS " =~ " $ENV " ]]; then
-            echo "::error::Invalid environment: $ENV"
-            exit 1
-          fi
-
-          echo "app_id=$APP_ID" >> $GITHUB_OUTPUT
-          echo "environment=$ENV" >> $GITHUB_OUTPUT
-
-      - name: Detect changed patterns
+      - name: Detect changed tfvars and build matrix
         id: detect
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
         run: |
-          CHANGED=$(git diff --name-only "${BEFORE_SHA:-HEAD~1}" HEAD 2>/dev/null | grep 'terraform.tfvars.json' | sed 's|/terraform.tfvars.json||' | sort -u)
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep 'terraform.tfvars.json' || true)
 
-          # Validate pattern names
-          VALID_CHANGED=""
-          for pattern in $CHANGED; do
-            if [[ "$pattern" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-              VALID_CHANGED="$VALID_CHANGED $pattern"
-            else
-              echo "::warning::Skipping invalid pattern name: $pattern"
-            fi
-          done
-          VALID_CHANGED=$(echo "$VALID_CHANGED" | xargs)
-
-          if [ -z "$VALID_CHANGED" ]; then
-            echo "changed_patterns=[]" >> $GITHUB_OUTPUT
-          else
-            JSON=$(echo "$VALID_CHANGED" | tr ' ' '\n' | jq -R . | jq -sc .)
-            echo "changed_patterns=$JSON" >> $GITHUB_OUTPUT
+          if [ -z "$CHANGED" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "matrix=[]" >> $GITHUB_OUTPUT
+            exit 0
           fi
+
+          MATRIX="["
+          FIRST=true
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
+            # Parse 4-part path: {app_id}/{app_name}/{environment}/{pattern}/terraform.tfvars.json
+            APP_ID=$(echo "$file" | cut -d'/' -f1)
+            APP_NAME=$(echo "$file" | cut -d'/' -f2)
+            ENV=$(echo "$file" | cut -d'/' -f3)
+            PATTERN=$(echo "$file" | cut -d'/' -f4)
+
+            # Validate all parts exist
+            if [ -z "$APP_ID" ] || [ -z "$APP_NAME" ] || [ -z "$ENV" ] || [ -z "$PATTERN" ]; then
+              echo "::warning::Skipping invalid path: $file"
+              continue
+            fi
+
+            # Validate formats
+            if [[ ! "$APP_ID" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+              echo "::warning::Invalid app_id: $APP_ID"
+              continue
+            fi
+            if [[ ! "$APP_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+              echo "::warning::Invalid app_name: $APP_NAME"
+              continue
+            fi
+            if [[ ! "$PATTERN" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+              echo "::warning::Invalid pattern: $PATTERN"
+              continue
+            fi
+
+            VALID_ENVS="dev staging prod"
+            if [[ ! " $VALID_ENVS " =~ " $ENV " ]]; then
+              echo "::warning::Invalid environment: $ENV"
+              continue
+            fi
+
+            # Determine pattern repo and terraform directory
+            COMPOSITES="web_backend"
+            if echo "$COMPOSITES" | grep -qw "$PATTERN"; then
+              REPO="terraform-pattern-${PATTERN}"
+              TF_DIR="."
+            else
+              REPO="terraform-azurerm-${PATTERN}"
+              TF_DIR="pattern"
+            fi
+
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              MATRIX="$MATRIX,"
+            fi
+
+            FOLDER_PATH="${APP_ID}/${APP_NAME}/${ENV}/${PATTERN}"
+            MATRIX="$MATRIX{\"app_id\":\"$APP_ID\",\"app_name\":\"$APP_NAME\",\"environment\":\"$ENV\",\"pattern\":\"$PATTERN\",\"repo\":\"$REPO\",\"tf_dir\":\"$TF_DIR\",\"folder_path\":\"$FOLDER_PATH\"}"
+          done <<< "$CHANGED"
+
+          MATRIX="$MATRIX]"
+
+          if [ "$MATRIX" = "[]" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
   apply:
-    name: "apply: ${{ matrix.pattern }}"
+    name: "apply: ${{ matrix.folder_path }}"
     runs-on: ubuntu-latest
-    needs: parse-branch
-    if: needs.parse-branch.outputs.changed_patterns != '[]'
-    environment: ${{ needs.parse-branch.outputs.environment }}
+    needs: parse-changes
+    if: needs.parse-changes.outputs.has_changes == 'true'
+    environment: ${{ matrix.environment }}
 
     strategy:
       fail-fast: false
       matrix:
-        pattern: ${{ fromJSON(needs.parse-branch.outputs.changed_patterns) }}
+        include: ${{ fromJSON(needs.parse-changes.outputs.matrix) }}
+
+    concurrency:
+      group: apply-${{ matrix.app_id }}-${{ matrix.environment }}-${{ matrix.pattern }}
+      cancel-in-progress: false
 
     env:
-      DEPLOY_ENV: ${{ needs.parse-branch.outputs.environment }}
+      DEPLOY_ENV: ${{ matrix.environment }}
 
     steps:
       - name: Checkout app-infrastructure
         uses: actions/checkout@v4
 
-      - name: Checkout infrastructure-automation
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.INFRA_APP_ID }}
+          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+          repositories: ${{ matrix.repo }}
+
+      - name: Checkout pattern repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/${{ env.INFRA_REPO }}
-          path: infra
-          ref: main
-          token: ${{ secrets.INFRA_REPO_TOKEN }}
+          repository: ${{ github.repository_owner }}/${{ matrix.repo }}
+          path: pattern-repo
+          ref: v1.1.0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -152,32 +182,32 @@ jobs:
 
       - name: Copy tfvars to pattern directory
         env:
-          PATTERN: ${{ matrix.pattern }}
+          FOLDER_PATH: ${{ matrix.folder_path }}
+          TF_DIR: ${{ matrix.tf_dir }}
         run: |
-          cp "${PATTERN}/terraform.tfvars.json" \
-             "infra/terraform/patterns/${PATTERN}/terraform.tfvars.json"
+          cp "${FOLDER_PATH}/terraform.tfvars.json" \
+             "pattern-repo/${TF_DIR}/terraform.tfvars.json"
 
       - name: Terraform Init
-        working-directory: infra/terraform/patterns/${{ matrix.pattern }}
+        working-directory: pattern-repo/${{ matrix.tf_dir }}
         env:
           ARM_CLIENT_ID: ${{ secrets[steps.creds.outputs.client_id] }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_USE_OIDC: true
-          PATTERN: ${{ matrix.pattern }}
           TF_STATE_RG: ${{ vars.TF_STATE_RESOURCE_GROUP }}
           TF_STATE_SA: ${{ secrets.TF_STATE_STORAGE_ACCOUNT }}
           TF_STATE_CONTAINER: ${{ vars.TF_STATE_CONTAINER }}
+          FOLDER_PATH: ${{ matrix.folder_path }}
         run: |
-          # backend.hcl provides the state key; storage details from CI secrets
           terraform init \
-            -backend-config="${GITHUB_WORKSPACE}/${PATTERN}/backend.hcl" \
+            -backend-config="${GITHUB_WORKSPACE}/${FOLDER_PATH}/backend.hcl" \
             -backend-config="resource_group_name=${TF_STATE_RG}" \
             -backend-config="storage_account_name=${TF_STATE_SA}" \
             -backend-config="container_name=${TF_STATE_CONTAINER:-tfstate}"
 
       - name: Terraform Plan
-        working-directory: infra/terraform/patterns/${{ matrix.pattern }}
+        working-directory: pattern-repo/${{ matrix.tf_dir }}
         env:
           ARM_CLIENT_ID: ${{ secrets[steps.creds.outputs.client_id] }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -189,7 +219,7 @@ jobs:
             -out=tfplan
 
       - name: Terraform Apply
-        working-directory: infra/terraform/patterns/${{ matrix.pattern }}
+        working-directory: pattern-repo/${{ matrix.tf_dir }}
         env:
           ARM_CLIENT_ID: ${{ secrets[steps.creds.outputs.client_id] }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -200,15 +230,15 @@ jobs:
 
       - name: Capture outputs
         if: success()
-        working-directory: infra/terraform/patterns/${{ matrix.pattern }}
+        working-directory: pattern-repo/${{ matrix.tf_dir }}
         env:
           ARM_CLIENT_ID: ${{ secrets[steps.creds.outputs.client_id] }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_USE_OIDC: true
-          PATTERN: ${{ matrix.pattern }}
+          FOLDER_PATH: ${{ matrix.folder_path }}
         run: |
-          echo "## ${PATTERN} Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "## ${FOLDER_PATH} Outputs" >> $GITHUB_STEP_SUMMARY
           echo '```json' >> $GITHUB_STEP_SUMMARY
           terraform output -json >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo '{}' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
