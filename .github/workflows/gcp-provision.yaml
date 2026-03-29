@@ -91,7 +91,7 @@ jobs:
         with:
           app-id: ${{ secrets.INFRA_APP_ID }}
           private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
-          repositories: ${{ steps.repo.outputs.repo }}
+          repositories: ${{ steps.repo.outputs.repo }},terraform-google-cloud-run
 
       - name: Checkout pattern repo
         uses: actions/checkout@v4
