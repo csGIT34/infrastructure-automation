@@ -25,7 +25,7 @@ provider "azuread" {}
 
 # 1. Naming
 module "naming_app" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "container_app"
@@ -39,7 +39,7 @@ module "naming_app" {
 }
 
 module "naming_env" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "container_env"
@@ -53,7 +53,7 @@ module "naming_env" {
 
 # 2. Resource Group
 module "resource_group" {
-  source   = "github.com/csGIT34/terraform-azurerm-resource-group?ref=v1.0.0"
+  source   = "github.com/AzSkyLab/terraform-azurerm-resource-group?ref=v1.0.0"
   name     = module.naming_app.resource_group_name
   location = var.location
   tags     = module.naming_app.tags
@@ -61,7 +61,7 @@ module "resource_group" {
 
 # 3. Container App
 module "container_app" {
-  source                       = "github.com/csGIT34/terraform-azurerm-container-app?ref=v1.0.0"
+  source                       = "github.com/AzSkyLab/terraform-azurerm-container-app?ref=v1.0.0"
   name                         = module.naming_app.name
   location                     = var.location
   resource_group_name          = module.resource_group.name
@@ -81,7 +81,7 @@ module "container_app" {
 
 # 4. Security Groups
 module "security_groups" {
-  source       = "github.com/csGIT34/terraform-azurerm-security-groups?ref=v1.0.0"
+  source       = "github.com/AzSkyLab/terraform-azurerm-security-groups?ref=v1.0.0"
   project      = var.project
   environment  = var.environment
   owner_emails = var.owners
@@ -93,7 +93,7 @@ module "security_groups" {
 
 # 5. RBAC Assignments
 module "rbac" {
-  source = "github.com/csGIT34/terraform-azurerm-rbac-assignments?ref=v1.0.0"
+  source = "github.com/AzSkyLab/terraform-azurerm-rbac-assignments?ref=v1.0.0"
   assignments = [
     {
       principal_id         = module.security_groups.group_ids["app-readers"]

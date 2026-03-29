@@ -199,8 +199,8 @@ app-infrastructure/             # Reference for the GitOps repo
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
-| `INFRA_REPO` | Infrastructure-automation repo | `csGIT34/infrastructure-automation` |
-| `APP_INFRA_REPO` | App-infrastructure GitOps repo | `csGIT34/app-infrastructure` |
+| `INFRA_REPO` | Infrastructure-automation repo | `AzSkyLab/infrastructure-automation` |
+| `APP_INFRA_REPO` | App-infrastructure GitOps repo | `AzSkyLab/app-infrastructure` |
 | `INFRA_APP_ID` | GitHub App ID for API auth | |
 | `INFRA_APP_PRIVATE_KEY` | GitHub App private key (PEM) | |
 | `MCP_TRANSPORT` | Transport mode (`streamable-http` or `stdio`) | `streamable-http` |
@@ -212,8 +212,8 @@ app-infrastructure/             # Reference for the GitOps repo
 ```bash
 cd mcp-server
 pip install -e .
-export INFRA_REPO=csGIT34/infrastructure-automation
-export APP_INFRA_REPO=csGIT34/app-infrastructure
+export INFRA_REPO=AzSkyLab/infrastructure-automation
+export APP_INFRA_REPO=AzSkyLab/app-infrastructure
 MCP_TRANSPORT=stdio python -m src.server
 ```
 

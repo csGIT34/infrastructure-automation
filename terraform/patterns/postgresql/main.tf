@@ -29,7 +29,7 @@ provider "azuread" {}
 
 # 1. Naming
 module "naming_pg" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "postgresql"
@@ -43,7 +43,7 @@ module "naming_pg" {
 }
 
 module "naming_kv" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "keyvault"
@@ -57,7 +57,7 @@ module "naming_kv" {
 
 # 2. Resource Group
 module "resource_group" {
-  source   = "github.com/csGIT34/terraform-azurerm-resource-group?ref=v1.0.0"
+  source   = "github.com/AzSkyLab/terraform-azurerm-resource-group?ref=v1.0.0"
   name     = module.naming_pg.resource_group_name
   location = var.location
   tags     = module.naming_pg.tags
@@ -65,7 +65,7 @@ module "resource_group" {
 
 # 3. PostgreSQL
 module "postgresql" {
-  source                = "github.com/csGIT34/terraform-azurerm-postgresql?ref=v1.0.0"
+  source                = "github.com/AzSkyLab/terraform-azurerm-postgresql?ref=v1.0.0"
   name                  = module.naming_pg.name
   location              = var.location
   resource_group_name   = module.resource_group.name
@@ -80,7 +80,7 @@ module "postgresql" {
 
 # 4. Key Vault for secrets
 module "key_vault" {
-  source              = "github.com/csGIT34/terraform-azurerm-key-vault?ref=v1.0.0"
+  source              = "github.com/AzSkyLab/terraform-azurerm-key-vault?ref=v1.0.0"
   name                = module.naming_kv.name
   location            = var.location
   resource_group_name = module.resource_group.name
@@ -95,7 +95,7 @@ module "key_vault" {
 
 # 5. Security Groups
 module "security_groups" {
-  source       = "github.com/csGIT34/terraform-azurerm-security-groups?ref=v1.0.0"
+  source       = "github.com/AzSkyLab/terraform-azurerm-security-groups?ref=v1.0.0"
   project      = var.project
   environment  = var.environment
   owner_emails = var.owners
@@ -107,7 +107,7 @@ module "security_groups" {
 
 # 6. RBAC Assignments
 module "rbac" {
-  source = "github.com/csGIT34/terraform-azurerm-rbac-assignments?ref=v1.0.0"
+  source = "github.com/AzSkyLab/terraform-azurerm-rbac-assignments?ref=v1.0.0"
   assignments = [
     {
       principal_id         = module.security_groups.group_ids["db-readers"]

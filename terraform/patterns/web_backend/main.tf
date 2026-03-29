@@ -34,7 +34,7 @@ provider "azuread" {}
 
 # 1. Naming
 module "naming_app" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "container_app"
@@ -48,7 +48,7 @@ module "naming_app" {
 }
 
 module "naming_env" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "container_env"
@@ -61,7 +61,7 @@ module "naming_env" {
 }
 
 module "naming_pg" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "postgresql"
@@ -74,7 +74,7 @@ module "naming_pg" {
 }
 
 module "naming_kv" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "keyvault"
@@ -87,7 +87,7 @@ module "naming_kv" {
 }
 
 module "naming_cr" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "container_registry"
@@ -101,7 +101,7 @@ module "naming_cr" {
 
 # 2. Resource Group (shared by all components)
 module "resource_group" {
-  source   = "github.com/csGIT34/terraform-azurerm-resource-group?ref=v1.0.0"
+  source   = "github.com/AzSkyLab/terraform-azurerm-resource-group?ref=v1.0.0"
   name     = module.naming_app.resource_group_name
   location = var.location
   tags     = module.naming_app.tags
@@ -109,7 +109,7 @@ module "resource_group" {
 
 # 3. Container Registry
 module "container_registry" {
-  source              = "github.com/csGIT34/terraform-azurerm-container-registry?ref=v1.0.0"
+  source              = "github.com/AzSkyLab/terraform-azurerm-container-registry?ref=v1.0.0"
   name                = module.naming_cr.name
   resource_group_name = module.resource_group.name
   location            = var.location
@@ -119,7 +119,7 @@ module "container_registry" {
 
 # 4. PostgreSQL
 module "postgresql" {
-  source                = "github.com/csGIT34/terraform-azurerm-postgresql?ref=v1.0.0"
+  source                = "github.com/AzSkyLab/terraform-azurerm-postgresql?ref=v1.0.0"
   name                  = module.naming_pg.name
   location              = var.location
   resource_group_name   = module.resource_group.name
@@ -134,7 +134,7 @@ module "postgresql" {
 
 # 5. Key Vault (stores all secrets)
 module "key_vault" {
-  source              = "github.com/csGIT34/terraform-azurerm-key-vault?ref=v1.0.0"
+  source              = "github.com/AzSkyLab/terraform-azurerm-key-vault?ref=v1.0.0"
   name                = module.naming_kv.name
   location            = var.location
   resource_group_name = module.resource_group.name
@@ -148,7 +148,7 @@ module "key_vault" {
 
 # 6. Container App (with managed identity for Key Vault + ACR access)
 module "container_app" {
-  source                       = "github.com/csGIT34/terraform-azurerm-container-app?ref=v1.0.0"
+  source                       = "github.com/AzSkyLab/terraform-azurerm-container-app?ref=v1.0.0"
   name                         = module.naming_app.name
   location                     = var.location
   resource_group_name          = module.resource_group.name
@@ -203,7 +203,7 @@ resource "azurerm_role_assignment" "app_acr_pull" {
 
 # 10. Security Groups
 module "security_groups" {
-  source       = "github.com/csGIT34/terraform-azurerm-security-groups?ref=v1.0.0"
+  source       = "github.com/AzSkyLab/terraform-azurerm-security-groups?ref=v1.0.0"
   project      = var.project
   environment  = var.environment
   owner_emails = var.owners
@@ -215,7 +215,7 @@ module "security_groups" {
 
 # 11. RBAC Assignments (resource-scoped)
 module "rbac" {
-  source     = "github.com/csGIT34/terraform-azurerm-rbac-assignments?ref=v1.0.0"
+  source     = "github.com/AzSkyLab/terraform-azurerm-rbac-assignments?ref=v1.0.0"
   depends_on = [time_sleep.wait_for_arm_propagation]
   assignments = [
     # Readers

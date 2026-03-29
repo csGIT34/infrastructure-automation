@@ -25,7 +25,7 @@ provider "azuread" {}
 
 # 1. Naming
 module "naming" {
-  source           = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.0"
+  source           = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.0"
   project          = var.project
   environment      = var.environment
   resource_type    = "keyvault"
@@ -40,7 +40,7 @@ module "naming" {
 
 # 2. Resource Group
 module "resource_group" {
-  source   = "github.com/csGIT34/terraform-azurerm-resource-group?ref=v1.0.0"
+  source   = "github.com/AzSkyLab/terraform-azurerm-resource-group?ref=v1.0.0"
   name     = module.naming.resource_group_name
   location = var.location
   tags     = module.naming.tags
@@ -48,7 +48,7 @@ module "resource_group" {
 
 # 3. Key Vault
 module "key_vault" {
-  source                     = "github.com/csGIT34/terraform-azurerm-key-vault?ref=v1.0.0"
+  source                     = "github.com/AzSkyLab/terraform-azurerm-key-vault?ref=v1.0.0"
   name                       = module.naming.name
   location                   = var.location
   resource_group_name        = module.resource_group.name
@@ -60,7 +60,7 @@ module "key_vault" {
 
 # 4. Security Groups
 module "security_groups" {
-  source       = "github.com/csGIT34/terraform-azurerm-security-groups?ref=v1.0.0"
+  source       = "github.com/AzSkyLab/terraform-azurerm-security-groups?ref=v1.0.0"
   project      = var.project
   environment  = var.environment
   owner_emails = var.owners
@@ -72,7 +72,7 @@ module "security_groups" {
 
 # 5. RBAC Assignments
 module "rbac" {
-  source = "github.com/csGIT34/terraform-azurerm-rbac-assignments?ref=v1.0.0"
+  source = "github.com/AzSkyLab/terraform-azurerm-rbac-assignments?ref=v1.0.0"
   assignments = [
     {
       principal_id         = module.security_groups.group_ids["secrets-readers"]

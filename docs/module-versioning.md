@@ -35,7 +35,7 @@ Versions are pinned at three levels:
 | Level | Where | Example |
 |-------|-------|---------|
 | **Workflow → Pattern repo** | `ref:` in prototype-provision.yaml and terraform-apply.yaml | `ref: v1.1.3` |
-| **Pattern → Module repos** | `source =` in pattern main.tf | `source = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.1"` |
+| **Pattern → Module repos** | `source =` in pattern main.tf | `source = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.1"` |
 | **Module repos** | Git tags | `v1.0.1` |
 
 All version references are explicit. No floating tags, no `latest`, no branch refs.
@@ -93,7 +93,7 @@ cd terraform-pattern-web-backend
 Edit `main.tf` — find the module source line:
 ```hcl
 module "postgresql" {
-  source = "github.com/csGIT34/terraform-azurerm-postgresql?ref=v1.1.1"
+  source = "github.com/AzSkyLab/terraform-azurerm-postgresql?ref=v1.1.1"
   #                                                         ^^^^^^^^
   # Change to v1.1.2
 ```
@@ -188,7 +188,7 @@ terraform-azurerm-redis/
 
 ```hcl
 module "naming" {
-  source = "github.com/csGIT34/terraform-azurerm-naming?ref=v1.0.1"
+  source = "github.com/AzSkyLab/terraform-azurerm-naming?ref=v1.0.1"
 
   project       = var.project
   environment   = var.environment
@@ -198,7 +198,7 @@ module "naming" {
 }
 
 module "resource_group" {
-  source = "github.com/csGIT34/terraform-azurerm-resource-group?ref=v1.0.0"
+  source = "github.com/AzSkyLab/terraform-azurerm-resource-group?ref=v1.0.0"
 
   name     = module.naming.resource_group_name
   location = var.location
@@ -206,7 +206,7 @@ module "resource_group" {
 }
 
 module "security_groups" {
-  source = "github.com/csGIT34/terraform-azurerm-security-groups?ref=v1.0.0"
+  source = "github.com/AzSkyLab/terraform-azurerm-security-groups?ref=v1.0.0"
   # ...
 }
 
@@ -397,7 +397,7 @@ The key differences from single-resource patterns:
 
 1. **Repo naming:** `terraform-pattern-{name}` instead of `terraform-azurerm-{name}`
 2. **TF directory:** `.` (root) instead of `pattern/`
-3. **main.tf references multiple module repos** via `source = "github.com/csGIT34/terraform-azurerm-{module}?ref=v1.0.1"`
+3. **main.tf references multiple module repos** via `source = "github.com/AzSkyLab/terraform-azurerm-{module}?ref=v1.0.1"`
 4. **Must be added to the COMPOSITES list** in both workflows:
    ```bash
    COMPOSITES="web_backend redis_app"  # space-separated
